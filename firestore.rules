@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Programs collection
+    match /programs/{programId} {
+      // Allow read for all authenticated users
+      allow read: if true;
+      
+      // Allow write for all (you can restrict this based on your needs)
+      allow write: if true;
+      
+      // For production, you might want:
+      // allow read: if request.auth != null;
+      // allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Users collection (if you add it later)
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

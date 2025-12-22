@@ -1,0 +1,138 @@
+import React from 'react';
+import { Program, ProgramStatus } from '../types';
+import { GreenRoomProgramCard } from '../components/GreenRoomProgramCard';
+
+interface GreenRoomPageProps {
+    programs: Program[];
+    setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
+}
+
+const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+};
+
+export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms }) => {
+    const assignShuffledCodes = (programId: string) => {
+        setPrograms(prev => prev.map(p => {
+            if (p.id !== programId) return p;
+
+            const allParticipants = p.teams.flatMap(t => t.participants);
+            const totalCount = allParticipants.length;
+
+            const pool: string[] = [];
+            for (let i = 0; i < totalCount; i++) {
+                pool.push(String.fromCharCode(65 + i));
+            }
+
+            const shuffledPool = shuffleArray(pool);
+
+            let letterIdx = 0;
+            return {
+                ...p,
+                teams: p.teams.map(t => ({
+                    ...t,
+                    participants: t.participants.map(pt => ({
+                        ...pt,
+                        codeLetter: pt.codeLetter || shuffledPool[letterIdx++],
+                        isCodeRevealed: pt.isCodeRevealed || false
+                    }))
+                }))
+            };
+        }));
+    };
+
+    const revealCode = (programId: string, participantChest: string) => {
+        setPrograms(prev => prev.map(p => {
+            if (p.id !== programId) return p;
+            return {
+                ...p,
+                teams: p.teams.map(t => ({
+                    ...t,
+                    participants: t.participants.map(pt =>
+                        pt.chestNumber === participantChest ? { ...pt, isCodeRevealed: true } : pt
+                    )
+                }))
+            };
+        }));
+    };
+
+    const allocateToJudge = (programId: string, judgePanel: string) => {
+        setPrograms(prev => prev.map(p => {
+            if (p.id !== programId) return p;
+            return { ...p, status: ProgramStatus.JUDGING, isAllocatedToJudge: true, judgePanel };
+        }));
+        alert(`Program details pushed to ${judgePanel} Judge Terminal.`);
+    };
+
+    // Only show programs that are:
+    // 1. Published (isPublished = true)
+    // 2. Have at least one participant registered
+    const filteredPrograms = programs
+        .filter(p => {
+            const isPublished = p.isPublished === true;
+            const hasParticipants = p.teams.some(t => t.participants.length > 0);
+            return isPublished && hasParticipants;
+        })
+        .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+    return (
+        <div className="space-y-6 text-left animate-in fade-in duration-500">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Green Room Control</h2>
+                    <p className="text-xs text-slate-500 font-medium">Verify performer identity and scratch codes for secure judge allocation.</p>
+                </div>
+                <div className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-center shadow-lg shadow-indigo-100">
+                    <p className="text-[10px] font-black uppercase leading-none opacity-80">Active Queue</p>
+                    <p className="text-xl font-black">{filteredPrograms.filter(p => !p.isAllocatedToJudge && p.status === ProgramStatus.PENDING).length}</p>
+                </div>
+            </div>
+
+            <div className="space-y-10">
+                {filteredPrograms.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">No Programs Available</h3>
+                        <p className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+                            Programs will appear here when they are:
+                        </p>
+                        <div className="flex flex-col items-center gap-2 text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
+                                <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="font-bold">Published by Admin</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                <span className="font-bold">Have at least one participant registered</span>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    filteredPrograms.map((prog) => (
+                        <GreenRoomProgramCard
+                            key={prog.id}
+                            program={prog}
+                            onAssignCodes={assignShuffledCodes}
+                            onRevealCode={revealCode}
+                            onAllocateToJudge={allocateToJudge}
+                            setPrograms={setPrograms}
+                        />
+                    ))
+                )}
+            </div>
+        </div>
+    );
+};
