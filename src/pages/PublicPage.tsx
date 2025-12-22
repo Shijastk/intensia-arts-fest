@@ -23,23 +23,23 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
         [programs]);
 
     return (
-        <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-teal-100 selection:text-teal-900">
+        <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-teal-100 selection:text-teal-900 overflow-x-hidden">
             {/* Header/Navbar */}
             <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-xl border-b border-slate-100 z-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-20">
                         {/* Logo Area */}
-                        <div className="flex items-center gap-3">
-                            <div className="relative w-10 h-10 flex items-center justify-center">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
                                 {/* Abstract Logo Shape */}
                                 <div className="absolute inset-0 bg-gradient-to-tr from-teal-600 to-emerald-400 rounded-full opacity-20 animate-pulse"></div>
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-teal-600 to-teal-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-teal-200">
+                                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-teal-600 to-teal-500 flex items-center justify-center text-white font-black text-xs sm:text-lg shadow-lg shadow-teal-200">
                                     I
                                 </div>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-xl font-black tracking-tight text-slate-900 uppercase leading-none">Intensia</span>
-                                <span className="text-[10px] font-bold text-teal-600 uppercase tracking-widest">Arts Fest</span>
+                                <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 uppercase leading-none">Intensia</span>
+                                <span className="text-[8px] sm:text-[10px] font-bold text-teal-600 uppercase tracking-widest">Arts Fest</span>
                             </div>
                         </div>
 
@@ -51,10 +51,10 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                         </div>
 
                         {/* CTA */}
-                        <div>
+                        <div className="flex-shrink-0">
                             <Link
                                 to="/login"
-                                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-full text-xs font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-slate-200"
+                                className="px-4 py-2 sm:px-6 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-slate-200"
                             >
                                 Login
                             </Link>
@@ -67,7 +67,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             <div id="home" className="pt-28 pb-12 sm:pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     {/* Hero Text */}
-                    <div className="order-2 lg:order-1 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    <div className="order-2 lg:order-1 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 text-center lg:text-left flex flex-col items-center lg:items-start">
                         <div className="space-y-4">
                             <span className="inline-block px-4 py-1.5 rounded-full bg-orange-50 text-orange-600 text-[10px] font-black uppercase tracking-widest border border-orange-100">
                                 Dec 26 - 27, 2025 • Kalpetta
@@ -77,15 +77,15 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                                 Form of <br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-400">Creativity</span>
                             </h1>
-                            <p className="text-lg text-slate-500 font-medium max-w-lg leading-relaxed">
+                            <p className="text-lg text-slate-500 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
                                 Experience the pinnacle of artistic expression at the Darul Falah Campus Fest. Where talent meets tradition in a celebration of culture.
                             </p>
                         </div>
 
                         {/* Stats Row */}
-                        <div className="flex flex-wrap items-center gap-8 md:gap-12 pt-4 border-t border-slate-100">
+                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-8 md:gap-12 pt-4 border-t border-slate-100 w-full">
                             <div>
-                                <p className="text-3xl font-black text-slate-900">500+</p>
+                                <p className="text-3xl font-black text-slate-900">100+</p>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Participants</p>
                             </div>
                             <div>
@@ -93,12 +93,12 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stages</p>
                             </div>
                             <div>
-                                <p className="text-3xl font-black text-slate-900">2</p>
+                                <p className="text-3xl font-black text-slate-900">3</p>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Days</p>
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4 w-full justify-center lg:justify-start">
                             <a href="#results" className="px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-full text-sm font-bold uppercase tracking-widest transition-all shadow-xl shadow-teal-200 flex items-center justify-center gap-2">
                                 View Results
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
