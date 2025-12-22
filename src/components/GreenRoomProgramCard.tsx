@@ -3,7 +3,7 @@ import { Program, ProgramStatus, Participant } from '../types';
 
 interface GreenRoomProgramCardProps {
     program: Program;
-    onAssignCodes: (programId: string) => void;
+    onAssignCodes: (programId: string, participantChest?: string) => void;
     onRevealCode: (programId: string, participantChest: string) => void;
     onAllocateToJudge: (programId: string, judgePanel: string) => void;
     setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
@@ -107,9 +107,14 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
                             <div className="mt-8 w-full">
                                 {!participant.isCodeRevealed ? (
                                     <button
-                                        onClick={() => {
-                                            if (!participant.codeLetter) onAssignCodes(program.id);
-                                            onRevealCode(program.id, participant.chestNumber);
+                                        onClick={async () => {
+                                            // Atomically assign AND reveal to avoid race conditions with stale state
+                                            if (!participant.codeLetter) {
+                                                // Call assign logic passing the chest number to also reveal it
+                                                await onAssignCodes(program.id, participant.chestNumber);
+                                            } else {
+                                                await onRevealCode(program.id, participant.chestNumber);
+                                            }
                                         }}
                                         className="w-full py-5 bg-slate-900 text-white rounded-3xl flex items-center justify-center gap-3 text-[12px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl active:scale-95 group"
                                     >

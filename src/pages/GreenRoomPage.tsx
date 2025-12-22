@@ -5,6 +5,7 @@ import { GreenRoomProgramCard } from '../components/GreenRoomProgramCard';
 interface GreenRoomPageProps {
     programs: Program[];
     setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
+    updateProgram: (id: string, updates: Partial<Program>) => Promise<boolean>;
 }
 
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -16,57 +17,76 @@ const shuffleArray = <T,>(array: T[]): T[] => {
     return shuffled;
 };
 
-export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms }) => {
-    const assignShuffledCodes = (programId: string) => {
-        setPrograms(prev => prev.map(p => {
-            if (p.id !== programId) return p;
+export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram }) => {
+    const assignShuffledCodes = async (programId: string, participantChestToReveal?: string) => {
+        console.log('🔵 assignShuffledCodes called for program:', programId);
+        const program = programs.find(p => p.id === programId);
+        if (!program) {
+            console.error('❌ Program not found:', programId);
+            return;
+        }
 
-            const allParticipants = p.teams.flatMap(t => t.participants);
-            const totalCount = allParticipants.length;
+        const allParticipants = program.teams.flatMap(t => t.participants);
+        const totalCount = allParticipants.length;
+        console.log('👥 Total participants:', totalCount);
 
-            const pool: string[] = [];
-            for (let i = 0; i < totalCount; i++) {
-                pool.push(String.fromCharCode(65 + i));
-            }
+        const pool: string[] = [];
+        for (let i = 0; i < totalCount; i++) {
+            pool.push(String.fromCharCode(65 + i));
+        }
 
-            const shuffledPool = shuffleArray(pool);
+        const shuffledPool = shuffleArray(pool);
+        console.log('🎲 Shuffled codes:', shuffledPool);
 
-            let letterIdx = 0;
-            return {
-                ...p,
-                teams: p.teams.map(t => ({
-                    ...t,
-                    participants: t.participants.map(pt => ({
-                        ...pt,
-                        codeLetter: pt.codeLetter || shuffledPool[letterIdx++],
-                        isCodeRevealed: pt.isCodeRevealed || false
-                    }))
-                }))
-            };
+        let letterIdx = 0;
+        const updatedTeams = program.teams.map(t => ({
+            ...t,
+            participants: t.participants.map(pt => {
+                // Determine new code letter (preserve existing if present)
+                const newCode = pt.codeLetter || shuffledPool[letterIdx++];
+
+                // Determine if code should be revealed
+                // Use existing reveal state OR reveal if this is the participant we just clicked
+                const shouldReveal = pt.isCodeRevealed || (participantChestToReveal && pt.chestNumber === participantChestToReveal);
+
+                return {
+                    ...pt,
+                    codeLetter: newCode,
+                    isCodeRevealed: shouldReveal || false
+                };
+            })
         }));
+
+        console.log('📝 Updated teams:', JSON.stringify(updatedTeams, null, 2));
+
+        // Save to Firebase
+        console.log('💾 Saving to Firebase...');
+        const result = await updateProgram(programId, { teams: updatedTeams });
+        console.log('✅ Firebase save result:', result);
     };
 
-    const revealCode = (programId: string, participantChest: string) => {
-        setPrograms(prev => prev.map(p => {
-            if (p.id !== programId) return p;
-            return {
-                ...p,
-                teams: p.teams.map(t => ({
-                    ...t,
-                    participants: t.participants.map(pt =>
-                        pt.chestNumber === participantChest ? { ...pt, isCodeRevealed: true } : pt
-                    )
-                }))
-            };
+    const revealCode = async (programId: string, participantChest: string) => {
+        const program = programs.find(p => p.id === programId);
+        if (!program) return;
+
+        const updatedTeams = program.teams.map(t => ({
+            ...t,
+            participants: t.participants.map(pt =>
+                pt.chestNumber === participantChest ? { ...pt, isCodeRevealed: true } : pt
+            )
         }));
+
+        // Save to Firebase
+        await updateProgram(programId, { teams: updatedTeams });
     };
 
-    const allocateToJudge = (programId: string, judgePanel: string) => {
-        setPrograms(prev => prev.map(p => {
-            if (p.id !== programId) return p;
-            return { ...p, status: ProgramStatus.JUDGING, isAllocatedToJudge: true, judgePanel };
-        }));
-        alert(`Program details pushed to ${judgePanel} Judge Terminal.`);
+    const allocateToJudge = async (programId: string, judgePanel: string) => {
+        // Save to Firebase
+        await updateProgram(programId, {
+            status: ProgramStatus.JUDGING,
+            isAllocatedToJudge: true,
+            judgePanel
+        });
     };
 
     // Only show programs that are:

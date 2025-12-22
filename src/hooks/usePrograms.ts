@@ -25,16 +25,17 @@ export const usePrograms = () => {
             setPrograms(updatedPrograms);
             setLoading(false);
 
-            // Initialize with mock data if Firestore is empty
-            if (!initialized && updatedPrograms.length === 0) {
-                console.log('Firestore is empty. Initializing with mock data...');
-                initializeMockData(MOCK_PROGRAMS).then(() => {
-                    console.log('Mock data initialization complete');
-                    setInitialized(true);
-                });
-            } else {
-                setInitialized(true);
-            }
+            // DISABLED: Auto-initialization removed to prevent injecting mock data
+            // if (!initialized && updatedPrograms.length === 0) {
+            //     console.log('Firestore is empty. Initializing with mock data...');
+            //     initializeMockData(MOCK_PROGRAMS).then(() => {
+            //         console.log('Mock data initialization complete');
+            //         setInitialized(true);
+            //     });
+            // } else {
+            //     setInitialized(true);
+            // }
+            setInitialized(true);
         });
 
         // Cleanup subscription on unmount
@@ -91,11 +92,11 @@ export const usePrograms = () => {
 
     return {
         programs,
-        setPrograms: (programs: Program[] | ((prev: Program[]) => Program[])) => {
+        setPrograms: (updater: Program[] | ((prev: Program[]) => Program[])) => {
             // For compatibility with existing code that uses setPrograms directly
             // We'll handle local updates and sync to Firestore
-            if (typeof programs === 'function') {
-                const updated = programs(programs);
+            if (typeof updater === 'function') {
+                const updated = updater(programs);
                 // Note: This is for compatibility. Real updates should use updateProgram()
                 console.warn('Direct setPrograms called. Consider using updateProgram() for Firebase sync.');
             }

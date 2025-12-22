@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Program } from './src/types';
 import { AdminPage } from './src/pages/AdminPage';
 import { GreenRoomPage } from './src/pages/GreenRoomPage';
 import { TeamLeaderPage } from './src/pages/TeamLeaderPage';
 import { JudgesPage } from './src/pages/JudgesPage';
+import { PublicPage } from './src/pages/PublicPage';
 import { usePrograms } from './src/hooks/usePrograms';
-import './src/utils/clearFirebase'; // Make clearFirebase available in console
+import './src/utils/clearFirebase';
 
 type UserRole = 'admin' | 'greenroom' | 'judge' | 'teamleader';
 type ViewType = 'ADMIN' | 'GREEN_ROOM' | 'TEAM_LEADER' | 'JUDGES';
@@ -16,86 +18,189 @@ interface User {
   role: UserRole;
   displayName: string;
   teamName?: string;
-  judgePanel?: string; // NEW: Stage/Panel assignment for judges
+  judgePanel?: string;
 }
 
 // Predefined user credentials
 const USERS: User[] = [
   { username: 'admin', password: 'admin123', role: 'admin', displayName: 'Administrator' },
   { username: 'greenroom', password: 'green123', role: 'greenroom', displayName: 'Green Room Clerk' },
-
-  // Judges with different panels/stages
   { username: 'judge1', password: 'judge123', role: 'judge', displayName: 'Judge - Stage 1', judgePanel: 'Stage 1' },
   { username: 'judge2', password: 'judge123', role: 'judge', displayName: 'Judge - Stage 2', judgePanel: 'Stage 2' },
   { username: 'judge3', password: 'judge123', role: 'judge', displayName: 'Judge - Panel A', judgePanel: 'Panel A' },
   { username: 'judge4', password: 'judge123', role: 'judge', displayName: 'Judge - Panel B', judgePanel: 'Panel B' },
-
-  // Team Leaders
-  { username: 'team1', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'Team Alpha' },
-  { username: 'team2', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'Team Beta' }
+  { username: 'team1', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'PRUDENTIA' },
+  { username: 'team2', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'SAPIENTIA' }
 ];
 
 const STORAGE_KEYS = {
-  USER: 'artsfest_current_user',
-  VIEW: 'artsfest_current_view'
+  USER: 'Intensia_current_user',
+  VIEW: 'Intensia_current_view'
 };
 
-const App: React.FC = () => {
-  // 🔥 USE FIREBASE INSTEAD OF LOCAL STATE
-  const { programs, loading, error, updateProgram: updateProgramInFirebase } = usePrograms();
+// Login Page Component
+interface LoginPageProps {
+  onLogin: (username: string, password: string) => boolean;
+}
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [view, setView] = useState<ViewType>('ADMIN');
+const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Load saved session
-  useEffect(() => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    setTimeout(() => {
+      const success = onLogin(username, password);
+      if (!success) {
+        setError('Invalid username or password');
+        setPassword('');
+      }
+      setLoading(false);
+    }, 500);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl">
+            <span className="text-4xl font-black text-white">A</span>
+          </div>
+          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-2">Intensia Arts fest</h1>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-xl">
+          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6 text-center">
+            Sign In to Continue
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm font-bold text-red-800">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-wider">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                placeholder="Enter your username"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-wider">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Signing In...
+                </span>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <Link
+              to="/"
+              className="block w-full text-center px-6 py-3 bg-white border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 rounded-xl text-sm font-bold transition-all"
+            >
+              View Public Portal
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Dashboard Layout Component
+const Dashboard = ({
+  currentUser,
+  programs,
+  loading,
+  error,
+  addProgram,
+  updateProgram,
+  deleteProgram,
+  handleLogout
+}: {
+  currentUser: User;
+  programs: Program[];
+  loading: boolean;
+  error: string | null;
+  addProgram: any;
+  updateProgram: any;
+  deleteProgram: any;
+  handleLogout: () => void;
+}) => {
+  const [view, setView] = useState<ViewType>(() => {
     try {
-      const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-      const savedView = localStorage.getItem(STORAGE_KEYS.VIEW);
-
-      if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser) as User);
-      }
-      if (savedView) {
-        setView(savedView as ViewType);
-      }
+      const saved = localStorage.getItem(STORAGE_KEYS.VIEW);
+      // Ensure saved view is valid for dashboard, otherwise default to ADMIN (or appropriate role default)
+      if (saved === 'PUBLIC') return 'ADMIN';
+      return (saved as ViewType) || 'ADMIN';
     } catch (error) {
-      console.error('Error loading session:', error);
-      localStorage.removeItem(STORAGE_KEYS.USER);
       localStorage.removeItem(STORAGE_KEYS.VIEW);
+      return 'ADMIN';
     }
-  }, []);
+  });
 
-  const handleLogin = (username: string, password: string): boolean => {
-    const user = USERS.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUser(user);
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.VIEW, view);
+  }, [view]);
 
-      let defaultView: ViewType;
-      if (user.role === 'admin') defaultView = 'ADMIN';
-      else if (user.role === 'greenroom') defaultView = 'GREEN_ROOM';
-      else if (user.role === 'judge') defaultView = 'JUDGES';
-      else defaultView = 'TEAM_LEADER';
-
-      setView(defaultView);
-      localStorage.setItem(STORAGE_KEYS.VIEW, defaultView);
-
-      return true;
+  // Set initial view based on role when component mounts or user changes
+  useEffect(() => {
+    if (currentUser) {
+      switch (currentUser.role) {
+        case 'admin':
+          // Don't force view if it's already set to something valid for admin
+          if (view !== 'ADMIN' && view !== 'GREEN_ROOM') setView('ADMIN');
+          break;
+        case 'greenroom': setView('GREEN_ROOM'); break;
+        case 'teamleader': setView('TEAM_LEADER'); break;
+        case 'judge': setView('JUDGES'); break;
+      }
     }
-    return false;
-  };
+  }, [currentUser.role]);
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setView('ADMIN');
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    localStorage.removeItem(STORAGE_KEYS.VIEW);
-  };
 
   const canAccessView = (viewType: ViewType): boolean => {
     if (!currentUser) return false;
-
     switch (currentUser.role) {
       case 'admin':
         return viewType === 'ADMIN' || viewType === 'GREEN_ROOM';
@@ -110,24 +215,21 @@ const App: React.FC = () => {
     }
   };
 
-  // Create a wrapper setPrograms function that updates Firebase
   const setPrograms = React.useCallback((updater: React.SetStateAction<Program[]>) => {
     if (typeof updater === 'function') {
       const newPrograms = updater(programs);
-      // Find what changed and update Firebase
       newPrograms.forEach((newProg, index) => {
         const oldProg = programs[index];
         if (oldProg && JSON.stringify(oldProg) !== JSON.stringify(newProg)) {
-          updateProgramInFirebase(newProg.id, newProg);
+          updateProgram(newProg.id, newProg);
         }
       });
     }
-  }, [programs, updateProgramInFirebase]);
+  }, [programs, updateProgram]);
 
   const renderContent = () => {
     if (!canAccessView(view)) return null;
 
-    // Show loading state
     if (loading) {
       return (
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -139,7 +241,6 @@ const App: React.FC = () => {
       );
     }
 
-    // Show error state
     if (error) {
       return (
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -156,9 +257,9 @@ const App: React.FC = () => {
 
     switch (view) {
       case 'ADMIN':
-        return <AdminPage programs={programs} setPrograms={setPrograms} />;
+        return <AdminPage programs={programs} setPrograms={setPrograms} addProgram={addProgram} updateProgram={updateProgram} deleteProgram={deleteProgram} />;
       case 'GREEN_ROOM':
-        return <GreenRoomPage programs={programs} setPrograms={setPrograms} />;
+        return <GreenRoomPage programs={programs} setPrograms={setPrograms} updateProgram={updateProgram} />;
       case 'JUDGES':
         return <JudgesPage programs={programs} setPrograms={setPrograms} currentUser={currentUser} />;
       case 'TEAM_LEADER':
@@ -175,10 +276,6 @@ const App: React.FC = () => {
     }
   };
 
-  if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -186,7 +283,7 @@ const App: React.FC = () => {
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-lg">A</div>
-              <h1 className="text-sm font-black tracking-tight hidden sm:block">ARTSFEST PRO</h1>
+              <h1 className="text-sm font-black tracking-tight hidden sm:block">Intensia Arts fest</h1>
             </div>
 
             <nav className="flex items-center bg-slate-100 p-1 rounded-xl">
@@ -253,7 +350,7 @@ const App: React.FC = () => {
       <footer className="bg-white border-t border-slate-200 py-10 mt-auto">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.6em] leading-relaxed">
-            ArtsFest Pro V4.0 Firebase Edition &bull; Real-time Sync  &bull; Cloud Powered
+            Intensia Arts fest V4.0 Firebase Edition &bull; Real-time Sync  &bull; Cloud Powered
           </p>
         </div>
       </footer>
@@ -268,101 +365,65 @@ const App: React.FC = () => {
   );
 };
 
-// Login Page Component
-const LoginPage: React.FC<{ onLogin: (username: string, password: string) => boolean }> = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+export default function App() {
+  const { programs, loading, error, addProgram, updateProgram, deleteProgram } = usePrograms();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.USER);
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error('Error parsing saved user from localStorage:', error);
+      localStorage.removeItem(STORAGE_KEYS.USER);
+      return null;
+    }
+  });
 
-    setTimeout(() => {
-      const success = onLogin(username, password);
-      if (!success) {
-        setError('Invalid username or password');
-        setPassword('');
-      }
-      setLoading(false);
-    }, 500);
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.USER);
+    }
+  }, [currentUser]);
+
+  const handleLogin = (username: string, password: string): boolean => {
+    const user = USERS.find(u => u.username === username && u.password === password);
+    if (user) {
+      setCurrentUser(user);
+      return true;
+    }
+    return false;
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl">
-            <span className="text-4xl font-black text-white">A</span>
-          </div>
-          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-2">ArtsFest Pro</h1>
-          <p className="text-sm text-slate-500 font-medium">🔥 Firebase Edition - Real-time Sync</p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-xl">
-          <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6 text-center">
-            Sign In to Continue
-          </h2>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-sm font-bold text-red-800">{error}</p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-wider">Username</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                placeholder="Enter your username"
-                required
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-wider">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed mt-6"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Signing In...
-                </span>
-              ) : (
-                'Sign In'
-              )}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<PublicPage programs={programs} />} />
+        <Route path="/login" element={!currentUser ? <LoginPage onLogin={handleLogin} /> : <Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={
+          currentUser ? (
+            <Dashboard
+              currentUser={currentUser}
+              programs={programs}
+              loading={loading}
+              error={error}
+              addProgram={addProgram}
+              updateProgram={updateProgram}
+              deleteProgram={deleteProgram}
+              handleLogout={handleLogout}
+            />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } />
+        {/* Redirect unknown routes to Public Page */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
-};
-
-export default App;
+}

@@ -322,6 +322,30 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
         if (newSelected.has(programId)) {
             newSelected.delete(programId);
         } else {
+            // Check global participant limit
+            if (program.participantsCount > 0) {
+                // Calculate how many people are currently registered in this program across ALL teams
+                const currentTotalParticipants = program.teams.reduce((sum, team) => sum + team.participants.length, 0);
+
+                // If we are editing a participant, and they are ALREADY in this program (in the DB), 
+                // then they are already counted in 'currentTotalParticipants'.
+                // We shouldn't double count them. 
+                // But wait, 'editingParticipant.programs' is the snapshot passed prop.
+                // We should check if the *current program data from 'programs'* has this participant.
+
+                // Actually, checking if editingParticipant was passed (meaning edit mode) 
+                // and if their ID matches someone in the team in the program is safer.
+                // But 'editingParticipant.programs' is simpler.
+
+                const isParticipantAlreadyIn = editingParticipant?.programs.some(p => p.id === programId);
+                const effectiveCount = currentTotalParticipants - (isParticipantAlreadyIn ? 1 : 0);
+
+                if (effectiveCount >= program.participantsCount) {
+                    alert(`Cannot register: This program has reached its maximum capacity of ${program.participantsCount} participants.`);
+                    return;
+                }
+            }
+
             // Check if adding this would exceed the limit
             if (!isGeneral) {
                 const currentNormalCount = Array.from(newSelected).filter(id => {
@@ -586,8 +610,8 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
                                                         {/* ✅ NEW: Group program indicator */}
                                                         {groupInfo && (
                                                             <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${groupInfo.currentCount >= groupInfo.perTeamLimit
-                                                                    ? 'bg-red-100 text-red-700'
-                                                                    : 'bg-blue-100 text-blue-700'
+                                                                ? 'bg-red-100 text-red-700'
+                                                                : 'bg-blue-100 text-blue-700'
                                                                 }`}>
                                                                 Group: {groupInfo.currentCount}/{groupInfo.perTeamLimit} per team
                                                             </span>

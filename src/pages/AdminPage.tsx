@@ -4,11 +4,14 @@ import { MetricsCard } from '../components/MetricsCard';
 import { ProgramList } from '../components/ProgramList';
 import { ParticipantList } from '../components/ParticipantList';
 import { ProgramFormModal } from '../components/ProgramFormModal';
-import { AIInsights } from '../components/AIInsights';
+import { LiveLeaderboard } from '../components/LiveLeaderboard';
 
 interface AdminPageProps {
     programs: Program[];
     setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
+    addProgram: (program: Omit<Program, 'id'>) => Promise<boolean>;
+    updateProgram: (id: string, updates: Partial<Program>) => Promise<boolean>;
+    deleteProgram: (id: string) => Promise<boolean>;
     onShowModal?: () => void;
 }
 
@@ -19,7 +22,7 @@ const CATEGORIES = [
     "A zone general non stage"
 ];
 
-export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, onShowModal }) => {
+export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, addProgram, updateProgram, deleteProgram, onShowModal }) => {
     const [adminSubView, setAdminSubView] = useState<'PROGRAMS' | 'PARTICIPANTS'>('PROGRAMS');
     const [showModal, setShowModal] = useState(false);
     const [editingProgram, setEditingProgram] = useState<Program | null>(null);
@@ -50,7 +53,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, onS
         };
     }, [programs]);
 
-    const handleSaveProgram = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSaveProgram = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         const name = formData.get('name') as string;
@@ -62,18 +65,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, onS
         const groupCount = parseInt(formData.get('groupCount') as string || '0');
 
         if (editingProgram) {
-            setPrograms(prev => prev.map(p => p.id === editingProgram.id ? {
-                ...p, name, category, startTime, venue, participantsCount, isGroup, membersPerGroup, groupCount
-            } : p));
+            // Update existing program in Firebase
+            const success = await updateProgram(editingProgram.id, {
+                name, category, startTime, venue, participantsCount, isGroup, membersPerGroup, groupCount
+            });
+            if (!success) {
+                console.error('Failed to update program');
+                return;
+            }
         } else {
-            const newProgram: Program = {
-                id: `p-${Date.now()}`,
+            // Create new program in Firebase
+            const newProgram: Omit<Program, 'id'> = {
                 name, category, startTime, venue,
                 status: ProgramStatus.PENDING,
                 teams: [], description: '', participantsCount, isGroup, membersPerGroup, groupCount,
                 isPublished: false, isAllocatedToJudge: false
             };
-            setPrograms(prev => [...prev, newProgram]);
+            const success = await addProgram(newProgram);
+            if (!success) {
+                console.error('Failed to add program');
+                return;
+            }
         }
         setShowModal(false);
         setEditingProgram(null);
@@ -98,6 +110,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, onS
                 </button>
             </div>
 
+            {/* Live Leaderboard */}
+            <LiveLeaderboard programs={programs} />
+
+            {/* Existing Metrics and View Toggle */}
+
             <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-left">
                 <MetricsCard label="Programs" value={stats.totalPrograms} colorClass="bg-indigo-50 text-indigo-600" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>} />
                 <MetricsCard label="Performers" value={stats.totalParticipants} colorClass="bg-violet-50 text-violet-600" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>} />
@@ -111,14 +128,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, onS
             </div>
 
             {adminSubView === 'PROGRAMS' ? (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    <div className="lg:col-span-8 space-y-4">
-                        <ProgramList programs={programs} setPrograms={setPrograms} onEdit={(p) => { setEditingProgram(p); setIsGroup(p.isGroup); setShowModal(true); }} />
-                    </div>
-                    <div className="lg:col-span-4 text-left">
-                        <AIInsights programs={programs} />
-                    </div>
-                </div>
+                <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setIsGroup(p.isGroup); setShowModal(true); }} />
             ) : (
                 <ParticipantList programs={programs} />
             )}

@@ -175,7 +175,7 @@ System automatically:
 ## 📁 Project Structure
 
 ```
-artsfest-admin-pro/
+Intensia-admin-pro/
 ├── src/
 │   ├── components/        # Reusable UI components
 │   │   ├── ProgramFormModal.tsx
