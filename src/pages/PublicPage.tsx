@@ -64,7 +64,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             </nav>
 
             {/* Hero Section */}
-            <div id="home" className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+            <div id="home" className="pt-28 pb-12 sm:pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     {/* Hero Text */}
                     <div className="order-2 lg:order-1 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
@@ -72,7 +72,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                             <span className="inline-block px-4 py-1.5 rounded-full bg-orange-50 text-orange-600 text-[10px] font-black uppercase tracking-widest border border-orange-100">
                                 Dec 26 - 27, 2025 • Kalpetta
                             </span>
-                            <h1 className="text-6xl md:text-8xl font-black text-slate-900 tracking-tighter leading-[0.9]">
+                            <h1 className="text-5xl sm:text-6xl md:text-8xl font-black text-slate-900 tracking-tighter leading-[0.9]">
                                 The Art<br />
                                 Form of <br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-400">Creativity</span>
@@ -83,7 +83,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                         </div>
 
                         {/* Stats Row */}
-                        <div className="flex items-center gap-12 pt-4 border-t border-slate-100">
+                        <div className="flex flex-wrap items-center gap-8 md:gap-12 pt-4 border-t border-slate-100">
                             <div>
                                 <p className="text-3xl font-black text-slate-900">500+</p>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Participants</p>
@@ -98,12 +98,12 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                             </div>
                         </div>
 
-                        <div className="flex gap-4 pt-4">
-                            <a href="#results" className="px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-full text-sm font-bold uppercase tracking-widest transition-all shadow-xl shadow-teal-200 flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                            <a href="#results" className="px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-full text-sm font-bold uppercase tracking-widest transition-all shadow-xl shadow-teal-200 flex items-center justify-center gap-2">
                                 View Results
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                             </a>
-                            <a href="#about" className="px-8 py-4 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-full text-sm font-bold uppercase tracking-widest transition-all hover:bg-slate-50">
+                            <a href="#about" className="px-8 py-4 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-full text-sm font-bold uppercase tracking-widest transition-all hover:bg-slate-50 text-center">
                                 Learn More
                             </a>
                         </div>
@@ -151,7 +151,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             </div>
 
             {/* About Section */}
-            <div id="about" className="py-24 bg-slate-50">
+            <div id="about" className="py-12 md:py-24 bg-slate-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col md:flex-row gap-16 items-center">
                         <div className="md:w-1/2 relative">
@@ -198,7 +198,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             </div>
 
             {/* Highlights Section */}
-            <div className="py-24 bg-white relative overflow-hidden">
+            <div className="py-12 md:py-24 bg-white relative overflow-hidden">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                     <div className="mb-12">
                         <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-2">— Highlights</p>
@@ -235,9 +235,9 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             </div>
 
             {/* Results & Events Section */}
-            <div id="results" className="py-24 bg-slate-50">
+            <div id="results" className="py-12 md:py-24 bg-slate-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 md:mb-12 gap-6">
                         <div>
                             <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-2">— Line-Up & Results</p>
                             <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">Latest Updates</h2>
@@ -285,7 +285,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                                             .map(team => (
                                                 <div key={team.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 group-hover:bg-white border border-transparent group-hover:border-slate-100 transition-all">
                                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${team.rank === 1 ? 'bg-amber-100 text-amber-700' :
-                                                            team.rank === 2 ? 'bg-slate-200 text-slate-600' : 'bg-orange-100 text-orange-700'
+                                                        team.rank === 2 ? 'bg-slate-200 text-slate-600' : 'bg-orange-100 text-orange-700'
                                                         }`}>
                                                         {team.rank}
                                                     </div>
@@ -338,7 +338,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             </div>
 
             {/* Footer */}
-            <footer className="bg-slate-900 text-white py-20 rounded-t-[3rem] mt-12">
+            <footer className="bg-slate-900 text-white py-12 md:py-20 rounded-t-[2rem] md:rounded-t-[3rem] mt-12">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                     <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-8 text-2xl animate-pulse">
                         ✨
