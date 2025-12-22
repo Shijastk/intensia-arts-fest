@@ -29,8 +29,8 @@ const USERS: User[] = [
   { username: 'judge2', password: 'judge123', role: 'judge', displayName: 'Judge - Stage 2', judgePanel: 'Stage 2' },
   { username: 'judge3', password: 'judge123', role: 'judge', displayName: 'Judge - Panel A', judgePanel: 'Panel A' },
   { username: 'judge4', password: 'judge123', role: 'judge', displayName: 'Judge - Panel B', judgePanel: 'Panel B' },
-  { username: 'team1', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'PRUDENTIA' },
-  { username: 'team2', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'SAPIENTIA' }
+  { username: 'team1', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'SAPIENTIA' },
+  { username: 'team2', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'PRUDENTIA' }
 ];
 
 const STORAGE_KEYS = {

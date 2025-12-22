@@ -55,12 +55,12 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
 
                 // Update Team Score (Include ALL programs - Normal + General)
                 // Map mock team names or verify if teamName matches
-                if (team.teamName === 'PRUDENTIA' || team.teamName === 'SAPIENTIA') {
+                if (team.teamName === 'SAPIENTIA' || team.teamName === 'PRUDENTIA') {
                     teamScores[team.teamName] = (teamScores[team.teamName] || 0) + points;
                 } else if (team.teamName === 'Team Alpha') { // Remapped legacy
-                    teamScores['PRUDENTIA'] = (teamScores['PRUDENTIA'] || 0) + points;
-                } else if (team.teamName === 'Team Beta') { // Remapped legacy
                     teamScores['SAPIENTIA'] = (teamScores['SAPIENTIA'] || 0) + points;
+                } else if (team.teamName === 'Team Beta') { // Remapped legacy
+                    teamScores['PRUDENTIA'] = (teamScores['PRUDENTIA'] || 0) + points;
                 }
 
                 // Update Participant Points
