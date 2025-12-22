@@ -16,11 +16,11 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
     onAllocateToJudge,
     setPrograms
 }) => {
-    const [selectedPanel, setSelectedPanel] = React.useState(program.judgePanel || 'Stage 1');
+    const [selectedPanel, setSelectedPanel] = React.useState(program.judgePanel || 'Ahsani Usthad');
     const allRevealed = program.teams.every(t => t.participants.every(pt => pt.isCodeRevealed));
     const isPending = program.status === ProgramStatus.PENDING && !program.isAllocatedToJudge;
 
-    const availablePanels = ['Stage 1', 'Stage 2', 'Panel A', 'Panel B'];
+    const availablePanels = ['Ahsani Usthad', 'Ajmal Usthad', 'Suhail Usthad', 'Stage 1'];
 
     const handleAllocate = () => {
         // First set the judge panel

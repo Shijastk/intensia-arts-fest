@@ -134,15 +134,26 @@ export const ProgramList: React.FC<ProgramListProps> = ({ programs, setPrograms,
         if (!program) return;
 
         const newPublishedState = !program.isPublished;
+        const updates: any = { isPublished: newPublishedState };
+
+        // If recalling (unpublishing) AND program is currently JUDGING, reset it
+        if (!newPublishedState && program.status === ProgramStatus.JUDGING) {
+            if (window.confirm('This program is currently assigned to a judge. Recalling it will remove it from the judge\'s panel and reset it to PENDING. Continue?')) {
+                updates.status = ProgramStatus.PENDING;
+                updates.isAllocatedToJudge = false;
+            } else {
+                return; // Cancel recall if user declines
+            }
+        }
 
         if (updateProgram) {
-            const success = await updateProgram(id, { isPublished: newPublishedState });
+            const success = await updateProgram(id, updates);
             if (!success) {
                 console.error('Failed to update publish status');
             }
         } else {
             // Fallback to local state
-            setPrograms(p => p.map(x => x.id === id ? { ...x, isPublished: newPublishedState } : x));
+            setPrograms(p => p.map(x => x.id === id ? { ...x, ...updates } : x));
         }
     };
 
@@ -168,6 +179,16 @@ export const ProgramList: React.FC<ProgramListProps> = ({ programs, setPrograms,
                             onEdit={onEdit}
                             onSelectParticipant={setSelectedParticipantName}
                             onPublish={handlePublish}
+                            onPublishResult={async (id) => {
+                                const program = programs.find(p => p.id === id);
+                                if (!program) return;
+                                const newResultState = !program.isResultPublished;
+                                if (updateProgram) {
+                                    await updateProgram(id, { isResultPublished: newResultState });
+                                } else {
+                                    setPrograms(p => p.map(x => x.id === id ? { ...x, isResultPublished: newResultState } : x));
+                                }
+                            }}
                             onRequestCancel={setCancelProgramId}
                         />
                     ))}

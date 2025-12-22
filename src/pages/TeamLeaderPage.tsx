@@ -438,46 +438,81 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
             return;
         }
 
-        // Remove participant from all programs first (if editing)
-        if (editingParticipant) {
-            setPrograms(prev => prev.map(program => ({
-                ...program,
-                teams: program.teams.map(team => {
-                    if (team.teamName !== teamName) return team;
+        // SMART UPDATE: Preserve existing data (like code letters) while updating details
+        setPrograms(currentPrograms => {
+            return currentPrograms.map(program => {
+                const isSelected = selectedPrograms.has(program.id);
+
+                // Find our team in this program
+                const teamIndex = program.teams.findIndex(t => t.teamName === teamName);
+
+                // Case 1: Team doesn't exist yet
+                if (teamIndex === -1) {
+                    // If not selected, nothing to do
+                    if (!isSelected) return program;
+
+                    // If selected, create new team with new participant
                     return {
-                        ...team,
-                        participants: team.participants.filter(p => p.chestNumber !== editingParticipant.chestNumber)
+                        ...program,
+                        teams: [...program.teams, {
+                            id: `t-${Date.now()}-${Math.random()}`,
+                            teamName,
+                            participants: [{ name, chestNumber }]
+                        }]
                     };
-                }).filter(team => team.participants.length > 0)
-            })));
-        }
+                }
 
-        // Add participant to selected programs
-        setPrograms(prev => prev.map(program => {
-            if (!selectedPrograms.has(program.id)) return program;
+                // Case 2: Team exists, we need to modify participants list
+                const existingTeam = program.teams[teamIndex];
+                let updatedParticipants = [...existingTeam.participants];
 
-            const teamIndex = program.teams.findIndex(t => t.teamName === teamName);
+                // Identity to look for: logic depends on whether we are editing or adding
+                // If editing, look for the OLD chest number. If adding, look for NEW chest number (duplicate check)
+                const searchChestNumber = editingParticipant ? editingParticipant.chestNumber : chestNumber;
+                const existingParticipantIndex = updatedParticipants.findIndex(p => p.chestNumber === searchChestNumber);
 
-            if (teamIndex >= 0) {
-                // Team exists, add participant
+                if (isSelected) {
+                    if (existingParticipantIndex >= 0) {
+                        // UPDATE: Participant exists, update name/chestNumber, PRESERVE other fields (codeLetter, etc.)
+                        updatedParticipants[existingParticipantIndex] = {
+                            ...updatedParticipants[existingParticipantIndex],
+                            name: name,
+                            chestNumber: chestNumber // Update chest number in case it changed
+                        };
+                    } else {
+                        // ADD: Participant not in this program yet, add them
+                        updatedParticipants.push({ name, chestNumber });
+                    }
+                } else {
+                    if (existingParticipantIndex >= 0) {
+                        // REMOVE: Participant was here but program is now unselected
+                        updatedParticipants = updatedParticipants.filter((_, idx) => idx !== existingParticipantIndex);
+                    }
+                    // Else: wasn't here, didn't want to be here, do nothing
+                }
+
+                // If team has no participants left, remove the team? 
+                // Usually cleaner to remove empty teams to keep data tidy
+                if (updatedParticipants.length === 0) {
+                    return {
+                        ...program,
+                        teams: program.teams.filter(t => t.teamName !== teamName)
+                    };
+                }
+
+                // Update the team with new participants list
                 const updatedTeams = [...program.teams];
                 updatedTeams[teamIndex] = {
-                    ...updatedTeams[teamIndex],
-                    participants: [...updatedTeams[teamIndex].participants, { name, chestNumber }]
+                    ...existingTeam,
+                    participants: updatedParticipants
                 };
-                return { ...program, teams: updatedTeams };
-            } else {
-                // Create new team
+
                 return {
                     ...program,
-                    teams: [...program.teams, {
-                        id: `t-${Date.now()}-${Math.random()}`,
-                        teamName,
-                        participants: [{ name, chestNumber }]
-                    }]
+                    teams: updatedTeams
                 };
-            }
-        }));
+            });
+        });
 
         alert(editingParticipant ? 'Participant updated successfully!' : 'Participant added successfully!');
         onClose();

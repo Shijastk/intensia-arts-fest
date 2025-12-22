@@ -37,7 +37,8 @@ export interface Program {
   isGroup: boolean;
   groupCount?: number;
   membersPerGroup?: number;
-  isPublished?: boolean;
+  isPublished?: boolean; // Flag for Green Room visibility (Publish to Green Room)
+  isResultPublished?: boolean; // Flag for Public Result visibility (Publish to Website)
   isAllocatedToJudge?: boolean; // Flag for Green Room allocation
   judgePanel?: string; // Stage/Panel assignment (e.g., "Stage 1", "Stage 2", "Panel A")
 }

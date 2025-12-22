@@ -26,9 +26,9 @@ const USERS: User[] = [
   { username: 'admin', password: 'admin123', role: 'admin', displayName: 'Administrator' },
   { username: 'greenroom', password: 'green123', role: 'greenroom', displayName: 'Green Room Clerk' },
   { username: 'judge1', password: 'judge123', role: 'judge', displayName: 'Judge - Stage 1', judgePanel: 'Stage 1' },
-  { username: 'judge2', password: 'judge123', role: 'judge', displayName: 'Judge - Stage 2', judgePanel: 'Stage 2' },
-  { username: 'judge3', password: 'judge123', role: 'judge', displayName: 'Judge - Panel A', judgePanel: 'Panel A' },
-  { username: 'judge4', password: 'judge123', role: 'judge', displayName: 'Judge - Panel B', judgePanel: 'Panel B' },
+  { username: 'ahsani', password: 'ahsani', role: 'judge', displayName: 'Ahsani Usthad', judgePanel: 'Ahsani Usthad' },
+  { username: 'ajmal', password: 'ajmal', role: 'judge', displayName: 'Ajmal Usthad', judgePanel: 'Ajmal Usthad' },
+  { username: 'suhail', password: 'suhail', role: 'judge', displayName: 'Suhail Usthad', judgePanel: 'Suhail Usthad' },
   { username: 'SAPIENTIA', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'SAPIENTIA' },
   { username: 'PRUDENTIA', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'PRUDENTIA' }
 ];

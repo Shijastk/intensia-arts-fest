@@ -8,7 +8,8 @@ interface ProgramAccordionProps {
   onDelete: (id: string) => void;
   onEdit: (program: Program) => void;
   onSelectParticipant: (name: string) => void;
-  onPublish: (id: string) => void;
+  onPublish: (id: string) => void; // Controls Green Room Visibility
+  onPublishResult: (id: string) => void; // Controls Public Result Visibility
   onRequestCancel: (id: string) => void;
 }
 
@@ -19,13 +20,16 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   onEdit,
   onSelectParticipant,
   onPublish,
+  onPublishResult,
   onRequestCancel
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const getStatusColor = (status: ProgramStatus) => {
     switch (status) {
       case ProgramStatus.COMPLETED: return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case ProgramStatus.JUDGING: return 'bg-purple-100 text-purple-700 border-purple-200';
       case ProgramStatus.PENDING: return 'bg-amber-100 text-amber-700 border-amber-200';
       case ProgramStatus.CANCELLED: return 'bg-rose-100 text-rose-700 border-rose-200';
       default: return 'bg-slate-100 text-slate-700';
@@ -34,6 +38,13 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextStatus = e.target.value as ProgramStatus;
+
+    if (program.status === ProgramStatus.JUDGING && (nextStatus === ProgramStatus.PENDING || nextStatus === ProgramStatus.CANCELLED)) {
+      setStatusError('Use "Recall (GR)" to change status from JUDGING');
+      setTimeout(() => setStatusError(null), 3000);
+      return;
+    }
+
     if (nextStatus === ProgramStatus.CANCELLED) {
       onRequestCancel(program.id);
     } else {
@@ -49,20 +60,27 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
             onClick={() => setIsOpen(!isOpen)}
             className="flex-1 flex items-center space-x-4 text-left"
           >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${program.isPublished ? 'bg-emerald-600 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${program.isPublished ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400'}`}>
               {program.isPublished ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-slate-900 truncate">{program.name}</h3>
-                {program.isPublished && <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest">Published</span>}
+                {program.isResultPublished && <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest">Result Live</span>}
+                {program.isPublished && <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-black uppercase tracking-widest">In Green Room</span>}
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{program.category}</span>
+                {program.judgePanel && (
+                  <span className="flex items-center text-[10px] text-orange-600 font-bold bg-orange-50 px-1.5 rounded-md border border-orange-100">
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    {program.judgePanel}
+                  </span>
+                )}
                 {program.startTime && (
                   <span className="flex items-center text-[10px] text-indigo-600 font-bold">
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -74,33 +92,55 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
           </button>
 
           <div className="flex items-center space-x-2">
-            {/* Always-visible Publish Toggle Button */}
+            {/* 1. GREEN ROOM TOGGLE */}
             <button
               onClick={() => onPublish(program.id)}
               className={`px-3 py-1 rounded-lg text-[10px] font-bold shadow-sm transition-all flex items-center gap-1.5 ${program.isPublished
-                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200'
-                  : 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200'
+                ? 'bg-indigo-100 text-indigo-700 border border-indigo-300 hover:bg-indigo-200'
+                : 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200'
                 }`}
-              title={program.isPublished ? 'Click to unpublish' : 'Click to publish'}
+              title={program.isPublished ? 'Click to recall from Green Room' : 'Click to send to Green Room'}
             >
-              {program.isPublished ? (
-                <>
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                  Unpublish
-                </>
-              ) : (
-                <>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+              {program.isPublished ? 'Recall (GR)' : 'Send to GR'}
+            </button>
+
+            {/* 2. PUBLIC RESULT TOGGLE (Only if Completed) */}
+            {program.status === ProgramStatus.COMPLETED && (
+              <>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Send this program back to judges for re-evaluation? This will allow judges to edit scores again.')) {
+                      onUpdateStatus(program.id, ProgramStatus.JUDGING);
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg text-[10px] font-bold shadow-sm transition-all flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                  title="Send back to judges for re-evaluation"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  Re-evaluate
+                </button>
+
+                <button
+                  onClick={() => onPublishResult(program.id)}
+                  className={`px-3 py-1 rounded-lg text-[10px] font-bold shadow-sm transition-all flex items-center gap-1.5 ${program.isResultPublished
+                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200'
+                    : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
+                    }`}
+                  title={program.isResultPublished ? 'Click to unpublish results' : 'Click to publish results to website'}
+                >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  Publish
-                </>
-              )}
-            </button>
+                  {program.isResultPublished ? 'Result Live' : 'Publish Result'}
+                </button>
+              </>
+            )}
 
+            {statusError && <span className="text-[10px] text-red-600 font-bold animate-pulse whitespace-nowrap">{statusError}</span>}
             <select
               value={program.status}
               onChange={handleStatusChange}
@@ -109,6 +149,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
             >
               {/* COMPLETED is only shown if it's already the status, admins cannot select it manually */}
               {program.status === ProgramStatus.COMPLETED && <option value={ProgramStatus.COMPLETED}>COMPLETED</option>}
+              <option value={ProgramStatus.JUDGING}>JUDGING</option>
               <option value={ProgramStatus.PENDING}>PENDING</option>
               <option value={ProgramStatus.CANCELLED}>CANCELLED</option>
             </select>

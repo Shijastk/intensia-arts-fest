@@ -11,7 +11,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
     const [activeTab, setActiveTab] = useState<'HOME' | 'RESULTS'>('HOME');
 
     const completedPrograms = useMemo(() =>
-        programs.filter(p => p.status === ProgramStatus.COMPLETED && p.isPublished).sort((a, b) =>
+        programs.filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished).sort((a, b) =>
             (b.startTime || '').localeCompare(a.startTime || '')
         ),
         [programs]);

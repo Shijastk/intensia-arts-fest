@@ -76,6 +76,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
             return {
                 ...p,
                 status: ProgramStatus.COMPLETED,
+                isPublished: false, // Ensure result is NOT published until Admin approves
                 teams: p.teams.map(team => {
                     const chestNumber = team.participants[0]?.chestNumber;
                     if (!chestNumber) return team;
