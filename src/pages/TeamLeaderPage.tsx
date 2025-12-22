@@ -174,8 +174,8 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                             const isExpanded = expandedParticipant === participant.chestNumber;
 
                             return (
-                                <div key={participant.chestNumber} className="border border-slate-200 rounded-xl overflow-hidden">
-                                    <div className="flex items-center justify-between p-4 bg-slate-50">
+                                <div key={participant.chestNumber} className="border border-slate-200 rounded-xl overflow-hidden overflow-x-auto no-scrollbar">
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 min-w-[700px]">
                                         <button
                                             onClick={() => setExpandedParticipant(isExpanded ? null : participant.chestNumber)}
                                             className="flex-1 flex items-center gap-4 text-left"
@@ -205,7 +205,7 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                                             </span>
                                             <button
                                                 onClick={() => handleEditParticipant(participant)}
-                                                className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+                                                className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
                                                 title="Edit Programs"
                                             >
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,7 +238,7 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                                     </div>
 
                                     {isExpanded && (
-                                        <div className="p-4 bg-white border-t border-slate-200">
+                                        <div className="p-4 bg-white border-t border-slate-200 min-w-[700px]">
                                             <h5 className="text-xs font-black uppercase text-slate-400 mb-3">Registered Programs</h5>
                                             {participant.programs.length > 0 ? (
                                                 <div className="space-y-2">
@@ -566,7 +566,7 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
                                     <p className="text-xs text-slate-300 mt-1">Admin needs to create programs first</p>
                                 </div>
                             ) : (
-                                <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                                <div className="space-y-2">
                                     {availablePrograms.map(program => {
                                         const isGeneral = program.category.toLowerCase().includes('general');
                                         const isSelected = selectedPrograms.has(program.id);
