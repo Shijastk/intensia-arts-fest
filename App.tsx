@@ -29,8 +29,8 @@ const USERS: User[] = [
   { username: 'judge2', password: 'judge123', role: 'judge', displayName: 'Judge - Stage 2', judgePanel: 'Stage 2' },
   { username: 'judge3', password: 'judge123', role: 'judge', displayName: 'Judge - Panel A', judgePanel: 'Panel A' },
   { username: 'judge4', password: 'judge123', role: 'judge', displayName: 'Judge - Panel B', judgePanel: 'Panel B' },
-  { username: 'team1', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'SAPIENTIA' },
-  { username: 'team2', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'PRUDENTIA' }
+  { username: 'SAPIENTIA', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'SAPIENTIA' },
+  { username: 'PRUDENTIA', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'PRUDENTIA' }
 ];
 
 const STORAGE_KEYS = {
@@ -388,7 +388,14 @@ export default function App() {
   }, [currentUser]);
 
   const handleLogin = (username: string, password: string): boolean => {
-    const user = USERS.find(u => u.username === username && u.password === password);
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
+    const user = USERS.find(u =>
+      u.username.toLowerCase() === cleanUsername &&
+      u.password === cleanPassword
+    );
+
     if (user) {
       setCurrentUser(user);
       return true;
