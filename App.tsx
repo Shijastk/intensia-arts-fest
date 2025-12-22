@@ -360,50 +360,6 @@ const LoginPage: React.FC<{ onLogin: (username: string, password: string) => boo
             </button>
           </form>
         </div>
-
-        <div className="mt-6 bg-white rounded-xl border border-slate-200 p-6">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4 text-center">
-            Demo Credentials
-          </h3>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="bg-indigo-50 rounded-lg p-3">
-              <p className="font-black text-indigo-900 mb-1">Admin</p>
-              <p className="font-mono text-indigo-600 text-[10px]">admin / admin123</p>
-            </div>
-            <div className="bg-emerald-50 rounded-lg p-3">
-              <p className="font-black text-emerald-900 mb-1">Green Room</p>
-              <p className="font-mono text-emerald-600 text-[10px]">greenroom / green123</p>
-            </div>
-            <div className="bg-violet-50 rounded-lg p-3">
-              <p className="font-black text-violet-900 mb-1">Judge Stage 1</p>
-              <p className="font-mono text-violet-600 text-[10px]">judge1 / judge123</p>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-3">
-              <p className="font-black text-purple-900 mb-1">Judge Stage 2</p>
-              <p className="font-mono text-purple-600 text-[10px]">judge2 / judge123</p>
-            </div>
-            <div className="bg-pink-50 rounded-lg p-3">
-              <p className="font-black text-pink-900 mb-1">Judge Panel A</p>
-              <p className="font-mono text-pink-600 text-[10px]">judge3 / judge123</p>
-            </div>
-            <div className="bg-rose-50 rounded-lg p-3">
-              <p className="font-black text-rose-900 mb-1">Judge Panel B</p>
-              <p className="font-mono text-rose-600 text-[10px]">judge4 / judge123</p>
-            </div>
-            <div className="bg-amber-50 rounded-lg p-3">
-              <p className="font-black text-amber-900 mb-1">Team Alpha</p>
-              <p className="font-mono text-amber-600 text-[10px]">team1 / team1pass</p>
-            </div>
-            <div className="bg-orange-50 rounded-lg p-3">
-              <p className="font-black text-orange-900 mb-1">Team Beta</p>
-              <p className="font-mono text-orange-600 text-[10px]">team2 / team2pass</p>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          🔥 Powered by Firebase &bull; Real-time Database
-        </p>
       </div>
     </div>
   );
