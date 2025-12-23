@@ -190,6 +190,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({ programs, setPrograms,
                                 }
                             }}
                             onRequestCancel={setCancelProgramId}
+                            onUpdateProgram={updateProgram} // Pass update capability
                         />
                     ))}
                 </div>

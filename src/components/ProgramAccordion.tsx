@@ -11,6 +11,7 @@ interface ProgramAccordionProps {
   onPublish: (id: string) => void; // Controls Green Room Visibility
   onPublishResult: (id: string) => void; // Controls Public Result Visibility
   onRequestCancel: (id: string) => void;
+  onUpdateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
 }
 
 export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
@@ -21,7 +22,8 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   onSelectParticipant,
   onPublish,
   onPublishResult,
-  onRequestCancel
+  onRequestCancel,
+  onUpdateProgram
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -52,10 +54,66 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     }
   };
 
+  // State for Admin Score Editing
+  const [isEditingScores, setIsEditingScores] = useState(false);
+  const [editedTeams, setEditedTeams] = useState(program.teams);
+
+  // Sync state if program updates externally
+  React.useEffect(() => {
+    setEditedTeams(program.teams);
+  }, [program]);
+
+  const handleScoreEdit = (teamId: string, chestNumber: string, field: 'score' | 'grade' | 'points' | 'rank', value: string) => {
+    setEditedTeams(prev => prev.map(t => {
+      // If group item, update all text fields for consistency (rank/grade/points often shared)
+      // but scores might be individual? Requirements say "Group Items: Score applies to entire team".
+      // We will follow the structure: find team, update participant or team fields.
+      if (t.id !== teamId) return t;
+
+      const updatedParticipants = t.participants.map(p => {
+        if (p.chestNumber !== chestNumber && !program.isGroup) return p;
+        // If group, maybe update all? For now, target specific participant row input.
+        // User requested "personalized results like judge page".
+        if (p.chestNumber === chestNumber) {
+          return {
+            ...p,
+            [field]: field === 'grade' ? value : Number(value)
+          };
+        }
+        return p;
+      });
+
+      // Recalculate team totals if needed (simple sum/max logic)
+      // For now, we trust the manual edit.
+      return {
+        ...t,
+        participants: updatedParticipants,
+        [field]: field === 'grade' ? value : Number(value) // Update team level too for display consistency
+      };
+    }));
+  };
+
+  const saveScores = async () => {
+    if (!onUpdateProgram) {
+      alert("Update function not available. Please contact support.");
+      return;
+    }
+
+    const success = await onUpdateProgram(program.id, { teams: editedTeams });
+    if (success) {
+      setIsEditingScores(false);
+      // Optional: Show success toast (not implemented)
+    } else {
+      alert("Failed to save scores to database.");
+    }
+  };
+
   return (
     <div className={`mb-3 transition-all duration-300 ${isOpen ? 'ring-2 ring-indigo-500/20' : ''}`}>
       <div className="w-full bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-indigo-300 transition-colors">
+        {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between p-4 md:p-5 gap-4">
+          {/* ... (Existing Header Button Code) ... */}
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="flex-1 flex items-center space-x-4 text-left"
@@ -92,7 +150,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
           </button>
 
           <div className="flex items-center space-x-2">
-            {/* 1. GREEN ROOM TOGGLE */}
+            {/* ... (Existing Buttons) ... */}
             <button
               onClick={() => onPublish(program.id)}
               className={`px-3 py-1 rounded-lg text-[10px] font-bold shadow-sm transition-all flex items-center gap-1.5 ${program.isPublished
@@ -147,33 +205,22 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
               disabled={program.status === ProgramStatus.COMPLETED}
               className={`px-2 py-1 rounded-lg text-[10px] font-bold border outline-none cursor-pointer transition-colors ${getStatusColor(program.status)} text-slate-900 ${program.status === ProgramStatus.COMPLETED ? 'opacity-80 cursor-not-allowed' : ''}`}
             >
-              {/* COMPLETED is only shown if it's already the status, admins cannot select it manually */}
               {program.status === ProgramStatus.COMPLETED && <option value={ProgramStatus.COMPLETED}>COMPLETED</option>}
               <option value={ProgramStatus.JUDGING}>JUDGING</option>
               <option value={ProgramStatus.PENDING}>PENDING</option>
               <option value={ProgramStatus.CANCELLED}>CANCELLED</option>
             </select>
 
-            <button
-              onClick={() => onEdit(program)}
-              className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
-              title="Schedule / Edit"
-            >
+            <button onClick={() => onEdit(program)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Schedule / Edit">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </button>
 
-            <button
-              onClick={() => onDelete(program.id)}
-              className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
-            >
+            <button onClick={() => onDelete(program.id)} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </button>
 
             <button onClick={() => setIsOpen(!isOpen)} className="p-1">
-              <svg
-                className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
+              <svg className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -182,6 +229,36 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
 
         {isOpen && (
           <div className="bg-slate-50 border-t border-slate-200 p-4">
+            {/* EDIT SCORE TOGGLE FOR ADMINS */}
+            {program.status === ProgramStatus.COMPLETED && (
+              <div className="flex justify-end mb-3">
+                {!isEditingScores ? (
+                  <button
+                    onClick={() => { setIsEditingScores(true); setEditedTeams(program.teams); }}
+                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    Edit Results
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setIsEditingScores(false); setEditedTeams(program.teams); }}
+                      className="text-xs bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveScores}
+                      className="text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-700 transition-colors"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="overflow-x-auto bg-white rounded-lg border border-slate-100 shadow-sm">
               <table className="w-full text-left text-[11px] sm:text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
@@ -194,7 +271,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {program.teams.length > 0 ? program.teams.map((team) => (
+                  {editedTeams.length > 0 ? editedTeams.map((team) => (
                     <tr key={team.id} className="hover:bg-slate-50/50">
                       <td className="px-3 py-3">
                         <div className="flex flex-col">
@@ -206,30 +283,54 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                         <p className="font-bold text-slate-700">{team.teamName}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {team.participants.map((p, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => onSelectParticipant(p.name)}
-                              className="text-indigo-600 hover:underline font-medium"
-                            >
-                              {p.name}
-                            </button>
+                            <span key={idx} className="text-slate-500 font-medium">{p.name}</span>
                           ))}
                         </div>
                       </td>
+                      {/* Rank */}
                       <td className="px-3 py-3 text-center">
-                        {program.status === ProgramStatus.COMPLETED ? (
-                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">#{team.rank}</span>
-                        ) : '-'}
+                        {isEditingScores ? (
+                          <input
+                            type="number"
+                            className="w-12 text-center border border-slate-300 rounded p-1"
+                            value={team.rank || ''}
+                            onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'rank', e.target.value)}
+                          />
+                        ) : (
+                          program.status === ProgramStatus.COMPLETED ? (
+                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">#{team.rank}</span>
+                          ) : '-'
+                        )}
                       </td>
+                      {/* Grade */}
                       <td className="px-3 py-3 text-center">
-                        {program.status === ProgramStatus.COMPLETED ? (
-                          <span className="font-bold text-emerald-600">{team.grade || '-'}</span>
-                        ) : '-'}
+                        {isEditingScores ? (
+                          <input
+                            type="text"
+                            className="w-12 text-center border border-slate-300 rounded p-1 uppercase"
+                            value={team.grade || ''}
+                            onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'grade', e.target.value)}
+                          />
+                        ) : (
+                          program.status === ProgramStatus.COMPLETED ? (
+                            <span className="font-bold text-emerald-600">{team.grade || '-'}</span>
+                          ) : '-'
+                        )}
                       </td>
+                      {/* Points */}
                       <td className="px-3 py-3 text-center">
-                        {program.status === ProgramStatus.COMPLETED ? (
-                          <span className="font-bold text-slate-800">{team.points || '0'}</span>
-                        ) : '-'}
+                        {isEditingScores ? (
+                          <input
+                            type="number"
+                            className="w-12 text-center border border-slate-300 rounded p-1"
+                            value={team.points || ''}
+                            onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'points', e.target.value)}
+                          />
+                        ) : (
+                          program.status === ProgramStatus.COMPLETED ? (
+                            <span className="font-bold text-slate-800">{team.points || '0'}</span>
+                          ) : '-'
+                        )}
                       </td>
                     </tr>
                   )) : (
