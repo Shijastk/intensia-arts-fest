@@ -13,7 +13,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
     const completedPrograms = useMemo(() =>
         programs.filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished).sort((a, b) =>
             (b.startTime || '').localeCompare(a.startTime || '')
-        ),
+        ).slice(0, 3), // Show only latest 3 results
         [programs]);
 
     const upcomingPrograms = useMemo(() =>
@@ -239,99 +239,66 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 md:mb-12 gap-6">
                         <div>
-                            <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-2">— Line-Up & Results</p>
-                            <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">Latest Updates</h2>
+                            <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-2">— Latest Results</p>
+                            <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">Recent Winners</h2>
+                            <p className="text-sm text-slate-500 mt-2">Showing latest 3 published results</p>
                         </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setActiveTab('HOME')}
-                                className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'HOME' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:text-slate-900'}`}
-                            >
-                                Completed
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('RESULTS')}
-                                className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'RESULTS' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:text-slate-900'}`}
-                            >
-                                Upcoming
-                            </button>
-                        </div>
+                        <Link
+                            to="/results"
+                            className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-teal-200 flex items-center gap-2"
+                        >
+                            View All Results
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                        </Link>
                     </div>
 
-                    {/* Dynamic Content Grid */}
+                    {/* Results Grid - Latest 3 */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {activeTab === 'HOME' ? (
-                            completedPrograms.length > 0 ? completedPrograms.map(prog => (
-                                <div key={prog.id} className="group bg-white rounded-[2rem] p-2 hover:shadow-xl transition-all border border-slate-100 h-full flex flex-col">
-                                    {/* Card Header (Venue/Date) */}
-                                    <div className="h-40 bg-slate-100 rounded-[1.5rem] relative overflow-hidden">
-                                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 group-hover:scale-105 transition-transform duration-500"></div>
-                                        <div className="absolute top-4 left-4">
-                                            <span className="px-3 py-1 bg-white/90 backdrop-blur-sm rounded-lg text-[10px] font-black uppercase tracking-wider text-slate-900">
-                                                {prog.category}
-                                            </span>
-                                        </div>
-                                        <div className="absolute bottom-4 left-4 right-4">
-                                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{prog.name}</h3>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase">{prog.venue} • {prog.startTime}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Winners List */}
-                                    <div className="p-4 space-y-3 flex-1">
-                                        {prog.teams
-                                            .filter(t => t.rank && t.rank <= 3)
-                                            .sort((a, b) => (a.rank || 0) - (b.rank || 0))
-                                            .map(team => (
-                                                <div key={team.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 group-hover:bg-white border border-transparent group-hover:border-slate-100 transition-all">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${team.rank === 1 ? 'bg-amber-100 text-amber-700' :
-                                                        team.rank === 2 ? 'bg-slate-200 text-slate-600' : 'bg-orange-100 text-orange-700'
-                                                        }`}>
-                                                        {team.rank}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs font-bold text-slate-900 uppercase line-clamp-1">{team.participants[0]?.name || 'Unknown'}</p>
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">{team.teamName}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                </div>
-                            )) : (
-                                <div className="col-span-3 text-center py-20 bg-white rounded-[2rem] border border-slate-100 border-dashed">
-                                    <p className="text-slate-400 font-bold uppercase text-sm">No results published yet</p>
-                                </div>
-                            )
-                        ) : (
-                            // Upcoming View (Reusing same tab var for toggle simplicity, logic swapped in code above but UI text implies Upcoming)
-                            // Wait, logic in activeTab state vs my UI text 
-                            // Let's fix the logic below: 
-                            // Actually I swapped logic in UI buttons vs state usage? 
-                            // No, logic was: activeTab === 'HOME' -> completedPrograms.
-                            // Let's stick to: Tab 1 = Completed, Tab 2 = Upcoming.
-                            upcomingPrograms.length > 0 ? upcomingPrograms.map(prog => (
-                                <div key={prog.id} className="bg-white rounded-[2rem] p-8 border border-slate-100 hover:shadow-xl transition-all group">
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
-                                            <span className="text-xl">📅</span>
-                                        </div>
-                                        <span className="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-black uppercase tracking-wider text-slate-600">
-                                            {prog.startTime?.split(' ')[1] || 'TBA'}
+                        {completedPrograms.length > 0 ? completedPrograms.map(prog => (
+                            <div key={prog.id} className="group bg-white rounded-[2rem] p-2 hover:shadow-xl transition-all border border-slate-100 h-full flex flex-col">
+                                {/* Card Header (Venue/Date) */}
+                                <div className="h-40 bg-slate-100 rounded-[1.5rem] relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 group-hover:scale-105 transition-transform duration-500"></div>
+                                    <div className="absolute top-4 left-4">
+                                        <span className="px-3 py-1 bg-white/90 backdrop-blur-sm rounded-lg text-[10px] font-black uppercase tracking-wider text-slate-900">
+                                            {prog.category}
                                         </span>
                                     </div>
-                                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2 group-hover:text-emerald-600 transition-colors">{prog.name}</h3>
-                                    <p className="text-sm text-slate-500 font-medium mb-4 line-clamp-2">{prog.description || 'No description available for this event.'}</p>
-
-                                    <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                        {prog.venue}
+                                    <div className="absolute bottom-4 left-4 right-4">
+                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none mb-1">{prog.name}</h3>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase">{prog.venue} • {prog.startTime}</p>
                                     </div>
                                 </div>
-                            )) : (
-                                <div className="col-span-3 text-center py-20 bg-white rounded-[2rem] border border-slate-100 border-dashed">
-                                    <p className="text-slate-400 font-bold uppercase text-sm">No upcoming events scheduled</p>
+
+                                {/* Winners List - Sorted by Points */}
+                                <div className="p-4 space-y-3 flex-1">
+                                    {prog.teams
+                                        .filter(t => t.points && t.points > 0)
+                                        .sort((a, b) => (b.points || 0) - (a.points || 0))
+                                        .slice(0, 3) // Top 3
+                                        .map((team, index) => (
+                                            <div key={team.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 group-hover:bg-white border border-transparent group-hover:border-slate-100 transition-all">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${index === 0 ? 'bg-amber-100 text-amber-700' :
+                                                    index === 1 ? 'bg-slate-200 text-slate-600' : 'bg-orange-100 text-orange-700'
+                                                    }`}>
+                                                    {index + 1}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="text-xs font-bold text-slate-900 uppercase line-clamp-1">{team.participants[0]?.name || 'Unknown'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">{team.teamName}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-black text-emerald-600">{team.points}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Points</p>
+                                                </div>
+                                            </div>
+                                        ))}
                                 </div>
-                            )
+                            </div>
+                        )) : (
+                            <div className="col-span-3 text-center py-20 bg-white rounded-[2rem] border border-slate-100 border-dashed">
+                                <p className="text-slate-400 font-bold uppercase text-sm">No results published yet</p>
+                            </div>
                         )}
                     </div>
                 </div>

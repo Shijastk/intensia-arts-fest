@@ -267,7 +267,6 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                     <th className="px-3 py-2">Chest No / Code</th>
                     <th className="px-3 py-2">Team & Participants</th>
                     <th className="px-3 py-2 text-center">Score</th>
-                    <th className="px-3 py-2 text-center">Rank</th>
                     <th className="px-3 py-2 text-center">Grade</th>
                     <th className="px-3 py-2 text-center">Points</th>
                   </tr>
@@ -305,21 +304,6 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                   {participant.score !== undefined ? participant.score :
                                     (editedTeams.find(t => t.id === participant.teamId)?.score || '-')}
                                 </span>
-                              ) : '-'
-                            )}
-                          </td>
-                          {/* Rank */}
-                          <td className="px-3 py-3 text-center">
-                            {isEditingScores ? (
-                              <input
-                                type="number"
-                                className="w-12 text-center border border-slate-300 rounded p-1"
-                                value={participant.rank || ''}
-                                onChange={(e) => handleScoreEdit(participant.teamId, participant.chestNumber, 'rank', e.target.value)}
-                              />
-                            ) : (
-                              program.status === ProgramStatus.COMPLETED ? (
-                                participant.rank ? <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">#{participant.rank}</span> : '-'
                               ) : '-'
                             )}
                           </td>
@@ -396,21 +380,6 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                               ) : '-'
                             )}
                           </td>
-                          {/* Rank */}
-                          <td className="px-3 py-3 text-center">
-                            {isEditingScores ? (
-                              <input
-                                type="number"
-                                className="w-12 text-center border border-slate-300 rounded p-1"
-                                value={team.rank || ''}
-                                onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'rank', e.target.value)}
-                              />
-                            ) : (
-                              program.status === ProgramStatus.COMPLETED ? (
-                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">#{team.rank}</span>
-                              ) : '-'
-                            )}
-                          </td>
                           {/* Grade */}
                           <td className="px-3 py-3 text-center">
                             {isEditingScores ? (
@@ -450,7 +419,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                     )
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">No registrations found.</td>
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">No registrations found.</td>
                     </tr>
                   )}
                 </tbody>

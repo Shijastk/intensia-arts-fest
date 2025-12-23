@@ -6,6 +6,7 @@ import { GreenRoomPage } from './src/pages/GreenRoomPage';
 import { TeamLeaderPage } from './src/pages/TeamLeaderPage';
 import { JudgesPage } from './src/pages/JudgesPage';
 import { PublicPage } from './src/pages/PublicPage';
+import { ResultsPage } from './src/pages/ResultsPage';
 import { MaintenancePage } from './src/pages/MaintenancePage';
 import { usePrograms } from './src/hooks/usePrograms';
 import './src/utils/clearFirebase';
@@ -462,6 +463,11 @@ export default function App() {
         {/* Public Page is redirected to Maintenance if Mode is ON */}
         <Route path="/" element={
           isMaintenanceMode ? <Navigate to="/maintenance" replace /> : <PublicPage programs={programs} />
+        } />
+
+        {/* Results Page */}
+        <Route path="/results" element={
+          isMaintenanceMode ? <Navigate to="/maintenance" replace /> : <ResultsPage programs={programs} />
         } />
 
         <Route path="/login" element={!currentUser ? <LoginPage onLogin={handleLogin} isMaintenanceMode={isMaintenanceMode} /> : <Navigate to="/dashboard" replace />} />
