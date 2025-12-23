@@ -40,22 +40,37 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
             const isGeneral = program.category.toLowerCase().includes('general');
 
             program.teams.forEach(team => {
+                // Strictly match team name
                 if (team.teamName === teamName) {
                     team.participants.forEach(participant => {
-                        const key = participant.chestNumber;
-                        if (!participantsMap.has(key)) {
-                            participantsMap.set(key, {
-                                name: participant.name,
-                                chestNumber: participant.chestNumber,
-                                programs: []
+                        // Strict Chest Number Validation to prevent cross-team shuffling
+                        const chestNo = participant.chestNumber.toString();
+                        let isValidParticipant = true;
+
+                        if (teamName === 'PRUDENTIA') {
+                            // PRUDENTIA must start with 2
+                            if (!chestNo.startsWith('2')) isValidParticipant = false;
+                        } else if (teamName === 'SAPIENTIA') {
+                            // SAPIENTIA must start with 3
+                            if (!chestNo.startsWith('3')) isValidParticipant = false;
+                        }
+
+                        if (isValidParticipant) {
+                            const key = participant.chestNumber;
+                            if (!participantsMap.has(key)) {
+                                participantsMap.set(key, {
+                                    name: participant.name,
+                                    chestNumber: participant.chestNumber,
+                                    programs: []
+                                });
+                            }
+                            participantsMap.get(key)!.programs.push({
+                                id: program.id,
+                                name: program.name,
+                                category: program.category,
+                                isGeneral
                             });
                         }
-                        participantsMap.get(key)!.programs.push({
-                            id: program.id,
-                            name: program.name,
-                            category: program.category,
-                            isGeneral
-                        });
                     });
                 }
             });
