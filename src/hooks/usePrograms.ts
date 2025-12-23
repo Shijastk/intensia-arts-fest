@@ -22,19 +22,18 @@ export const usePrograms = () => {
     // Subscribe to real-time updates
     useEffect(() => {
         const unsubscribe = subscribeToPrograms((updatedPrograms) => {
-            setPrograms(updatedPrograms);
-            setLoading(false);
+            // Apply User Requested Team Name Swap
+            const swappedPrograms = updatedPrograms.map(p => ({
+                ...p,
+                teams: p.teams.map(t => {
+                    if (t.teamName === 'PRUDENTIA') return { ...t, teamName: 'SAPIENTIA' };
+                    if (t.teamName === 'SAPIENTIA') return { ...t, teamName: 'PRUDENTIA' };
+                    return t;
+                })
+            }));
 
-            // DISABLED: Auto-initialization removed to prevent injecting mock data
-            // if (!initialized && updatedPrograms.length === 0) {
-            //     console.log('Firestore is empty. Initializing with mock data...');
-            //     initializeMockData(MOCK_PROGRAMS).then(() => {
-            //         console.log('Mock data initialization complete');
-            //         setInitialized(true);
-            //     });
-            // } else {
-            //     setInitialized(true);
-            // }
+            setPrograms(swappedPrograms);
+            setLoading(false);
             setInitialized(true);
         });
 
