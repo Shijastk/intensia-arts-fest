@@ -44,23 +44,25 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
         if (program.status !== ProgramStatus.COMPLETED) return;
 
         const isGeneral = program.category.toLowerCase().includes('general') || program.name.toLowerCase().includes('general');
-        // Check "Off Stage" by category name. User didn't specify exact string, assuming standard "Off Stage" or "Writing" etc? 
-        // User prompt: "ONLY OFF STAGE INTUVIUAL OR GROUP PROGRAMS"
-        // I'll check if category contains "off" or "writing" or "drawing" as a heuristic, OR if it's NOT "Stage"
-        const isOffStage = !program.category.toLowerCase().includes('stage') || program.category.toLowerCase().includes('off');
+        // Off-stage programs are those with "no stage" or "non stage" in category
+        const isOffStage = program.category.toLowerCase().includes('no stage') ||
+            program.category.toLowerCase().includes('non stage') ||
+            program.category.toLowerCase().includes('off stage');
 
         program.teams.forEach(team => {
             if (team.rank && POINTS[team.rank as keyof typeof POINTS]) {
                 const points = POINTS[team.rank as keyof typeof POINTS];
 
                 // Update Team Score (Include ALL programs - Normal + General)
-                // Map mock team names or verify if teamName matches
                 if (team.teamName === 'PRUDENTIA' || team.teamName === 'SAPIENTIA') {
                     teamScores[team.teamName] = (teamScores[team.teamName] || 0) + points;
                 } else if (team.teamName === 'Team Alpha') { // Remapped legacy
-                    teamScores['SAPIENTIA'] = (teamScores['SAPIENTIA'] || 0) + points;
-                } else if (team.teamName === 'Team Beta') { // Remapped legacy
                     teamScores['PRUDENTIA'] = (teamScores['PRUDENTIA'] || 0) + points;
+                } else if (team.teamName === 'Team Beta') { // Remapped legacy
+                    teamScores['SAPIENTIA'] = (teamScores['SAPIENTIA'] || 0) + points;
+                } else {
+                    // Log unknown team names to help debug
+                    console.warn(`⚠️ Unknown team name in program "${program.name}": "${team.teamName}" with rank ${team.rank}`);
                 }
 
                 // Update Participant Points
@@ -100,7 +102,10 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
         if (program.status !== ProgramStatus.COMPLETED) return;
 
         const isGeneral = program.category.toLowerCase().includes('general');
-        const isOffStage = !program.category.toLowerCase().includes('stage') || program.category.toLowerCase().includes('off');
+        // Off-stage programs are those with "no stage" or "non stage" in category
+        const isOffStage = program.category.toLowerCase().includes('no stage') ||
+            program.category.toLowerCase().includes('non stage') ||
+            program.category.toLowerCase().includes('off stage');
 
         program.teams.forEach(team => {
             if (team.rank && POINTS[team.rank as keyof typeof POINTS]) {
@@ -132,6 +137,14 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
     const leadingTeam = teams[0];
     const trailingTeam = teams[1] || { name: 'N/A', score: 0 };
     const margin = leadingTeam.score - trailingTeam.score;
+
+    // Debug: Log final scores
+    console.log('=== FINAL TEAM SCORES ===');
+    console.log('PRUDENTIA:', teamScores['PRUDENTIA']);
+    console.log('SAPIENTIA:', teamScores['SAPIENTIA']);
+    console.log('Leading Team:', leadingTeam);
+    console.log('Trailing Team:', trailingTeam);
+    console.log('=========================');
 
     // Find Kala Prathibha
     const kalaSorted = Object.values(kalaCandidates).sort((a: any, b: any) => b.points - a.points);

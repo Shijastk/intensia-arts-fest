@@ -115,9 +115,19 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                 participants: updatedParticipants,
                 score: bestParticipant.score,
                 grade: bestParticipant.grade,
-                rank: bestParticipant.rank,
+                // Don't set rank yet - will be calculated after all teams are processed
+                rank: undefined,
                 points: updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0) // Sum points from all participants in the team
             };
+        });
+
+        // NOW calculate team ranks based on team scores
+        const sortedTeams = [...updatedTeams].sort((a, b) => (b.score || 0) - (a.score || 0));
+        sortedTeams.forEach((team, index) => {
+            const originalTeam = updatedTeams.find(t => t.id === team.id);
+            if (originalTeam) {
+                originalTeam.rank = index + 1; // 1st place = rank 1, 2nd place = rank 2, etc.
+            }
         });
 
         // Use updateProgram if available for reliable Firebase sync
