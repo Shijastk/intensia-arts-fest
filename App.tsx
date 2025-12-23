@@ -60,7 +60,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isMaintenanceMode }) => 
     setTimeout(() => {
       const success = onLogin(username, password);
       if (!success) {
-        setError(isMaintenanceMode ? 'Maintenance Mode Active: Only Admins can login' : 'Invalid username or password');
+        setError(isMaintenanceMode ? 'Maintenance Mode Active: Only Admins can login' : `Invalid username or password for ${username}`);
         setPassword('');
       }
       setLoading(false);
