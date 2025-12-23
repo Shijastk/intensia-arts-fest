@@ -12,6 +12,10 @@ export interface Participant {
   codeLetter?: string;
   isCodeRevealed?: boolean; // Track if the code has been "scratched"
   role?: string;
+  score?: number;
+  grade?: string;
+  points?: number;
+  rank?: number;
 }
 
 export interface Team {

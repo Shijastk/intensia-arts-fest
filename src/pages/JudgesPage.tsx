@@ -38,9 +38,9 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
         program.teams.forEach(team => {
             team.participants.forEach(participant => {
                 initialScores[participant.chestNumber] = {
-                    score: team.score?.toString() || '',
-                    grade: team.grade || '',
-                    points: team.points?.toString() || ''
+                    score: participant.score?.toString() || team.score?.toString() || '',
+                    grade: participant.grade || team.grade || '',
+                    points: participant.points?.toString() || team.points?.toString() || ''
                 };
             });
         });
@@ -48,13 +48,31 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
     };
 
     const handleScoreChange = (chestNumber: string, field: 'score' | 'grade' | 'points', value: string) => {
-        setScores(prev => ({
-            ...prev,
-            [chestNumber]: {
-                ...prev[chestNumber],
-                [field]: value
+        if (selectedProgram?.isGroup) {
+            // For group items, applying score to one member applies to ALL members of that team
+            const team = selectedProgram.teams.find(t => t.participants.some(p => p.chestNumber === chestNumber));
+            if (team) {
+                setScores(prev => {
+                    const newScores = { ...prev };
+                    team.participants.forEach(p => {
+                        newScores[p.chestNumber] = {
+                            ...(newScores[p.chestNumber] || { score: '', grade: '', points: '' }),
+                            [field]: value
+                        };
+                    });
+                    return newScores;
+                });
             }
-        }));
+        } else {
+            // Individual update
+            setScores(prev => ({
+                ...prev,
+                [chestNumber]: {
+                    ...prev[chestNumber],
+                    [field]: value
+                }
+            }));
+        }
     };
 
     const handleSubmitScores = () => {
@@ -63,11 +81,14 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
         const confirm = window.confirm('Are you sure you want to submit these scores? This will mark the program as completed.');
         if (!confirm) return;
 
-        // Calculate ranks based on scores
-        const participantsWithScores = selectedProgram.teams.map(team => ({
-            teamId: team.id,
-            score: parseFloat(scores[team.participants[0]?.chestNumber]?.score || '0')
-        })).sort((a, b) => b.score - a.score);
+        // Calculate ranks based on scores for ALL participants
+        const allParticipants = selectedProgram.teams.flatMap(team =>
+            team.participants.map(p => ({
+                chestNumber: p.chestNumber,
+                teamId: team.id,
+                score: parseFloat(scores[p.chestNumber]?.score || '0')
+            }))
+        ).sort((a, b) => b.score - a.score);
 
         // Update programs with scores and ranks
         setPrograms(prev => prev.map(p => {
@@ -78,18 +99,30 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                 status: ProgramStatus.COMPLETED,
                 isPublished: false, // Ensure result is NOT published until Admin approves
                 teams: p.teams.map(team => {
-                    const chestNumber = team.participants[0]?.chestNumber;
-                    if (!chestNumber) return team;
+                    const updatedParticipants = team.participants.map(participant => {
+                        const scoreData = scores[participant.chestNumber];
+                        const rankIndex = allParticipants.findIndex(ps => ps.chestNumber === participant.chestNumber);
 
-                    const scoreData = scores[chestNumber];
-                    const rankIndex = participantsWithScores.findIndex(ps => ps.teamId === team.id);
+                        return {
+                            ...participant,
+                            score: parseFloat(scoreData?.score || '0'),
+                            grade: scoreData?.grade || '',
+                            points: parseInt(scoreData?.points || '0'),
+                            rank: rankIndex + 1
+                        };
+                    });
+
+                    // Update team stats based on best performing participant (or sum for points)
+                    // For Group items, everyone has same score, so simple average/first is fine.
+                    const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0]);
 
                     return {
                         ...team,
-                        score: parseFloat(scoreData?.score || '0'),
-                        grade: scoreData?.grade || '',
-                        points: parseInt(scoreData?.points || '0'),
-                        rank: rankIndex + 1
+                        participants: updatedParticipants,
+                        score: bestParticipant.score,
+                        grade: bestParticipant.grade,
+                        rank: bestParticipant.rank,
+                        points: updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0) // Sum points from all participants in the team
                     };
                 })
             };
@@ -140,10 +173,10 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                     <div>
                         <h4 className="text-sm font-bold text-blue-900 mb-1">Judging Instructions</h4>
                         <ul className="text-xs text-blue-800 space-y-1">
-                            <li>• Only programs passed from Green Room will appear here</li>
-                            <li>• Participants are identified by code letters (A, B, C, etc.) for fair judging</li>
-                            <li>• Enter Score (0-100), Grade (A+, A, B+, etc.), and Points (0-10)</li>
-                            <li>• Ranks will be automatically assigned based on scores</li>
+                            <li>• Participants identified by Code Letter only (Anonymity Enforced)</li>
+                            <li>• Group Items: Score applies to entire team</li>
+                            <li>• Individual Items: Score each participant separately</li>
+                            <li>• Ranks calculated automatically</li>
                         </ul>
                     </div>
                 </div>
@@ -221,6 +254,10 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                     <span className="text-sm font-medium opacity-90">{selectedProgram.startTime}</span>
                                     <span className="w-1 h-1 bg-white/50 rounded-full"></span>
                                     <span className="text-sm font-medium opacity-90">{selectedProgram.venue}</span>
+                                    <span className="w-1 h-1 bg-white/50 rounded-full"></span>
+                                    <span className="text-xs font-black bg-white/20 px-2 py-0.5 rounded opacity-90">
+                                        {selectedProgram.isGroup ? 'GROUP ITEM' : 'INDIVIDUAL ITEM'}
+                                    </span>
                                 </div>
                             </div>
                             <button
@@ -241,82 +278,152 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                 <thead className="bg-slate-50 border-b-2 border-slate-200">
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-black uppercase text-slate-600">Code</th>
-                                        <th className="px-4 py-3 text-left text-xs font-black uppercase text-slate-600">Team</th>
+                                        <th className="px-4 py-3 text-left text-xs font-black uppercase text-slate-600">Info</th>
                                         <th className="px-4 py-3 text-center text-xs font-black uppercase text-slate-600">Score (0-100)</th>
                                         <th className="px-4 py-3 text-center text-xs font-black uppercase text-slate-600">Grade</th>
                                         <th className="px-4 py-3 text-center text-xs font-black uppercase text-slate-600">Points (0-10)</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {selectedProgram.teams.map((team) => {
-                                        const participant = team.participants[0];
-                                        if (!participant) return null;
-
-                                        return (
-                                            <tr key={team.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-                                                            <span className="text-2xl font-black text-emerald-600">
-                                                                {participant.codeLetter || '?'}
-                                                            </span>
+                                    {selectedProgram.isGroup ? (
+                                        // Group Mode: Show Teams
+                                        selectedProgram.teams.map((team) => {
+                                            const representative = team.participants[0];
+                                            if (!representative) return null;
+                                            return (
+                                                <tr key={team.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-4 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                                                <span className="text-2xl font-black text-emerald-600">
+                                                                    {representative.codeLetter || '?'}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-black text-emerald-600 uppercase">Team Code</p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="text-xs font-black text-emerald-600 uppercase">Code Letter</p>
-                                                            <p className="text-[10px] text-slate-400 font-medium">Chest: {participant.chestNumber}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <p className="text-sm font-bold text-slate-900">{team.teamName}</p>
-                                                    <p className="text-xs text-slate-500">{team.participants.length} participant(s)</p>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="100"
-                                                        step="0.1"
-                                                        value={scores[participant.chestNumber]?.score || ''}
-                                                        onChange={(e) => handleScoreChange(participant.chestNumber, 'score', e.target.value)}
-                                                        className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                                        placeholder="0-100"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <select
-                                                        value={scores[participant.chestNumber]?.grade || ''}
-                                                        onChange={(e) => handleScoreChange(participant.chestNumber, 'grade', e.target.value)}
-                                                        className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
-                                                    >
-                                                        <option value="">Select</option>
-                                                        <option value="A+">A+</option>
-                                                        <option value="A">A</option>
-                                                        <option value="A-">A-</option>
-                                                        <option value="B+">B+</option>
-                                                        <option value="B">B</option>
-                                                        <option value="B-">B-</option>
-                                                        <option value="C+">C+</option>
-                                                        <option value="C">C</option>
-                                                        <option value="C-">C-</option>
-                                                        <option value="D">D</option>
-                                                    </select>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max="10"
-                                                        step="1"
-                                                        value={scores[participant.chestNumber]?.points || ''}
-                                                        onChange={(e) => handleScoreChange(participant.chestNumber, 'points', e.target.value)}
-                                                        className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                                        placeholder="0-10"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <p className="text-sm font-bold text-slate-900">Team Entry</p>
+                                                        <p className="text-xs text-slate-500">{team.participants.length} Participants</p>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            step="0.1"
+                                                            value={scores[representative.chestNumber]?.score || ''}
+                                                            onChange={(e) => handleScoreChange(representative.chestNumber, 'score', e.target.value)}
+                                                            className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                            placeholder="0-100"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <select
+                                                            value={scores[representative.chestNumber]?.grade || ''}
+                                                            onChange={(e) => handleScoreChange(representative.chestNumber, 'grade', e.target.value)}
+                                                            className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+                                                        >
+                                                            <option value="">Select</option>
+                                                            <option value="A+">A+</option>
+                                                            <option value="A">A</option>
+                                                            <option value="A-">A-</option>
+                                                            <option value="B+">B+</option>
+                                                            <option value="B">B</option>
+                                                            <option value="B-">B-</option>
+                                                            <option value="C+">C+</option>
+                                                            <option value="C">C</option>
+                                                            <option value="C-">C-</option>
+                                                            <option value="D">D</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="10"
+                                                            step="1"
+                                                            value={scores[representative.chestNumber]?.points || ''}
+                                                            onChange={(e) => handleScoreChange(representative.chestNumber, 'points', e.target.value)}
+                                                            className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                            placeholder="0-10"
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    ) : (
+                                        // Individual Mode: Show Participants
+                                        selectedProgram.teams.map((team) => (
+                                            <React.Fragment key={team.id}>
+                                                {team.participants.map((participant) => (
+                                                    <tr key={participant.chestNumber} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="px-4 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                                                    <span className="text-2xl font-black text-emerald-600">
+                                                                        {participant.codeLetter || '?'}
+                                                                    </span>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-black text-emerald-600 uppercase">Code Letter</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <p className="text-sm font-bold text-slate-900">Chest #{participant.chestNumber}</p>
+                                                            <p className="text-xs text-slate-500">Participant</p>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="100"
+                                                                step="0.1"
+                                                                value={scores[participant.chestNumber]?.score || ''}
+                                                                onChange={(e) => handleScoreChange(participant.chestNumber, 'score', e.target.value)}
+                                                                className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                                placeholder="0-100"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <select
+                                                                value={scores[participant.chestNumber]?.grade || ''}
+                                                                onChange={(e) => handleScoreChange(participant.chestNumber, 'grade', e.target.value)}
+                                                                className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer"
+                                                            >
+                                                                <option value="">Select</option>
+                                                                <option value="A+">A+</option>
+                                                                <option value="A">A</option>
+                                                                <option value="A-">A-</option>
+                                                                <option value="B+">B+</option>
+                                                                <option value="B">B</option>
+                                                                <option value="B-">B-</option>
+                                                                <option value="C+">C+</option>
+                                                                <option value="C">C</option>
+                                                                <option value="C-">C-</option>
+                                                                <option value="D">D</option>
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-4 py-4">
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="10"
+                                                                step="1"
+                                                                value={scores[participant.chestNumber]?.points || ''}
+                                                                onChange={(e) => handleScoreChange(participant.chestNumber, 'points', e.target.value)}
+                                                                className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                                                placeholder="0-10"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </React.Fragment>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>

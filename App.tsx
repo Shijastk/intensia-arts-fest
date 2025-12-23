@@ -6,6 +6,7 @@ import { GreenRoomPage } from './src/pages/GreenRoomPage';
 import { TeamLeaderPage } from './src/pages/TeamLeaderPage';
 import { JudgesPage } from './src/pages/JudgesPage';
 import { PublicPage } from './src/pages/PublicPage';
+import { MaintenancePage } from './src/pages/MaintenancePage';
 import { usePrograms } from './src/hooks/usePrograms';
 import './src/utils/clearFirebase';
 
@@ -41,9 +42,10 @@ const STORAGE_KEYS = {
 // Login Page Component
 interface LoginPageProps {
   onLogin: (username: string, password: string) => boolean;
+  isMaintenanceMode: boolean;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+const LoginPage: React.FC<LoginPageProps> = ({ onLogin, isMaintenanceMode }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -57,7 +59,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     setTimeout(() => {
       const success = onLogin(username, password);
       if (!success) {
-        setError('Invalid username or password');
+        setError(isMaintenanceMode ? 'Maintenance Mode Active: Only Admins can login' : 'Invalid username or password');
         setPassword('');
       }
       setLoading(false);
@@ -67,6 +69,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {isMaintenanceMode && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3 animate-pulse">
+            <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <div>
+              <h3 className="text-sm font-black text-amber-800 uppercase">System Maintenance</h3>
+              <p className="text-xs text-amber-700 font-medium">Only Administrators can access the portal now.</p>
+            </div>
+          </div>
+        )}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl">
             <span className="text-4xl font-black text-white">A</span>
@@ -156,7 +167,9 @@ const Dashboard = ({
   addProgram,
   updateProgram,
   deleteProgram,
-  handleLogout
+  handleLogout,
+  isMaintenanceMode,
+  setIsMaintenanceMode
 }: {
   currentUser: User;
   programs: Program[];
@@ -166,6 +179,8 @@ const Dashboard = ({
   updateProgram: any;
   deleteProgram: any;
   handleLogout: () => void;
+  isMaintenanceMode: boolean;
+  setIsMaintenanceMode: (mode: boolean) => void;
 }) => {
   const [view, setView] = useState<ViewType>(() => {
     try {
@@ -257,6 +272,7 @@ const Dashboard = ({
 
     switch (view) {
       case 'ADMIN':
+        // NOTE: We pass setPrograms as prop, avoiding strict type check mismatch if any
         return <AdminPage programs={programs} setPrograms={setPrograms} addProgram={addProgram} updateProgram={updateProgram} deleteProgram={deleteProgram} />;
       case 'GREEN_ROOM':
         return <GreenRoomPage programs={programs} setPrograms={setPrograms} updateProgram={updateProgram} />;
@@ -323,6 +339,17 @@ const Dashboard = ({
           </div>
 
           <div className="flex items-center space-x-3">
+            {currentUser.role === 'admin' && (
+              <button
+                onClick={() => {
+                  const confirm = window.confirm(isMaintenanceMode ? 'Disable Maintenance Mode? Users will be able to access the system.' : 'Enable Maintenance Mode? Non-admin users will be blocked.');
+                  if (confirm) setIsMaintenanceMode(!isMaintenanceMode);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${isMaintenanceMode ? 'bg-amber-100 text-amber-700 border-amber-200 animate-pulse' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}
+              >
+                {isMaintenanceMode ? '⚠ Maintenance ON' : 'Maintenance OFF'}
+              </button>
+            )}
             <div className="hidden md:block text-right">
               <p className="text-[10px] font-black text-slate-400 uppercase leading-none">Logged in as</p>
               <p className="text-[11px] font-bold text-indigo-600 uppercase">{currentUser.displayName}</p>
@@ -382,6 +409,15 @@ export default function App() {
     }
   });
 
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(() => {
+    // Persist maintenance mode
+    return localStorage.getItem('MAINTENANCE_MODE') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('MAINTENANCE_MODE', String(isMaintenanceMode));
+  }, [isMaintenanceMode]);
+
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser));
@@ -400,6 +436,10 @@ export default function App() {
     );
 
     if (user) {
+      // Block non-admins during maintenance
+      if (isMaintenanceMode && user.role !== 'admin') {
+        return false;
+      }
       setCurrentUser(user);
       return true;
     }
@@ -413,25 +453,38 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PublicPage programs={programs} />} />
-        <Route path="/login" element={!currentUser ? <LoginPage onLogin={handleLogin} /> : <Navigate to="/dashboard" replace />} />
+        <Route path="/maintenance" element={<MaintenancePage />} />
+
+        {/* Public Page is redirected to Maintenance if Mode is ON */}
+        <Route path="/" element={
+          isMaintenanceMode ? <Navigate to="/maintenance" replace /> : <PublicPage programs={programs} />
+        } />
+
+        <Route path="/login" element={!currentUser ? <LoginPage onLogin={handleLogin} isMaintenanceMode={isMaintenanceMode} /> : <Navigate to="/dashboard" replace />} />
+
         <Route path="/dashboard" element={
           currentUser ? (
-            <Dashboard
-              currentUser={currentUser}
-              programs={programs}
-              loading={loading}
-              error={error}
-              addProgram={addProgram}
-              updateProgram={updateProgram}
-              deleteProgram={deleteProgram}
-              handleLogout={handleLogout}
-            />
+            isMaintenanceMode && currentUser.role !== 'admin' ? (
+              <Navigate to="/maintenance" replace />
+            ) : (
+              <Dashboard
+                currentUser={currentUser}
+                programs={programs}
+                loading={loading}
+                error={error}
+                addProgram={addProgram}
+                updateProgram={updateProgram}
+                deleteProgram={deleteProgram}
+                handleLogout={handleLogout}
+                isMaintenanceMode={isMaintenanceMode}
+                setIsMaintenanceMode={setIsMaintenanceMode}
+              />
+            )
           ) : (
             <Navigate to="/login" replace />
           )
         } />
-        {/* Redirect unknown routes to Public Page */}
+        {/* Redirect unknown routes to Public Page or Maintenance */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
