@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Program } from './src/types';
 import { AdminPage } from './src/pages/AdminPage';
 import { GreenRoomPage } from './src/pages/GreenRoomPage';
@@ -448,7 +448,7 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/maintenance" element={<MaintenancePage />} />
 
@@ -484,6 +484,6 @@ export default function App() {
         {/* Redirect unknown routes to Public Page or Maintenance */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
