@@ -409,10 +409,7 @@ export default function App() {
     }
   });
 
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(() => {
-    // Persist maintenance mode
-    return localStorage.getItem('MAINTENANCE_MODE') === 'true';
-  });
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(false);
 
   useEffect(() => {
     localStorage.setItem('MAINTENANCE_MODE', String(isMaintenanceMode));
