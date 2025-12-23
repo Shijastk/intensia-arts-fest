@@ -271,69 +271,136 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {editedTeams.length > 0 ? editedTeams.map((team) => (
-                    <tr key={team.id} className="hover:bg-slate-50/50">
-                      <td className="px-3 py-3">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800">{team.participants[0]?.chestNumber || 'N/A'}</span>
-                          <span className="text-slate-400 text-[9px]">Code: {team.participants[0]?.codeLetter || '-'}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <p className="font-bold text-slate-700">{team.teamName}</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {team.participants.map((p, idx) => (
-                            <span key={idx} className="text-slate-500 font-medium">{p.name}</span>
-                          ))}
-                        </div>
-                      </td>
-                      {/* Rank */}
-                      <td className="px-3 py-3 text-center">
-                        {isEditingScores ? (
-                          <input
-                            type="number"
-                            className="w-12 text-center border border-slate-300 rounded p-1"
-                            value={team.rank || ''}
-                            onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'rank', e.target.value)}
-                          />
-                        ) : (
-                          program.status === ProgramStatus.COMPLETED ? (
-                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">#{team.rank}</span>
-                          ) : '-'
-                        )}
-                      </td>
-                      {/* Grade */}
-                      <td className="px-3 py-3 text-center">
-                        {isEditingScores ? (
-                          <input
-                            type="text"
-                            className="w-12 text-center border border-slate-300 rounded p-1 uppercase"
-                            value={team.grade || ''}
-                            onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'grade', e.target.value)}
-                          />
-                        ) : (
-                          program.status === ProgramStatus.COMPLETED ? (
-                            <span className="font-bold text-emerald-600">{team.grade || '-'}</span>
-                          ) : '-'
-                        )}
-                      </td>
-                      {/* Points */}
-                      <td className="px-3 py-3 text-center">
-                        {isEditingScores ? (
-                          <input
-                            type="number"
-                            className="w-12 text-center border border-slate-300 rounded p-1"
-                            value={team.points || ''}
-                            onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'points', e.target.value)}
-                          />
-                        ) : (
-                          program.status === ProgramStatus.COMPLETED ? (
-                            <span className="font-bold text-slate-800">{team.points || '0'}</span>
-                          ) : '-'
-                        )}
-                      </td>
-                    </tr>
-                  )) : (
+                  {editedTeams.length > 0 ? (
+                    // Logic Difference: Individual (Row per Participant) vs Group (Row per Team)
+                    !program.isGroup ? (
+                      // INDIVIDUAL ITEM: Flatten participants
+                      editedTeams.flatMap(team => team.participants.map(p => ({ ...p, teamId: team.id, teamName: team.teamName }))).map((participant) => (
+                        <tr key={participant.chestNumber} className="hover:bg-slate-50/50">
+                          <td className="px-3 py-3">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800">{participant.chestNumber}</span>
+                              <span className="text-slate-400 text-[9px]">Code: {participant.codeLetter || '-'}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="font-bold text-slate-700">{participant.name}</p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{participant.teamName}</p>
+                          </td>
+                          {/* Rank */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="number"
+                                className="w-12 text-center border border-slate-300 rounded p-1"
+                                value={participant.rank || ''}
+                                onChange={(e) => handleScoreEdit(participant.teamId, participant.chestNumber, 'rank', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                participant.rank ? <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">#{participant.rank}</span> : '-'
+                              ) : '-'
+                            )}
+                          </td>
+                          {/* Grade */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="text"
+                                className="w-12 text-center border border-slate-300 rounded p-1 uppercase"
+                                value={participant.grade || ''}
+                                onChange={(e) => handleScoreEdit(participant.teamId, participant.chestNumber, 'grade', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                <span className="font-bold text-emerald-600">{participant.grade || '-'}</span>
+                              ) : '-'
+                            )}
+                          </td>
+                          {/* Points */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="number"
+                                className="w-12 text-center border border-slate-300 rounded p-1"
+                                value={participant.points || ''}
+                                onChange={(e) => handleScoreEdit(participant.teamId, participant.chestNumber, 'points', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                <span className="font-bold text-slate-800">{participant.points || '0'}</span>
+                              ) : '-'
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      // GROUP ITEM: Row per Team
+                      editedTeams.map((team) => (
+                        <tr key={team.id} className="hover:bg-slate-50/50">
+                          <td className="px-3 py-3">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800">{team.participants[0]?.chestNumber || 'N/A'}</span>
+                              <span className="text-slate-400 text-[9px]">Code: {team.participants[0]?.codeLetter || '-'}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="font-bold text-slate-700">{team.teamName}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {team.participants.map((p, idx) => (
+                                <span key={idx} className="text-slate-500 font-medium">{p.name}</span>
+                              ))}
+                            </div>
+                          </td>
+                          {/* Rank */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="number"
+                                className="w-12 text-center border border-slate-300 rounded p-1"
+                                value={team.rank || ''}
+                                onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'rank', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold">#{team.rank}</span>
+                              ) : '-'
+                            )}
+                          </td>
+                          {/* Grade */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="text"
+                                className="w-12 text-center border border-slate-300 rounded p-1 uppercase"
+                                value={team.grade || ''}
+                                onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'grade', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                <span className="font-bold text-emerald-600">{team.grade || '-'}</span>
+                              ) : '-'
+                            )}
+                          </td>
+                          {/* Points */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="number"
+                                className="w-12 text-center border border-slate-300 rounded p-1"
+                                value={team.points || ''}
+                                onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'points', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                <span className="font-bold text-slate-800">{team.points || '0'}</span>
+                              ) : '-'
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )
+                  ) : (
                     <tr>
                       <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">No registrations found.</td>
                     </tr>
