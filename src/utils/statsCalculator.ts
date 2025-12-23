@@ -58,9 +58,9 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
                 if (team.teamName === 'PRUDENTIA' || team.teamName === 'SAPIENTIA') {
                     teamScores[team.teamName] = (teamScores[team.teamName] || 0) + points;
                 } else if (team.teamName === 'Team Alpha') { // Remapped legacy
-                    teamScores['PRUDENTIA'] = (teamScores['PRUDENTIA'] || 0) + points;
-                } else if (team.teamName === 'Team Beta') { // Remapped legacy
                     teamScores['SAPIENTIA'] = (teamScores['SAPIENTIA'] || 0) + points;
+                } else if (team.teamName === 'Team Beta') { // Remapped legacy
+                    teamScores['PRUDENTIA'] = (teamScores['PRUDENTIA'] || 0) + points;
                 }
 
                 // Update Participant Points
