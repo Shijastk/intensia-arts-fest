@@ -427,19 +427,24 @@ export default function App() {
     const cleanUsername = username.trim().toLowerCase();
     const cleanPassword = password.trim();
 
+    console.log('Login attempt:', { cleanUsername, cleanPassword }); // Debug log
+
     const user = USERS.find(u =>
       u.username.toLowerCase() === cleanUsername &&
       u.password === cleanPassword
     );
 
     if (user) {
+      console.log('User found:', user.username, user.role);
       // Block non-admins during maintenance
       if (isMaintenanceMode && user.role !== 'admin') {
+        console.warn('Login blocked by maintenance mode');
         return false;
       }
       setCurrentUser(user);
       return true;
     }
+    console.error('User not found or password mismatch');
     return false;
   };
 
