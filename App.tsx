@@ -30,8 +30,8 @@ const USERS: User[] = [
   { username: 'ahsani', password: 'ahsani', role: 'judge', displayName: 'Ahsani Usthad', judgePanel: 'Ahsani Usthad' },
   { username: 'ajmal', password: 'ajmal', role: 'judge', displayName: 'Ajmal Usthad', judgePanel: 'Ajmal Usthad' },
   { username: 'suhail', password: 'suhail', role: 'judge', displayName: 'Suhail Usthad', judgePanel: 'Suhail Usthad' },
-  { username: 'PRUDENTIA', password: 'team1pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'PRUDENTIA' },
-  { username: 'SAPIENTIA', password: 'team2pass', role: 'teamleader', displayName: 'Team Leader', teamName: 'SAPIENTIA' }
+  { username: 'PRUDENTIA', password: 'team1pass', role: 'teamleader', displayName: 'PRUDENTIA', teamName: 'PRUDENTIA' },
+  { username: 'SAPIENTIA', password: 'team2pass', role: 'teamleader', displayName: 'SAPIENTIA', teamName: 'SAPIENTIA' }
 ];
 
 const STORAGE_KEYS = {
