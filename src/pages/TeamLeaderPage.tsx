@@ -29,7 +29,8 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
 }) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingParticipant, setEditingParticipant] = useState<TeamParticipant | null>(null);
-    const [expandedParticipant, setExpandedParticipant] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState<'name' | 'chestNumber'>('name');
 
     // Get all participants for this team
     const teamParticipants = useMemo(() => {
@@ -60,8 +61,28 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
             });
         });
 
-        return Array.from(participantsMap.values());
-    }, [programs, teamName]);
+        let result = Array.from(participantsMap.values());
+
+        // Filter
+        if (searchTerm) {
+            const lowerSearch = searchTerm.toLowerCase();
+            result = result.filter(p =>
+                p.name.toLowerCase().includes(lowerSearch) ||
+                p.chestNumber.toLowerCase().includes(lowerSearch)
+            );
+        }
+
+        // Sort
+        result.sort((a, b) => {
+            if (sortBy === 'name') {
+                return a.name.localeCompare(b.name);
+            } else {
+                return a.chestNumber.localeCompare(b.chestNumber, undefined, { numeric: true });
+            }
+        });
+
+        return result;
+    }, [programs, teamName, searchTerm, sortBy]);
 
     const handleOpenAddModal = () => {
         setEditingParticipant(null);
@@ -90,6 +111,9 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
 
     // Show ALL programs to team leaders (they can register anytime)
     const availablePrograms = programs;
+
+    // State for list expansion
+    const [expandedParticipant, setExpandedParticipant] = useState<string | null>(null);
 
     return (
         <div className="space-y-6">
@@ -136,7 +160,7 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
                     <p className="text-3xl font-black text-indigo-600">{teamParticipants.length}</p>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Total Participants</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Found Participants</p>
                 </div>
                 <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
                     <p className="text-3xl font-black text-emerald-600">{availablePrograms.length}</p>
@@ -146,16 +170,39 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                     <p className="text-3xl font-black text-violet-600">
                         {teamParticipants.reduce((sum, p) => sum + p.programs.length, 0)}
                     </p>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Total Registrations</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Registrations (Filtered)</p>
                 </div>
             </div>
 
             {/* Participants List */}
             <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                     <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">
                         Team Participants ({teamParticipants.length})
                     </h3>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-initial">
+                            <input
+                                type="text"
+                                placeholder="Search name or chest no..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full sm:w-64 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            />
+                            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as 'name' | 'chestNumber')}
+                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                        >
+                            <option value="name">Sort by Name</option>
+                            <option value="chestNumber">Sort by Chest No</option>
+                        </select>
+                    </div>
                 </div>
 
                 {teamParticipants.length === 0 ? (
