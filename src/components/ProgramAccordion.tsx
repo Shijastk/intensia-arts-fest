@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Program, ProgramStatus } from '../types';
+import { calculatePoints } from '../utils/pointsCalculator';
 
 interface ProgramAccordionProps {
   program: Program;
@@ -265,6 +266,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                   <tr>
                     <th className="px-3 py-2">Chest No / Code</th>
                     <th className="px-3 py-2">Team & Participants</th>
+                    <th className="px-3 py-2 text-center">Score</th>
                     <th className="px-3 py-2 text-center">Rank</th>
                     <th className="px-3 py-2 text-center">Grade</th>
                     <th className="px-3 py-2 text-center">Points</th>
@@ -286,6 +288,25 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           <td className="px-3 py-3">
                             <p className="font-bold text-slate-700">{participant.name}</p>
                             <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{participant.teamName}</p>
+                          </td>
+                          {/* Score */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="number"
+                                step="0.1"
+                                className="w-16 text-center border border-slate-300 rounded p-1"
+                                value={participant.score || ''}
+                                onChange={(e) => handleScoreEdit(participant.teamId, participant.chestNumber, 'score', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                <span className="font-bold text-slate-800">
+                                  {participant.score !== undefined ? participant.score :
+                                    (editedTeams.find(t => t.id === participant.teamId)?.score || '-')}
+                                </span>
+                              ) : '-'
+                            )}
                           </td>
                           {/* Rank */}
                           <td className="px-3 py-3 text-center">
@@ -320,12 +341,16 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           {/* Points */}
                           <td className="px-3 py-3 text-center">
                             {isEditingScores ? (
-                              <input
-                                type="number"
-                                className="w-12 text-center border border-slate-300 rounded p-1"
-                                value={participant.points || ''}
-                                onChange={(e) => handleScoreEdit(participant.teamId, participant.chestNumber, 'points', e.target.value)}
-                              />
+                              (() => {
+                                const score = participant.score || 0;
+                                const grade = participant.grade || '';
+                                const points = calculatePoints(score, grade, false);
+                                return (
+                                  <div className="w-12 text-center bg-slate-100 border border-slate-300 rounded p-1 font-bold text-emerald-600">
+                                    {points}
+                                  </div>
+                                );
+                              })()
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
                                 <span className="font-bold text-slate-800">{participant.points || '0'}</span>
@@ -354,6 +379,22 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                 </div>
                               ))}
                             </div>
+                          </td>
+                          {/* Score */}
+                          <td className="px-3 py-3 text-center">
+                            {isEditingScores ? (
+                              <input
+                                type="number"
+                                step="0.1"
+                                className="w-16 text-center border border-slate-300 rounded p-1"
+                                value={team.score || ''}
+                                onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'score', e.target.value)}
+                              />
+                            ) : (
+                              program.status === ProgramStatus.COMPLETED ? (
+                                <span className="font-bold text-slate-800">{team.score || '-'}</span>
+                              ) : '-'
+                            )}
                           </td>
                           {/* Rank */}
                           <td className="px-3 py-3 text-center">
@@ -388,12 +429,16 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           {/* Points */}
                           <td className="px-3 py-3 text-center">
                             {isEditingScores ? (
-                              <input
-                                type="number"
-                                className="w-12 text-center border border-slate-300 rounded p-1"
-                                value={team.points || ''}
-                                onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'points', e.target.value)}
-                              />
+                              (() => {
+                                const score = team.score || 0;
+                                const grade = team.grade || '';
+                                const points = calculatePoints(score, grade, true);
+                                return (
+                                  <div className="w-12 text-center bg-slate-100 border border-slate-300 rounded p-1 font-bold text-emerald-600">
+                                    {points}
+                                  </div>
+                                );
+                              })()
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
                                 <span className="font-bold text-slate-800">{team.points || '0'}</span>
@@ -405,7 +450,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                     )
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">No registrations found.</td>
+                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">No registrations found.</td>
                     </tr>
                   )}
                 </tbody>

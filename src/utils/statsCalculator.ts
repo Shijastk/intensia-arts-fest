@@ -65,10 +65,7 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
                     console.warn(`⚠️ Unknown team name in program "${program.name}": "${team.teamName}" with rank ${team.rank}`);
                 }
 
-                // Update Participant Points
-                // For group programs, user said "INTUVIUAL OR GROUP PROGRAMS INTUVITUAL TOPPER"
-                // Usually for group items, individuals don't get individual points for Prathibha, but the prompt implies checking individuals.
-                // I will assign points to EACH participant in the winning team.
+                // Update Participant Points - Use actual points from participant data
                 team.participants.forEach(p => {
                     const key = p.chestNumber;
                     if (!participantPoints[key]) {
@@ -77,14 +74,17 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
                             points: 0,
                             chestNumber: p.chestNumber,
                             teamName: team.teamName,
-                            isOffStage: false, // Track if they have ANY off stage points? No, filters apply per program
+                            isOffStage: false,
                             isGeneral: false
                         };
                     }
 
+                    // Use participant's actual points (not rank-based points)
+                    const actualPoints = p.points || 0;
+
                     // Logic for Kala Prathibha (All Normal Programs, No General)
                     if (!isGeneral) {
-                        participantPoints[key].points += points;
+                        participantPoints[key].points += actualPoints;
                     }
 
                     // Logic for Sarkha Prathibha (Off Stage only)
@@ -109,22 +109,21 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
 
         program.teams.forEach(team => {
             if (team.rank && POINTS[team.rank as keyof typeof POINTS]) {
-                const points = POINTS[team.rank as keyof typeof POINTS];
-
                 team.participants.forEach(p => {
                     const key = p.chestNumber;
+                    const actualPoints = p.points || 0; // Use participant's actual points
 
                     // KALA PRATHIBHA: Normal (Not General)
                     if (!isGeneral) {
                         if (!kalaCandidates[key]) kalaCandidates[key] = { ...p, points: 0, teamName: team.teamName, isOffStage, isGeneral } as any;
-                        kalaCandidates[key].points = (kalaCandidates[key].points || 0) + points;
+                        kalaCandidates[key].points = (kalaCandidates[key].points || 0) + actualPoints;
                     }
 
                     // SARKHA PRATHIBHA: Off Stage (Normal)
                     // "NORMAL PROGRAMS BASED ON ONLY OFF STAGE" -> Implies !isGeneral && isOffStage
                     if (!isGeneral && isOffStage) {
                         if (!sarkhaCandidates[key]) sarkhaCandidates[key] = { ...p, points: 0, teamName: team.teamName, isOffStage, isGeneral } as any;
-                        sarkhaCandidates[key].points = (sarkhaCandidates[key].points || 0) + points;
+                        sarkhaCandidates[key].points = (sarkhaCandidates[key].points || 0) + actualPoints;
                     }
                 });
             }

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Program, ProgramStatus } from '../types';
+import { calculatePoints, getGradeBreakdown } from '../utils/pointsCalculator';
 
 interface JudgesPageProps {
     programs: Program[];
@@ -10,7 +11,7 @@ interface JudgesPageProps {
 
 export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, currentUser, updateProgram }) => {
     const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
-    const [scores, setScores] = useState<{ [key: string]: { score: string, grade: string, points: string } }>({});
+    const [scores, setScores] = useState<{ [key: string]: { score: string, grade: string } }>({});
 
     // Only show programs that are allocated to judges and match this judge's panel
     const allocatedPrograms = useMemo(() => {
@@ -35,20 +36,19 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
     const handleSelectProgram = (program: Program) => {
         setSelectedProgram(program);
         // Initialize scores for this program's participants
-        const initialScores: { [key: string]: { score: string, grade: string, points: string } } = {};
+        const initialScores: { [key: string]: { score: string, grade: string } } = {};
         program.teams.forEach(team => {
             team.participants.forEach(participant => {
                 initialScores[participant.chestNumber] = {
                     score: participant.score?.toString() || team.score?.toString() || '',
-                    grade: participant.grade || team.grade || '',
-                    points: participant.points?.toString() || team.points?.toString() || ''
+                    grade: participant.grade || team.grade || ''
                 };
             });
         });
         setScores(initialScores);
     };
 
-    const handleScoreChange = (chestNumber: string, field: 'score' | 'grade' | 'points', value: string) => {
+    const handleScoreChange = (chestNumber: string, field: 'score' | 'grade', value: string) => {
         if (selectedProgram?.isGroup) {
             // For group items, applying score to one member applies to ALL members of that team
             const team = selectedProgram.teams.find(t => t.participants.some(p => p.chestNumber === chestNumber));
@@ -57,7 +57,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                     const newScores = { ...prev };
                     team.participants.forEach(p => {
                         newScores[p.chestNumber] = {
-                            ...(newScores[p.chestNumber] || { score: '', grade: '', points: '' }),
+                            ...(newScores[p.chestNumber] || { score: '', grade: '' }),
                             [field]: value
                         };
                     });
@@ -82,33 +82,44 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
         const confirm = window.confirm('Are you sure you want to submit these scores? This will mark the program as completed.');
         if (!confirm) return;
 
-        // Calculate ranks based on scores for ALL participants
+        // Calculate ranks based on POINTS for ALL participants
         const allParticipants = selectedProgram.teams.flatMap(team =>
-            team.participants.map(p => ({
-                chestNumber: p.chestNumber,
-                teamId: team.id,
-                score: parseFloat(scores[p.chestNumber]?.score || '0')
-            }))
-        ).sort((a, b) => b.score - a.score);
+            team.participants.map(p => {
+                const scoreData = scores[p.chestNumber];
+                const score = parseFloat(scoreData?.score || '0');
+                const grade = scoreData?.grade || '';
+                const points = calculatePoints(score, grade, selectedProgram.isGroup);
+
+                return {
+                    chestNumber: p.chestNumber,
+                    teamId: team.id,
+                    score,
+                    grade,
+                    points
+                };
+            })
+        ).sort((a, b) => b.points - a.points); // Sort by POINTS, not score
 
         // Construct the updated teams structure
         const updatedTeams = selectedProgram.teams.map(team => {
             const updatedParticipants = team.participants.map(participant => {
                 const scoreData = scores[participant.chestNumber];
+                const score = parseFloat(scoreData?.score || '0');
+                const grade = scoreData?.grade || '';
+                const points = calculatePoints(score, grade, selectedProgram.isGroup);
                 const rankIndex = allParticipants.findIndex(ps => ps.chestNumber === participant.chestNumber);
 
                 return {
                     ...participant,
-                    score: parseFloat(scoreData?.score || '0'),
-                    grade: scoreData?.grade || '',
-                    points: parseInt(scoreData?.points || '0'),
+                    score,
+                    grade,
+                    points,
                     rank: rankIndex + 1
                 };
             });
 
-            // Update team stats based on best performing participant (or sum for points)
-            // For Group items, everyone has same score, so simple average/first is fine.
-            const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0]);
+            // Update team stats based on best performing participant (highest points)
+            const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.points || 0) > (curr.points || 0) ? prev : curr, updatedParticipants[0]);
 
             return {
                 ...team,
@@ -121,8 +132,8 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
             };
         });
 
-        // NOW calculate team ranks based on team scores
-        const sortedTeams = [...updatedTeams].sort((a, b) => (b.score || 0) - (a.score || 0));
+        // NOW calculate team ranks based on team POINTS (not score!)
+        const sortedTeams = [...updatedTeams].sort((a, b) => (b.points || 0) - (a.points || 0));
         sortedTeams.forEach((team, index) => {
             const originalTeam = updatedTeams.find(t => t.id === team.id);
             if (originalTeam) {
@@ -206,10 +217,37 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                             <li>• Participants identified by Code Letter only (Anonymity Enforced)</li>
                             <li>• Group Items: Score applies to entire team</li>
                             <li>• Individual Items: Score each participant separately</li>
-                            <li>• Ranks calculated automatically</li>
+                            <li>• <strong>Points are AUTO-CALCULATED</strong> based on Score + Grade</li>
+                            <li>• Individual Max: 10 points | Group Max: 20 points</li>
                         </ul>
                     </div>
                 </div>
+            </div>
+
+            {/* Grade Points Reference Table */}
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                <h4 className="text-sm font-bold text-emerald-900 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    Grade Points Reference
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    {getGradeBreakdown(false).map(({ grade, points }) => (
+                        <div key={grade} className="bg-white rounded-lg p-2 border border-emerald-200 text-center">
+                            <div className="text-lg font-black text-emerald-600">{grade}</div>
+                            <div className="text-xs text-slate-600">
+                                <span className="font-bold">{points}</span> pts (Ind)
+                            </div>
+                            <div className="text-xs text-slate-500">
+                                <span className="font-bold">{points * 2}</span> pts (Grp)
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <p className="text-xs text-emerald-700 mt-2 italic">
+                    💡 Final Points = (Score/100 × 5) + Grade Points (Individual) or (Score/100 × 10) + Grade Points (Group)
+                </p>
             </div>
 
             {/* Programs to Judge */}
@@ -346,6 +384,11 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                                             step="0.1"
                                                             value={scores[representative.chestNumber]?.score || ''}
                                                             onChange={(e) => handleScoreChange(representative.chestNumber, 'score', e.target.value)}
+                                                            onInput={(e) => {
+                                                                const input = e.target as HTMLInputElement;
+                                                                if (parseFloat(input.value) > 100) input.value = '100';
+                                                                if (parseFloat(input.value) < 0) input.value = '0';
+                                                            }}
                                                             className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                                             placeholder="0-100"
                                                         />
@@ -359,27 +402,21 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                                             <option value="">Select</option>
                                                             <option value="A+">A+</option>
                                                             <option value="A">A</option>
-                                                            <option value="A-">A-</option>
-                                                            <option value="B+">B+</option>
                                                             <option value="B">B</option>
-                                                            <option value="B-">B-</option>
-                                                            <option value="C+">C+</option>
                                                             <option value="C">C</option>
-                                                            <option value="C-">C-</option>
-                                                            <option value="D">D</option>
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-4">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            max="10"
-                                                            step="1"
-                                                            value={scores[representative.chestNumber]?.points || ''}
-                                                            onChange={(e) => handleScoreChange(representative.chestNumber, 'points', e.target.value)}
-                                                            className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                                            placeholder="0-10"
-                                                        />
+                                                        {(() => {
+                                                            const score = parseFloat(scores[representative.chestNumber]?.score || '0');
+                                                            const grade = scores[representative.chestNumber]?.grade || '';
+                                                            const points = calculatePoints(score, grade, true); // true = isGroup
+                                                            return (
+                                                                <div className="w-20 px-3 py-2 bg-slate-100 border border-slate-300 rounded-lg text-center text-sm font-black text-emerald-600">
+                                                                    {points}
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </td>
                                                 </tr>
                                             );
@@ -414,6 +451,11 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                                                 step="0.1"
                                                                 value={scores[participant.chestNumber]?.score || ''}
                                                                 onChange={(e) => handleScoreChange(participant.chestNumber, 'score', e.target.value)}
+                                                                onInput={(e) => {
+                                                                    const input = e.target as HTMLInputElement;
+                                                                    if (parseFloat(input.value) > 100) input.value = '100';
+                                                                    if (parseFloat(input.value) < 0) input.value = '0';
+                                                                }}
                                                                 className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                                                 placeholder="0-100"
                                                             />
@@ -427,27 +469,21 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                                                 <option value="">Select</option>
                                                                 <option value="A+">A+</option>
                                                                 <option value="A">A</option>
-                                                                <option value="A-">A-</option>
-                                                                <option value="B+">B+</option>
                                                                 <option value="B">B</option>
-                                                                <option value="B-">B-</option>
-                                                                <option value="C+">C+</option>
                                                                 <option value="C">C</option>
-                                                                <option value="C-">C-</option>
-                                                                <option value="D">D</option>
                                                             </select>
                                                         </td>
                                                         <td className="px-4 py-4">
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                max="10"
-                                                                step="1"
-                                                                value={scores[participant.chestNumber]?.points || ''}
-                                                                onChange={(e) => handleScoreChange(participant.chestNumber, 'points', e.target.value)}
-                                                                className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-center text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                                                placeholder="0-10"
-                                                            />
+                                                            {(() => {
+                                                                const score = parseFloat(scores[participant.chestNumber]?.score || '0');
+                                                                const grade = scores[participant.chestNumber]?.grade || '';
+                                                                const points = calculatePoints(score, grade, false); // false = individual
+                                                                return (
+                                                                    <div className="w-20 px-3 py-2 bg-slate-100 border border-slate-300 rounded-lg text-center text-sm font-black text-emerald-600">
+                                                                        {points}
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </td>
                                                     </tr>
                                                 ))}
