@@ -4,295 +4,18 @@ import { Program } from '../types';
 interface TeamLeaderPageProps {
     teamName: string;
     programs: Program[];
-    setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
+    setPrograms: React.Dispatch<React.SetStateAction<Program[]>>; // Kept for compatibility but deprecated
+    updateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
     onLogout: () => void;
 }
 
-interface TeamParticipant {
-    name: string;
-    chestNumber: string;
-    programs: Array<{
-        id: string;
-        name: string;
-        category: string;
-        isGeneral: boolean;
-    }>;
-}
+// ... 
 
-export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
-    teamName,
-    programs,
-    setPrograms,
-    onLogout
-}) => {
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [editingParticipant, setEditingParticipant] = useState<TeamParticipant | null>(null);
-    const [expandedParticipant, setExpandedParticipant] = useState<string | null>(null);
-
-    // Get all participants for this team
-    const teamParticipants = useMemo(() => {
-        const participantsMap = new Map<string, TeamParticipant>();
-
-        programs.forEach(program => {
-            const isGeneral = program.category.toLowerCase().includes('general');
-
-            program.teams.forEach(team => {
-                if (team.teamName === teamName) {
-                    team.participants.forEach(participant => {
-                        const key = participant.chestNumber;
-                        if (!participantsMap.has(key)) {
-                            participantsMap.set(key, {
-                                name: participant.name,
-                                chestNumber: participant.chestNumber,
-                                programs: []
-                            });
-                        }
-                        participantsMap.get(key)!.programs.push({
-                            id: program.id,
-                            name: program.name,
-                            category: program.category,
-                            isGeneral
-                        });
-                    });
-                }
-            });
-        });
-
-        return Array.from(participantsMap.values());
-    }, [programs, teamName]);
-
-    const handleOpenAddModal = () => {
-        setEditingParticipant(null);
-        setShowAddModal(true);
-    };
-
-    const handleEditParticipant = (participant: TeamParticipant) => {
-        setEditingParticipant(participant);
-        setShowAddModal(true);
-    };
-
-    const handleDeleteParticipant = (chestNumber: string) => {
-        if (!confirm('Are you sure you want to remove this participant from all programs?')) return;
-
-        setPrograms(prev => prev.map(program => ({
-            ...program,
-            teams: program.teams.map(team => {
-                if (team.teamName !== teamName) return team;
-                return {
-                    ...team,
-                    participants: team.participants.filter(p => p.chestNumber !== chestNumber)
-                };
-            }).filter(team => team.participants.length > 0)
-        })));
-    };
-
-    // Show ALL programs to team leaders (they can register anytime)
-    const availablePrograms = programs;
-
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
-                <div>
-                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">{teamName} - Registration Portal</h2>
-                    <p className="text-xs text-slate-500 font-medium">Add participants and select programs for them</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleOpenAddModal}
-                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-md"
-                    >
-                        + Add Participant
-                    </button>
-                    <button
-                        onClick={onLogout}
-                        className="px-6 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all"
-                    >
-                        Logout
-                    </button>
-                </div>
-            </div>
-
-            {/* Info Card */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                        <h4 className="text-sm font-bold text-amber-900 mb-1">Registration Limits</h4>
-                        <ul className="text-xs text-amber-800 space-y-1">
-                            <li>• Maximum <strong>4 programs</strong> in normal categories (stage and non-stage)</li>
-                            <li>• <strong>Unlimited programs</strong>in general categories</li>
-                            <li>• System will automatically prevent exceeding limits</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            {/* Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-                    <p className="text-3xl font-black text-indigo-600">{teamParticipants.length}</p>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Total Participants</p>
-                </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-                    <p className="text-3xl font-black text-emerald-600">{availablePrograms.length}</p>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Available Programs</p>
-                </div>
-                <div className="bg-white rounded-xl border border-slate-200 p-5 text-center">
-                    <p className="text-3xl font-black text-violet-600">
-                        {teamParticipants.reduce((sum, p) => sum + p.programs.length, 0)}
-                    </p>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Total Registrations</p>
-                </div>
-            </div>
-
-            {/* Participants List */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">
-                        Team Participants ({teamParticipants.length})
-                    </h3>
-                </div>
-
-                {teamParticipants.length === 0 ? (
-                    <div className="text-center py-12">
-                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
-                        </div>
-                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No Participants Added</p>
-                        <p className="text-xs text-slate-300 mt-1">Click "+ Add Participant" to get started</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {teamParticipants.map(participant => {
-                            const normalProgramCount = participant.programs.filter(p => !p.isGeneral).length;
-                            const generalProgramCount = participant.programs.filter(p => p.isGeneral).length;
-                            const isExpanded = expandedParticipant === participant.chestNumber;
-
-                            return (
-                                <div key={participant.chestNumber} className="border border-slate-200 rounded-xl overflow-hidden overflow-x-auto no-scrollbar">
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 min-w-[700px]">
-                                        <button
-                                            onClick={() => setExpandedParticipant(isExpanded ? null : participant.chestNumber)}
-                                            className="flex-1 flex items-center gap-4 text-left"
-                                        >
-                                            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                                <span className="text-lg font-black text-indigo-600">
-                                                    {participant.name.charAt(0).toUpperCase()}
-                                                </span>
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="text-sm font-black text-slate-900">{participant.name}</h4>
-                                                <div className="flex items-center gap-3 mt-0.5">
-                                                    <span className="text-xs text-slate-500 font-medium">Chest: {participant.chestNumber}</span>
-                                                    <span className={`text-xs font-bold ${normalProgramCount >= 4 ? 'text-red-600' : 'text-green-600'}`}>
-                                                        Normal: {normalProgramCount}/4
-                                                    </span>
-                                                    <span className="text-xs font-bold text-blue-600">
-                                                        General: {generalProgramCount}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </button>
-
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold">
-                                                {participant.programs.length} Programs
-                                            </span>
-                                            <button
-                                                onClick={() => handleEditParticipant(participant)}
-                                                className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
-                                                title="Edit Programs"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteParticipant(participant.chestNumber)}
-                                                className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
-                                                title="Delete Participant"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                onClick={() => setExpandedParticipant(isExpanded ? null : participant.chestNumber)}
-                                                className="p-1"
-                                            >
-                                                <svg
-                                                    className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {isExpanded && (
-                                        <div className="p-4 bg-white border-t border-slate-200 min-w-[700px]">
-                                            <h5 className="text-xs font-black uppercase text-slate-400 mb-3">Registered Programs</h5>
-                                            {participant.programs.length > 0 ? (
-                                                <div className="space-y-2">
-                                                    {participant.programs.map(prog => (
-                                                        <div key={prog.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                                                            <div>
-                                                                <p className="text-sm font-bold text-slate-900">{prog.name}</p>
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-xs text-slate-500">{prog.category}</span>
-                                                                    {prog.isGeneral && (
-                                                                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-black uppercase">
-                                                                            Unlimited
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-slate-400 italic text-center py-4">No programs selected</p>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* Add/Edit Participant Modal */}
-            {showAddModal && (
-                <ParticipantProgramModal
-                    teamName={teamName}
-                    programs={programs}
-                    setPrograms={setPrograms}
-                    availablePrograms={availablePrograms}
-                    editingParticipant={editingParticipant}
-                    onClose={() => {
-                        setShowAddModal(false);
-                        setEditingParticipant(null);
-                    }}
-                />
-            )}
-        </div>
-    );
-};
-
-// Modal Component for Adding/Editing Participant and Selecting Programs
 interface ParticipantProgramModalProps {
     teamName: string;
     programs: Program[];
     setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
+    updateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
     availablePrograms: Program[];
     editingParticipant: TeamParticipant | null;
     onClose: () => void;
@@ -302,6 +25,7 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
     teamName,
     programs,
     setPrograms,
+    updateProgram,
     availablePrograms,
     editingParticipant,
     onClose
@@ -364,7 +88,7 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
         setSelectedPrograms(newSelected);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!name.trim() || !chestNumber.trim()) {
@@ -377,7 +101,7 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
             return;
         }
 
-        // Check if chest number already exists (when adding new)
+        // Check if chest number already exists
         if (!editingParticipant) {
             const exists = programs.some(p =>
                 p.teams.some(t =>
@@ -391,130 +115,107 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
             }
         }
 
-        // ✅ NEW: Validate group program participant limits
+        // Validate group program limits
         const validationErrors: string[] = [];
-
         selectedPrograms.forEach(programId => {
             const program = programs.find(p => p.id === programId);
             if (!program) return;
-
-            // Check if this is a group program with participant limits
             if (program.isGroup && program.participantsCount) {
-                // Count how many teams are already registered for this program
                 const totalTeams = new Set(program.teams.map(t => t.teamName)).size;
-
-                // If this team isn't registered yet, count them as a new team
                 const teamExists = program.teams.some(t => t.teamName === teamName);
                 const effectiveTotalTeams = teamExists ? totalTeams : totalTeams + 1;
-
-                // Calculate per-team limit (total participants / number of teams)
                 const perTeamLimit = Math.floor(program.participantsCount / effectiveTotalTeams);
 
-                // Count current participants for this team in this program
                 const currentTeamParticipantCount = program.teams
                     .filter(t => t.teamName === teamName)
                     .reduce((sum, t) => sum + t.participants.length, 0);
 
-                // When editing, subtract 1 because we're replacing, not adding
                 const adjustedCount = editingParticipant ? currentTeamParticipantCount - 1 : currentTeamParticipantCount;
 
-                // Check if adding this participant would exceed the limit
                 if (adjustedCount >= perTeamLimit) {
                     validationErrors.push(
-                        `"${program.name}" - Your team can only register ${perTeamLimit} participant(s). ` +
-                        `(Total: ${program.participantsCount} ÷ ${effectiveTotalTeams} teams = ${perTeamLimit} per team)`
+                        `"${program.name}" - Limit: ${perTeamLimit} per team`
                     );
                 }
             }
         });
 
-        // Show validation errors if any
         if (validationErrors.length > 0) {
-            alert(
-                'Group Program Limits Exceeded:\n\n' +
-                validationErrors.join('\n\n') +
-                '\n\nPlease adjust your program selection.'
-            );
+            alert('Group Limits Exceeded:\n\n' + validationErrors.join('\n'));
             return;
         }
 
-        // SMART UPDATE: Preserve existing data (like code letters) while updating details
-        setPrograms(currentPrograms => {
-            return currentPrograms.map(program => {
-                const isSelected = selectedPrograms.has(program.id);
+        if (!updateProgram) {
+            alert("Update feature unavailable.");
+            return;
+        }
 
-                // Find our team in this program
-                const teamIndex = program.teams.findIndex(t => t.teamName === teamName);
+        // Process Updates
+        const updates: Promise<boolean>[] = [];
 
-                // Case 1: Team doesn't exist yet
-                if (teamIndex === -1) {
-                    // If not selected, nothing to do
-                    if (!isSelected) return program;
+        for (const program of programs) {
+            const isSelected = selectedPrograms.has(program.id);
+            let updatedTeams = [...program.teams];
+            const teamIndex = updatedTeams.findIndex(t => t.teamName === teamName);
+            let modified = false;
 
-                    // If selected, create new team with new participant
-                    return {
-                        ...program,
-                        teams: [...program.teams, {
-                            id: `t-${Date.now()}-${Math.random()}`,
-                            teamName,
-                            participants: [{ name, chestNumber }]
-                        }]
-                    };
+            if (teamIndex === -1) {
+                // Team doesn't exist
+                if (isSelected) {
+                    // Add Team + Participant
+                    updatedTeams.push({
+                        id: `t-${Date.now()}-${Math.random()}`,
+                        teamName,
+                        participants: [{ name, chestNumber }]
+                    });
+                    modified = true;
                 }
+            } else {
+                // Team exists
+                const team = { ...updatedTeams[teamIndex] };
+                let participants = [...team.participants];
 
-                // Case 2: Team exists, we need to modify participants list
-                const existingTeam = program.teams[teamIndex];
-                let updatedParticipants = [...existingTeam.participants];
-
-                // Identity to look for: logic depends on whether we are editing or adding
-                // If editing, look for the OLD chest number. If adding, look for NEW chest number (duplicate check)
                 const searchChestNumber = editingParticipant ? editingParticipant.chestNumber : chestNumber;
-                const existingParticipantIndex = updatedParticipants.findIndex(p => p.chestNumber === searchChestNumber);
+                const pIndex = participants.findIndex(p => p.chestNumber === searchChestNumber);
 
                 if (isSelected) {
-                    if (existingParticipantIndex >= 0) {
-                        // UPDATE: Participant exists, update name/chestNumber, PRESERVE other fields (codeLetter, etc.)
-                        updatedParticipants[existingParticipantIndex] = {
-                            ...updatedParticipants[existingParticipantIndex],
-                            name: name,
-                            chestNumber: chestNumber // Update chest number in case it changed
-                        };
+                    if (pIndex >= 0) {
+                        // Update Existing
+                        if (participants[pIndex].name !== name || participants[pIndex].chestNumber !== chestNumber) {
+                            participants[pIndex] = { ...participants[pIndex], name, chestNumber };
+                            modified = true;
+                        }
                     } else {
-                        // ADD: Participant not in this program yet, add them
-                        updatedParticipants.push({ name, chestNumber });
+                        // Add New to Team
+                        participants.push({ name, chestNumber });
+                        modified = true;
                     }
                 } else {
-                    if (existingParticipantIndex >= 0) {
-                        // REMOVE: Participant was here but program is now unselected
-                        updatedParticipants = updatedParticipants.filter((_, idx) => idx !== existingParticipantIndex);
+                    if (pIndex >= 0) {
+                        // Remove from Team
+                        participants = participants.filter((_, idx) => idx !== pIndex);
+                        modified = true;
                     }
-                    // Else: wasn't here, didn't want to be here, do nothing
                 }
 
-                // If team has no participants left, remove the team? 
-                // Usually cleaner to remove empty teams to keep data tidy
-                if (updatedParticipants.length === 0) {
-                    return {
-                        ...program,
-                        teams: program.teams.filter(t => t.teamName !== teamName)
-                    };
+                if (modified) {
+                    if (participants.length === 0) {
+                        // Remove team if empty
+                        updatedTeams = updatedTeams.filter((_, idx) => idx !== teamIndex);
+                    } else {
+                        team.participants = participants;
+                        updatedTeams[teamIndex] = team;
+                    }
                 }
+            }
 
-                // Update the team with new participants list
-                const updatedTeams = [...program.teams];
-                updatedTeams[teamIndex] = {
-                    ...existingTeam,
-                    participants: updatedParticipants
-                };
+            if (modified) {
+                updates.push(updateProgram(program.id, { teams: updatedTeams }));
+            }
+        }
 
-                return {
-                    ...program,
-                    teams: updatedTeams
-                };
-            });
-        });
-
-        alert(editingParticipant ? 'Participant updated successfully!' : 'Participant added successfully!');
+        await Promise.all(updates);
+        alert(editingParticipant ? 'Updated successfully!' : 'Added successfully!');
         onClose();
     };
 

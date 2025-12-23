@@ -284,6 +284,7 @@ const Dashboard = ({
             teamName={currentUser.teamName}
             programs={programs}
             setPrograms={setPrograms}
+            updateProgram={updateProgram}
             onLogout={handleLogout}
           />
         ) : null;
