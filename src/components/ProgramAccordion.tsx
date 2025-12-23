@@ -275,8 +275,8 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                     // Logic Difference: Individual (Row per Participant) vs Group (Row per Team)
                     !program.isGroup ? (
                       // INDIVIDUAL ITEM: Flatten participants
-                      editedTeams.flatMap(team => team.participants.map(p => ({ ...p, teamId: team.id, teamName: team.teamName }))).map((participant) => (
-                        <tr key={participant.chestNumber} className="hover:bg-slate-50/50">
+                      editedTeams.flatMap(team => team.participants.map(p => ({ ...p, teamId: team.id, teamName: team.teamName }))).map((participant, flatIdx) => (
+                        <tr key={`${participant.teamId}-${participant.chestNumber}-${flatIdx}`} className="hover:bg-slate-50/50">
                           <td className="px-3 py-3">
                             <div className="flex flex-col">
                               <span className="font-bold text-slate-800">{participant.chestNumber}</span>
@@ -346,9 +346,12 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           </td>
                           <td className="px-3 py-3">
                             <p className="font-bold text-slate-700">{team.teamName}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
+                            <div className="flex flex-col gap-1 mt-1">
                               {team.participants.map((p, idx) => (
-                                <span key={idx} className="text-slate-500 font-medium">{p.name}</span>
+                                <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                                  {p.name}
+                                </div>
                               ))}
                             </div>
                           </td>
