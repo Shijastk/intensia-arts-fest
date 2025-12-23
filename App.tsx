@@ -277,7 +277,7 @@ const Dashboard = ({
       case 'GREEN_ROOM':
         return <GreenRoomPage programs={programs} setPrograms={setPrograms} updateProgram={updateProgram} />;
       case 'JUDGES':
-        return <JudgesPage programs={programs} setPrograms={setPrograms} currentUser={currentUser} />;
+        return <JudgesPage programs={programs} setPrograms={setPrograms} currentUser={currentUser} updateProgram={updateProgram} />;
       case 'TEAM_LEADER':
         return currentUser?.teamName ? (
           <TeamLeaderPage

@@ -5,9 +5,10 @@ interface JudgesPageProps {
     programs: Program[];
     setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
     currentUser: { judgePanel?: string } | null;
+    updateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
 }
 
-export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, currentUser }) => {
+export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, currentUser, updateProgram }) => {
     const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
     const [scores, setScores] = useState<{ [key: string]: { score: string, grade: string, points: string } }>({});
 
@@ -75,7 +76,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
         }
     };
 
-    const handleSubmitScores = () => {
+    const handleSubmitScores = async () => {
         if (!selectedProgram) return;
 
         const confirm = window.confirm('Are you sure you want to submit these scores? This will mark the program as completed.');
@@ -90,47 +91,66 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
             }))
         ).sort((a, b) => b.score - a.score);
 
-        // Update programs with scores and ranks
-        setPrograms(prev => prev.map(p => {
-            if (p.id !== selectedProgram.id) return p;
+        // Construct the updated teams structure
+        const updatedTeams = selectedProgram.teams.map(team => {
+            const updatedParticipants = team.participants.map(participant => {
+                const scoreData = scores[participant.chestNumber];
+                const rankIndex = allParticipants.findIndex(ps => ps.chestNumber === participant.chestNumber);
+
+                return {
+                    ...participant,
+                    score: parseFloat(scoreData?.score || '0'),
+                    grade: scoreData?.grade || '',
+                    points: parseInt(scoreData?.points || '0'),
+                    rank: rankIndex + 1
+                };
+            });
+
+            // Update team stats based on best performing participant (or sum for points)
+            // For Group items, everyone has same score, so simple average/first is fine.
+            const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0]);
 
             return {
-                ...p,
-                status: ProgramStatus.COMPLETED,
-                isPublished: false, // Ensure result is NOT published until Admin approves
-                teams: p.teams.map(team => {
-                    const updatedParticipants = team.participants.map(participant => {
-                        const scoreData = scores[participant.chestNumber];
-                        const rankIndex = allParticipants.findIndex(ps => ps.chestNumber === participant.chestNumber);
-
-                        return {
-                            ...participant,
-                            score: parseFloat(scoreData?.score || '0'),
-                            grade: scoreData?.grade || '',
-                            points: parseInt(scoreData?.points || '0'),
-                            rank: rankIndex + 1
-                        };
-                    });
-
-                    // Update team stats based on best performing participant (or sum for points)
-                    // For Group items, everyone has same score, so simple average/first is fine.
-                    const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0]);
-
-                    return {
-                        ...team,
-                        participants: updatedParticipants,
-                        score: bestParticipant.score,
-                        grade: bestParticipant.grade,
-                        rank: bestParticipant.rank,
-                        points: updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0) // Sum points from all participants in the team
-                    };
-                })
+                ...team,
+                participants: updatedParticipants,
+                score: bestParticipant.score,
+                grade: bestParticipant.grade,
+                rank: bestParticipant.rank,
+                points: updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0) // Sum points from all participants in the team
             };
-        }));
+        });
 
-        alert('Scores submitted successfully! Program marked as completed.');
-        setSelectedProgram(null);
-        setScores({});
+        // Use updateProgram if available for reliable Firebase sync
+        if (updateProgram) {
+            const success = await updateProgram(selectedProgram.id, {
+                status: ProgramStatus.COMPLETED,
+                isPublished: false,
+                teams: updatedTeams
+            });
+
+            if (success) {
+                alert('Scores submitted successfully! Program marked as completed.');
+                setSelectedProgram(null);
+                setScores({});
+            } else {
+                alert('Failed to submit scores. Please try again.');
+            }
+        } else {
+            // Legacy fallback (likely not persisting)
+            console.warn("Using unsafe setPrograms fallback");
+            setPrograms(prev => prev.map(p => {
+                if (p.id !== selectedProgram.id) return p;
+                return {
+                    ...p,
+                    status: ProgramStatus.COMPLETED,
+                    isPublished: false,
+                    teams: updatedTeams
+                };
+            }));
+            alert('Scores submitted locally (Verify persistence).');
+            setSelectedProgram(null);
+            setScores({});
+        }
     };
 
     return (
