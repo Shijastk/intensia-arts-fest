@@ -33,5 +33,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+   
+    // Gallery collection
+    match /gallery/{imageId} {
+      // Allow read for everyone (public gallery)
+      allow read: if true;
+      // Allow write for all (you can restrict this to authenticated users if needed)
+      allow write: if true;
+    }
   }
 }

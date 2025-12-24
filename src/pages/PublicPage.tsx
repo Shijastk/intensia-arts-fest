@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { Program, ProgramStatus } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Program, ProgramStatus, GalleryImage } from '../types';
 import { Link } from 'react-router-dom';
+import { subscribeToGalleryImages } from '../services/firestore.service';
 
 interface PublicPageProps {
     programs: Program[];
@@ -9,6 +10,15 @@ interface PublicPageProps {
 export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [activeTab, setActiveTab] = useState<'HOME' | 'RESULTS'>('HOME');
+    const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+
+    // Subscribe to gallery images
+    useEffect(() => {
+        const unsubscribe = subscribeToGalleryImages((images) => {
+            setGalleryImages(images.slice(0, 3)); // Only show latest 3 images
+        });
+        return () => unsubscribe();
+    }, []);
 
     const completedPrograms = useMemo(() =>
         programs.filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished).sort((a, b) =>
@@ -233,6 +243,59 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Gallery Section - Only visible if at least 1 image exists */}
+            {galleryImages.length > 0 && (
+                <div className="py-12 md:py-24 bg-white">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 md:mb-12 gap-6">
+                            <div>
+                                <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-2">— Event Gallery</p>
+                                <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">Festival Moments</h2>
+                                <p className="text-sm text-slate-500 mt-2">Capturing the vibrant moments from our event</p>
+                            </div>
+                            {/* View All button - Only visible if 3 or more images */}
+                            {galleryImages.length >= 3 && (
+                                <Link
+                                    to="/gallery"
+                                    className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-teal-200 flex items-center gap-2"
+                                >
+                                    View All Photos
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                                </Link>
+                            )}
+                        </div>
+
+                        {/* Gallery Grid - Latest 3 images */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {galleryImages.map((image, index) => (
+                                <div
+                                    key={image.id}
+                                    className="group relative aspect-square rounded-[2rem] overflow-hidden bg-slate-100 shadow-lg hover:shadow-2xl transition-all duration-300"
+                                >
+                                    <img
+                                        src={image.imageUrl}
+                                        alt={`Gallery ${index + 1}`}
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                        onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%23f1f5f9" width="400" height="400"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="18" dy="50%25" dx="50%25" text-anchor="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
+                                        }}
+                                    />
+                                    {/* Overlay */}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                        <div className="absolute bottom-6 left-6 right-6">
+                                            <p className="text-white text-xs font-bold uppercase tracking-wide">
+                                                Intensia 2025
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Results & Events Section */}
             <div id="results" className="py-12 md:py-24 bg-slate-50">

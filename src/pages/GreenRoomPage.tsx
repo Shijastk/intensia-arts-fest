@@ -1,6 +1,7 @@
 import React from 'react';
 import { Program, ProgramStatus } from '../types';
 import { GreenRoomProgramCard } from '../components/GreenRoomProgramCard';
+import { GalleryUpload } from '../components/GalleryUpload';
 
 interface GreenRoomPageProps {
     programs: Program[];
@@ -112,6 +113,9 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                     <p className="text-xl font-black">{filteredPrograms.filter(p => !p.isAllocatedToJudge && p.status === ProgramStatus.PENDING).length}</p>
                 </div>
             </div>
+
+            {/* Gallery Upload Section */}
+            <GalleryUpload />
 
             <div className="space-y-10">
                 {filteredPrograms.length === 0 ? (

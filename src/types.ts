@@ -65,3 +65,10 @@ export interface ParticipantSummary {
   achievements: { programName: string; rank: number }[];
   totalWins: number;
 }
+
+export interface GalleryImage {
+  id: string;
+  imageUrl: string;
+  createdAt: any; // Firestore Timestamp
+  uploadedBy?: string;
+}

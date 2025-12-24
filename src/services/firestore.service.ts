@@ -213,7 +213,8 @@ import { Program } from '../types'; // Note: Assuming 'Program' type is aliased/
 // Collection names (CHANGED: PROGRAMS now points to 'events' for testing)
 export const COLLECTIONS = {
     PROGRAMS: 'events', // ← KEY CHANGE: Internally uses 'events' collection
-    USERS: 'users'
+    USERS: 'users',
+    GALLERY: 'gallery'
 };
 
 /**
@@ -382,6 +383,74 @@ export const clearAllPrograms = async (): Promise<boolean> => {
         return true;
     } catch (error) {
         console.error('Error clearing programs:', error);
+        return false;
+    }
+};
+
+/**
+ * Gallery Service
+ */
+
+// Add new gallery image
+export const addGalleryImage = async (imageUrl: string, uploadedBy?: string): Promise<string | null> => {
+    try {
+        const docRef = await addDoc(collection(db, COLLECTIONS.GALLERY), {
+            imageUrl,
+            uploadedBy,
+            createdAt: Timestamp.now()
+        });
+        console.log('✅ Gallery image added:', docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error('❌ Error adding gallery image:', error);
+        return null;
+    }
+};
+
+// Get all gallery images (one-time fetch)
+export const getAllGalleryImages = async (): Promise<any[]> => {
+    try {
+        const galleryRef = collection(db, COLLECTIONS.GALLERY);
+        const q = query(galleryRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+
+        const images: any[] = [];
+        snapshot.forEach((doc) => {
+            images.push({ id: doc.id, ...doc.data() });
+        });
+
+        return images;
+    } catch (error) {
+        console.error('❌ Error getting gallery images:', error);
+        return [];
+    }
+};
+
+// Subscribe to gallery images (real-time listener)
+export const subscribeToGalleryImages = (callback: (images: any[]) => void) => {
+    const galleryRef = collection(db, COLLECTIONS.GALLERY);
+    const q = query(galleryRef, orderBy('createdAt', 'desc'));
+
+    return onSnapshot(q, (snapshot) => {
+        const images: any[] = [];
+        snapshot.forEach((doc) => {
+            images.push({ id: doc.id, ...doc.data() });
+        });
+        callback(images);
+    }, (error) => {
+        console.error('❌ Error fetching gallery images:', error);
+        callback([]);
+    });
+};
+
+// Delete gallery image
+export const deleteGalleryImage = async (id: string): Promise<boolean> => {
+    try {
+        await deleteDoc(doc(db, COLLECTIONS.GALLERY, id));
+        console.log('✅ Gallery image deleted:', id);
+        return true;
+    } catch (error) {
+        console.error('❌ Error deleting gallery image:', error);
         return false;
     }
 };
