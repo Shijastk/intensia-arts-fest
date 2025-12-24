@@ -3,22 +3,22 @@ import { collection, getDocs, writeBatch } from 'firebase/firestore';
 
 /**
  * ⚠️ DANGER: Delete All Data from Firebase
- * This will permanently delete ALL programs and related data
+ * This will permanently delete ALL events and related data
  * Use with extreme caution!
  */
 export const deleteAllFirebaseData = async (): Promise<boolean> => {
     try {
         console.log('🗑️ Starting to delete all Firebase data...');
 
-        const programsRef = collection(db, 'programs');
-        const snapshot = await getDocs(programsRef);
+        const eventsRef = collection(db, 'events');
+        const snapshot = await getDocs(eventsRef);
 
         if (snapshot.empty) {
             console.log('✅ No data to delete - Firebase is already empty');
             return true;
         }
 
-        console.log(`Found ${snapshot.size} programs to delete...`);
+        console.log(`Found ${snapshot.size} events to delete...`);
 
         // Firestore batch can handle max 500 operations
         const batchSize = 500;

@@ -1,21 +1,34 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Programs collection
-    match /programs/{programId} {
+   
+    // Events collection (ACTIVE - Primary collection in use)
+    match /events/{eventId} {
       // Allow read for all authenticated users
       allow read: if true;
-      
+     
       // Allow write for all (you can restrict this based on your needs)
       allow write: if true;
-      
+     
       // For production, you might want:
       // allow read: if request.auth != null;
       // allow write: if request.auth != null && request.auth.token.admin == true;
+      
+      // Optional: If you have subcollections (e.g., teams/participants under events), add:
+      // match /{subcollection}/{document} {
+      //   allow read, write: if true;  // Adjust as needed
+      // }
     }
-    
-    // Users collection (if you add it later)
+   
+    // Programs collection (LEGACY - Old collection, kept for backup/verification)
+    match /programs/{programId} {
+      // Allow read for verification/migration scripts
+      allow read: if true;
+      // Prevent writes to old collection
+      allow write: if false;
+    }
+   
+    // Users collection
     match /users/{userId} {
       allow read: if true;
       allow write: if true;

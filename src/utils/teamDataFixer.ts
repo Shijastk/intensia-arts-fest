@@ -5,8 +5,7 @@ import { Program } from '../types';
  * PRUDENTIA: 200-299
  * SAPIENTIA: 300-399
  * 
- * NOTE: Team names are swapped before saving to Firebase because
- * usePrograms hook applies a reverse swap when loading data
+ * ✅ FIXED: Team names are now saved correctly without swapping
  */
 export const fixTeamAssignments = (programs: Program[]): Program[] => {
     const fixedPrograms = programs.map(program => {
@@ -22,11 +21,10 @@ export const fixTeamAssignments = (programs: Program[]): Program[] => {
             });
         });
 
-        // Create new team structure
-        // NOTE: We create teams with swapped names because usePrograms will swap them back
+        // Create new team structure with CORRECT team names
         const prudentiaTeam = {
             id: `t-prudentia-${Date.now()}`,
-            teamName: 'SAPIENTIA', // Will be swapped to PRUDENTIA by usePrograms
+            teamName: 'PRUDENTIA', // ✅ CORRECT: Chest 200-299 → PRUDENTIA
             participants: [] as any[],
             score: undefined,
             rank: undefined,
@@ -36,7 +34,7 @@ export const fixTeamAssignments = (programs: Program[]): Program[] => {
 
         const sapientiaTeam = {
             id: `t-sapientia-${Date.now()}`,
-            teamName: 'PRUDENTIA', // Will be swapped to SAPIENTIA by usePrograms
+            teamName: 'SAPIENTIA', // ✅ CORRECT: Chest 300-399 → SAPIENTIA
             participants: [] as any[],
             score: undefined,
             rank: undefined,
@@ -49,10 +47,10 @@ export const fixTeamAssignments = (programs: Program[]): Program[] => {
             const chestNum = parseInt(participant.chestNumber);
 
             if (chestNum >= 200 && chestNum <= 299) {
-                // Belongs to PRUDENTIA (but save as SAPIENTIA due to swap)
+                // ✅ CORRECT: Chest 200-299 → PRUDENTIA
                 prudentiaTeam.participants.push(participant);
             } else if (chestNum >= 300 && chestNum <= 399) {
-                // Belongs to SAPIENTIA (but save as PRUDENTIA due to swap)
+                // ✅ CORRECT: Chest 300-399 → SAPIENTIA
                 sapientiaTeam.participants.push(participant);
             } else {
                 // Unknown range - keep in original team or skip

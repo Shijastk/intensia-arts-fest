@@ -22,17 +22,7 @@ export const usePrograms = () => {
     // Subscribe to real-time updates
     useEffect(() => {
         const unsubscribe = subscribeToPrograms((updatedPrograms) => {
-            // Apply User Requested Team Name Swap
-            const swappedPrograms = updatedPrograms.map(p => ({
-                ...p,
-                teams: p.teams.map(t => {
-                    if (t.teamName === 'PRUDENTIA') return { ...t, teamName: 'SAPIENTIA' };
-                    if (t.teamName === 'SAPIENTIA') return { ...t, teamName: 'PRUDENTIA' };
-                    return t;
-                })
-            }));
-
-            setPrograms(swappedPrograms);
+            setPrograms(updatedPrograms);
             setLoading(false);
             setInitialized(true);
         });
