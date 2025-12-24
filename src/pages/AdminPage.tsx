@@ -17,26 +17,18 @@ interface AdminPageProps {
 }
 
 const CATEGORIES = [
-    "A zone stage",
-    "A zone no stage",
-    "A zone general stage",
-    "A zone general non stage",
     "B zone stage senior",
     "B zone stage junior",
     "B zone no stage senior",
     "B zone no stage junior",
-    "B zone general stage senior",
-    "B zone general stage junior",
-    "B zone general non stage senior",
-    "B zone general non stage junior",
+    "B zone general stage",
+    "B zone general non stage",
     "C zone stage senior",
     "C zone stage junior",
     "C zone no stage senior",
     "C zone no stage junior",
-    "C zone general stage senior",
-    "C zone general stage junior",
-    "C zone general non stage senior",
-    "C zone general non stage junior",
+    "C zone general stage",
+    "C zone general non stage",
 
 ];
 
@@ -137,16 +129,38 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, add
             // Apply fixes
             const fixedPrograms = fixTeamAssignments(programs);
 
-            // Update each program in Firebase
+            // Update ONLY programs that have changed
             const updates: Promise<boolean>[] = [];
-            fixedPrograms.forEach(program => {
-                updates.push(updateProgram(program.id, { teams: program.teams }));
-            });
+            let updatedCount = 0;
 
-            await Promise.all(updates);
+            for (let i = 0; i < programs.length; i++) {
+                const original = programs[i];
+                const fixed = fixedPrograms[i];
 
-            alert(`✅ Team Data Fixed Successfully!\n\n${report.movedParticipants.length} participants moved across ${report.affectedPrograms} programs.\n\nPlease check the Team Leader pages to verify.`);
-            setShowFixModal(false);
+                // Simple deep comparison of teams
+                if (JSON.stringify(original.teams) !== JSON.stringify(fixed.teams)) {
+                    updates.push(updateProgram(fixed.id, { teams: fixed.teams }));
+                    updatedCount++;
+                }
+            }
+
+            if (updatedCount === 0) {
+                // Should not happen if report said changes exist, but safe guard
+                alert('No impactful changes detected after processing.');
+                setIsFixing(false);
+                return;
+            }
+
+            const results = await Promise.all(updates);
+            const successfulUpdates = results.filter(r => r).length;
+
+            if (successfulUpdates === updatedCount) {
+                alert(`✅ Team Data Fixed Successfully!\n\n${report.movedParticipants.length} participants moved.\n${successfulUpdates} programs updated.\n\nPlease check the Team Leader pages to verify.`);
+                setShowFixModal(false);
+            } else {
+                alert(`⚠️ Partial Success. Updated ${successfulUpdates} out of ${updatedCount} programs.\nSome updates may have failed.`);
+            }
+
         } catch (error) {
             console.error('Error fixing team data:', error);
             alert('❌ Failed to fix team data. Please try again or contact support.');

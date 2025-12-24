@@ -32,17 +32,22 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
     const [editingParticipant, setEditingParticipant] = useState<TeamParticipant | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState<'name' | 'chestNumber'>('name');
+    const [zoneFilter, setZoneFilter] = useState<'All' | 'A' | 'B' | 'C' | 'General'>('All');
     const [isLoading, setIsLoading] = useState(false);
 
     // Get all participants for this team 
     const teamParticipants = useMemo(() => {
-        const participantsMap = new Map<string, TeamParticipant>();
+        const participantsMap = new Map<string, TeamParticipant & { zones: Set<string> }>();
 
         programs.forEach(program => {
-            const isGeneral = program.category.toLowerCase().includes('general');
-            // console.log(program,"proggrams")
+            const isGeneral = program.category.toLowerCase().includes('general') || program.name.toLowerCase().includes('general');
+            let programZone = 'General';
+            const catLower = program.category.toLowerCase();
+            if (catLower.includes('a zone')) programZone = 'A';
+            else if (catLower.includes('b zone')) programZone = 'B';
+            else if (catLower.includes('c zone')) programZone = 'C';
+
             program.teams.forEach(team => {
-                console.log(team, "team")
                 if (team.teamName === teamName) {
                     team.participants.forEach(participant => {
                         const key = `${participant.chestNumber}-${participant.name}`.toLowerCase();
@@ -50,16 +55,25 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                             participantsMap.set(key, {
                                 name: participant.name,
                                 chestNumber: participant.chestNumber,
-                                programs: []
+                                programs: [],
+                                zones: new Set() // Track zones this participant belongs to
                             });
                         }
-                        participantsMap.get(key)!.programs.push({
+                        const pEntry = participantsMap.get(key)!;
+
+                        // Add program
+                        pEntry.programs.push({
                             id: program.id,
                             name: program.name,
                             category: program.category,
                             isGeneral,
                             isGroup: program.isGroup || false
                         });
+
+                        // Track Zone
+                        if (programZone !== 'General') {
+                            pEntry.zones.add(programZone);
+                        }
                     });
                 }
             });
@@ -67,7 +81,20 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
 
         let result = Array.from(participantsMap.values());
 
-        // Filter 
+        // Filter by Zone
+        if (zoneFilter !== 'All') {
+            if (zoneFilter === 'General') {
+                // Show participants who ONLY have general programs or explicit general filter interaction?
+                // Usually "General" filter implies those NOT in A/B/C or explicitly in General. 
+                // Strict interpretation: Participants with NO specific zone (A/B/C) assigned yet
+                result = result.filter(p => p.zones.size === 0);
+            } else {
+                // Show participants who overlap with the selected zone
+                result = result.filter(p => p.zones.has(zoneFilter));
+            }
+        }
+
+        // Filter by Search
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
             result = result.filter(p =>
@@ -89,7 +116,7 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
         });
 
         return result;
-    }, [programs, teamName, searchTerm, sortBy]);
+    }, [programs, teamName, searchTerm, sortBy, zoneFilter]);
 
     const handleOpenAddModal = () => {
         setEditingParticipant(null);
@@ -259,6 +286,17 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
+                        <select
+                            value={zoneFilter}
+                            onChange={(e) => setZoneFilter(e.target.value as any)}
+                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                        >
+                            <option value="All">All Zones</option>
+                            <option value="A">Zone A</option>
+                            <option value="B">Zone B</option>
+                            <option value="C">Zone C</option>
+                            <option value="General">General/Unassigned</option>
+                        </select>
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value as 'name' | 'chestNumber')}
@@ -812,8 +850,8 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
                                         </div>
                                         <select
                                             value={programSortBy}
-                                            onChange={(e) => setProgramSortBy(e.target.value as 'name' | 'category' | 'time')}
-                                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                            onChange={(e) => setProgramSortBy(e.target.value as any)}
+                                            className="w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                                         >
                                             <option value="name">Sort by Name</option>
                                             <option value="category">Sort by Category</option>
