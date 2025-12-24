@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { addGalleryImage } from '../services/firestore.service';
+import { addGalleryImage, subscribeToGalleryImages, deleteGalleryImage } from '../services/firestore.service';
 
 export const GalleryUpload: React.FC = () => {
     const [imageUrl, setImageUrl] = useState('');
@@ -52,18 +52,41 @@ export const GalleryUpload: React.FC = () => {
         }
     };
 
+    // State for gallery images
+    const [images, setImages] = useState<any[]>([]);
+
+    // Subscribe to gallery images
+    React.useEffect(() => {
+        const unsubscribe = subscribeToGalleryImages((newImages: any[]) => {
+            setImages(newImages);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('Are you sure you want to delete this image?')) return;
+
+        try {
+            await deleteGalleryImage(id);
+            // State update handled by subscription
+        } catch (error) {
+            console.error('Error deleting image:', error);
+            alert('Failed to delete image');
+        }
+    };
+
     return (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <div className="mb-4">
-                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-1">
-                    📸 Event Gallery Upload
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
+            <div className="mb-6">
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-1 flex items-center gap-2">
+                    <span>📸</span> Event Gallery Upload
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
                     Upload event photos by pasting the image link from your cloud storage
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 mb-8">
                 <div>
                     <label htmlFor="imageUrl" className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
                         Image URL
@@ -100,7 +123,46 @@ export const GalleryUpload: React.FC = () => {
                 </button>
             </form>
 
-            <div className="mt-4 p-4 bg-slate-50 rounded-xl">
+            <div className="border-t border-slate-100 pt-6">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide mb-4">
+                    Uploaded Images ({images.length})
+                </h4>
+
+                {images.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic text-center py-4">No images uploaded yet.</p>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {images.map((img) => (
+                            <div key={img.id} className="group relative aspect-video bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                                <img
+                                    src={img.imageUrl}
+                                    alt="Gallery"
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Invalid+Image'; }}
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <button
+                                        onClick={() => handleDelete(img.id)}
+                                        className="p-2 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition-colors shadow-lg"
+                                        title="Delete Image"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                                    <p className="text-[10px] text-white/80 truncate">
+                                        {new Date(img.createdAt?.seconds * 1000).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-6 p-4 bg-slate-50 rounded-xl">
                 <p className="text-xs font-bold text-slate-600 mb-2">💡 Instructions:</p>
                 <ul className="text-xs text-slate-500 space-y-1 font-medium">
                     <li>• Upload your image to your cloud storage (Google Drive, Dropbox, etc.)</li>

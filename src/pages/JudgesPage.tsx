@@ -50,12 +50,24 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
 
     const handleScoreChange = (chestNumber: string, field: 'score' | 'grade', value: string) => {
         if (selectedProgram?.isGroup) {
-            // For group items, applying score to one member applies to ALL members of that team
+            // Find the team AND the specific chunk this participant belongs to
             const team = selectedProgram.teams.find(t => t.participants.some(p => p.chestNumber === chestNumber));
             if (team) {
+                const limit = (selectedProgram.membersPerGroup && selectedProgram.membersPerGroup > 0) ? selectedProgram.membersPerGroup : 999;
+
+                // Find the chunk range
+                const pIndex = team.participants.findIndex(p => p.chestNumber === chestNumber);
+                if (pIndex === -1) return;
+
+                const chunkIndex = Math.floor(pIndex / limit);
+                const startIndex = chunkIndex * limit;
+                const endIndex = startIndex + limit;
+
+                const targetParticipants = team.participants.slice(startIndex, endIndex);
+
                 setScores(prev => {
                     const newScores = { ...prev };
-                    team.participants.forEach(p => {
+                    targetParticipants.forEach(p => {
                         newScores[p.chestNumber] = {
                             ...(newScores[p.chestNumber] || { score: '', grade: '' }),
                             [field]: value
@@ -354,12 +366,27 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {selectedProgram.isGroup ? (
-                                        // Group Mode: Show Teams
-                                        selectedProgram.teams.map((team) => {
-                                            const representative = team.participants[0];
+                                        // Group Mode: Show Teams (Flattened Chunks)
+                                        selectedProgram.teams.flatMap((team) => {
+                                            const limit = (selectedProgram.membersPerGroup && selectedProgram.membersPerGroup > 0) ? selectedProgram.membersPerGroup : 999;
+                                            const subTeams = [];
+                                            const pList = team.participants;
+
+                                            // Split team into chunks
+                                            for (let i = 0; i < pList.length; i += limit) {
+                                                subTeams.push({
+                                                    teamId: team.id,
+                                                    participants: pList.slice(i, i + limit),
+                                                    // Unique ID for React Key (using first participant chest)
+                                                    uniqueKey: `${team.id}-${pList[i]?.chestNumber}`
+                                                });
+                                            }
+                                            return subTeams;
+                                        }).map((subTeam) => {
+                                            const representative = subTeam.participants[0];
                                             if (!representative) return null;
                                             return (
-                                                <tr key={team.id} className="hover:bg-slate-50 transition-colors">
+                                                <tr key={subTeam.uniqueKey} className="hover:bg-slate-50 transition-colors">
                                                     <td className="px-4 py-4">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -374,7 +401,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                                     </td>
                                                     <td className="px-4 py-4">
                                                         <p className="text-sm font-bold text-slate-900">Team Entry</p>
-                                                        <p className="text-xs text-slate-500">{team.participants.length} Participants</p>
+                                                        <p className="text-xs text-slate-500">{subTeam.participants.length} Participants</p>
                                                     </td>
                                                     <td className="px-4 py-4">
                                                         <input
@@ -421,6 +448,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                                                 </tr>
                                             );
                                         })
+
                                     ) : (
                                         // Individual Mode: Show Participants
                                         selectedProgram.teams.map((team) => (

@@ -325,6 +325,39 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           <td className="px-3 py-3">
                             <p className="font-bold text-slate-700">{participant.name}</p>
                             <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{participant.teamName}</p>
+                            {/* Delete Participant Button */}
+                            {(program.status !== ProgramStatus.COMPLETED || isEditingScores) && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Are you sure you want to remove ${participant.name} from this program?`)) {
+                                    // Find the team
+                                    const team = program.teams.find(t => t.id === participant.teamId);
+                                    if (team) {
+                                      const newParticipants = team.participants.filter(p => p.chestNumber !== participant.chestNumber);
+                                      let newTeams;
+                                      if (newParticipants.length === 0) {
+                                        // Remove empty team
+                                        newTeams = program.teams.filter(t => t.id !== participant.teamId);
+                                      } else {
+                                        // Update team
+                                        newTeams = program.teams.map(t =>
+                                          t.id === participant.teamId ? { ...t, participants: newParticipants } : t
+                                        );
+                                      }
+                                      if (onUpdateProgram) {
+                                        await onUpdateProgram(program.id, { teams: newTeams });
+                                        setEditedTeams(newTeams);
+                                      }
+                                    }
+                                  }
+                                }}
+                                className="mt-1 text-[10px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 w-fit"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                Remove
+                              </button>
+                            )}
                           </td>
                           {/* Score */}
                           <td className="px-3 py-3 text-center">
@@ -440,17 +473,38 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                 </div>
                               ))}
                             </div>
+                            {/* Delete Team Button */}
+                            {(program.status !== ProgramStatus.COMPLETED || isEditingScores) && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Are you sure you want to remove ${team.displayName} from this program?`)) {
+                                    const newTeams = program.teams.filter(t => t.id !== team.id);
+                                    if (onUpdateProgram) {
+                                      await onUpdateProgram(program.id, { teams: newTeams });
+                                      setEditedTeams(newTeams);
+                                    }
+                                  }
+                                }}
+                                className="mt-2 text-[10px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 w-fit"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                Remove Team
+                              </button>
+                            )}
                           </td>
                           {/* Score */}
                           <td className="px-3 py-3 text-center">
                             {isEditingScores ? (
-                              <input
-                                type="number"
-                                step="0.1"
-                                className="w-16 text-center border border-slate-300 rounded p-1"
-                                value={team.displayScore || ''}
-                                onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'score', e.target.value)}
-                              />
+                              <div className="flex flex-col items-center gap-2">
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="w-16 text-center border border-slate-300 rounded p-1"
+                                  value={team.displayScore || ''}
+                                  onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'score', e.target.value)}
+                                />
+                              </div>
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
                                 <span className="font-bold text-slate-800">{team.displayScore || '-'}</span>

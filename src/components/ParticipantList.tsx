@@ -3,9 +3,11 @@ import { Program, ProgramStatus, ParticipantSummary } from '../types';
 
 interface ParticipantListProps {
     programs: Program[];
+    onDeleteParticipant?: (chestNumber: string) => void;
 }
 
-export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) => {
+export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, onDeleteParticipant }) => {
+    // ... existing state ...
     const [searchTerm, setSearchTerm] = useState('');
     const [participantSortBy, setParticipantSortBy] = useState<'name' | 'chest' | 'team'>('name');
     const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null);
@@ -128,12 +130,29 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) =>
             {selectedParticipant && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
                     <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-[380px] overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
-                        <div className="bg-indigo-600 px-6 py-12 text-white text-center">
+                        <div className="bg-indigo-600 px-6 py-12 text-white text-center relative">
                             <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-white/30 shadow-2xl">
                                 <span className="text-3xl font-black">{selectedParticipant.name.charAt(0)}</span>
                             </div>
                             <h4 className="text-xl font-black uppercase tracking-tight">{selectedParticipant.name}</h4>
                             <p className="text-[11px] font-bold opacity-70 uppercase tracking-[0.2em] mt-1">Chest #{selectedParticipant.chestNumber} &bull; {selectedParticipant.teamName}</p>
+
+                            {onDeleteParticipant && (
+                                <button
+                                    onClick={() => {
+                                        if (confirm("Are you sure you want to permanently delete this participant?")) {
+                                            onDeleteParticipant(selectedParticipant.chestNumber);
+                                            setSelectedParticipantName(null);
+                                        }
+                                    }}
+                                    className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-red-500 rounded-full transition-colors text-white"
+                                    title="Delete Participant"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                         <div className="p-8 text-left">
                             <div className="grid grid-cols-2 gap-4 mb-8 -mt-16">

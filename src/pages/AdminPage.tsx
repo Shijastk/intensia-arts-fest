@@ -169,6 +169,51 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, add
         }
     };
 
+    const handleGlobalDeleteParticipant = async (chestNumber: string) => {
+        if (!confirm(`Are you sure you want to completely remove participant with Chest No. ${chestNumber} from ALL programs? This cannot be undone.`)) {
+            return;
+        }
+
+        setIsFixing(true); // Reusing loading state
+        try {
+            const updates: Promise<boolean>[] = [];
+
+            programs.forEach(program => {
+                let modified = false;
+                const updatedTeams = program.teams.map(team => {
+                    const originalCount = team.participants.length;
+                    const newParticipants = team.participants.filter(p => p.chestNumber !== chestNumber);
+
+                    if (newParticipants.length !== originalCount) {
+                        modified = true;
+                        return { ...team, participants: newParticipants };
+                    }
+                    return team;
+                }).filter(t => t.participants.length > 0); // Remove empty teams
+
+                // If team count changed (empty team removed) or participant count changed
+                if (program.teams.length !== updatedTeams.length) modified = true;
+
+                if (modified) {
+                    updates.push(updateProgram(program.id, { teams: updatedTeams }));
+                }
+            });
+
+            if (updates.length > 0) {
+                await Promise.all(updates);
+                alert(`Participant ${chestNumber} removed from ${updates.length} programs.`);
+            } else {
+                alert('Participant not found in any programs.');
+            }
+
+        } catch (error) {
+            console.error('Error deleting participant:', error);
+            alert('Failed to delete participant.');
+        } finally {
+            setIsFixing(false);
+        }
+    };
+
     return (
         <>
             {/* Header with New Event Button */}
@@ -236,7 +281,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, add
             {adminSubView === 'PROGRAMS' ? (
                 <ProgramList programs={filteredPrograms} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setIsGroup(p.isGroup); setShowModal(true); }} />
             ) : (
-                <ParticipantList programs={filteredPrograms} />
+                <ParticipantList programs={filteredPrograms} onDeleteParticipant={handleGlobalDeleteParticipant} />
             )}
 
             <ProgramFormModal

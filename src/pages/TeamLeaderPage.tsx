@@ -251,7 +251,7 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                     <div>
                         <h4 className="text-sm font-bold text-amber-900 mb-1">Registration Limits</h4>
                         <ul className="text-xs text-amber-800 space-y-1">
-                            <li>• Maximum <strong>4 programs</strong> in normal categories (stage and non-stage)</li>
+                            <li>• Maximum <strong>8 programs</strong> in normal categories (stage and non-stage)</li>
                             <li>• <strong>Unlimited programs</strong> in general categories</li>
                             <li>• System will automatically prevent exceeding limits</li>
                             <li>• Group programs have team-wise participant limits</li>
@@ -353,8 +353,8 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                                                 <h4 className="text-sm font-black text-slate-900">{participant.name}</h4>
                                                 <div className="flex items-center gap-3 mt-0.5">
                                                     <span className="text-xs text-slate-500 font-medium">Chest: {participant.chestNumber}</span>
-                                                    <span className={`text-xs font-bold ${normalProgramCount >= 4 ? 'text-red-600' : 'text-green-600'}`}>
-                                                        Normal: {normalProgramCount}/4
+                                                    <span className={`text-xs font-bold ${normalProgramCount >= 8 ? 'text-red-600' : 'text-green-600'}`}>
+                                                        Normal: {normalProgramCount}/8
                                                     </span>
                                                     <span className="text-xs font-bold text-blue-600">
                                                         General: {generalProgramCount}
@@ -575,8 +575,8 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
                     return p && !p.category.toLowerCase().includes('general');
                 }).length;
 
-                if (currentNormalCount >= 4) {
-                    alert('Maximum 4 normal programs allowed! You can add unlimited general programs.');
+                if (currentNormalCount >= 8) {
+                    alert('Maximum 8 normal programs allowed! You can add unlimited general programs.');
                     return;
                 }
             }
@@ -825,7 +825,7 @@ const ParticipantProgramModal: React.FC<ParticipantProgramModalProps> = ({
                                 <p className="text-xs font-bold text-indigo-900">Programs Selected: {selectedPrograms.size}</p>
                                 <div className="flex items-center gap-4 mt-1">
                                     <span className={`text-xs font-bold ${normalCount >= 4 ? 'text-red-600' : 'text-green-600'}`}>
-                                        Normal: {normalCount}/4
+                                        Normal: {normalCount}/8
                                     </span>
                                     <span className="text-xs font-bold text-blue-600">
                                         General: {generalCount} (Unlimited)
