@@ -18,6 +18,7 @@ interface TeamParticipant {
         category: string;
         isGeneral: boolean;
         isGroup: boolean;
+        subTeamLabel?: string;
     }>;
 }
 
@@ -61,13 +62,24 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                         }
                         const pEntry = participantsMap.get(key)!;
 
+                        // Calculate Sub-Team Label for display
+                        let subTeamLabel = '';
+                        if (program.isGroup && program.membersPerGroup && program.membersPerGroup > 0) {
+                            const pIndex = team.participants.findIndex(p => p.chestNumber === participant.chestNumber);
+                            if (pIndex !== -1) {
+                                const subIndex = Math.floor(pIndex / program.membersPerGroup);
+                                subTeamLabel = String.fromCharCode(65 + subIndex);
+                            }
+                        }
+
                         // Add program
                         pEntry.programs.push({
                             id: program.id,
                             name: program.name,
                             category: program.category,
                             isGeneral,
-                            isGroup: program.isGroup || false
+                            isGroup: program.isGroup || false,
+                            subTeamLabel // Add label
                         });
 
                         // Track Zone
@@ -414,7 +426,7 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                                                                     )}
                                                                     {prog.isGroup && (
                                                                         <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-black uppercase">
-                                                                            Group
+                                                                            Group {prog.subTeamLabel ? `- ${prog.subTeamLabel}` : ''}
                                                                         </span>
                                                                     )}
                                                                 </div>

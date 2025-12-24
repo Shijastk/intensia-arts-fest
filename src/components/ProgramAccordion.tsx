@@ -66,31 +66,69 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
 
   const handleScoreEdit = (teamId: string, chestNumber: string, field: 'score' | 'grade' | 'points' | 'rank', value: string) => {
     setEditedTeams(prev => prev.map(t => {
-      // If group item, update all text fields for consistency (rank/grade/points often shared)
-      // but scores might be individual? Requirements say "Group Items: Score applies to entire team".
-      // We will follow the structure: find team, update participant or team fields.
       if (t.id !== teamId) return t;
 
-      const updatedParticipants = t.participants.map(p => {
-        if (p.chestNumber !== chestNumber && !program.isGroup) return p;
-        // If group, maybe update all? For now, target specific participant row input.
-        // User requested "personalized results like judge page".
-        if (p.chestNumber === chestNumber) {
-          return {
-            ...p,
-            [field]: field === 'grade' ? value : Number(value)
-          };
-        }
-        return p;
-      });
+      if (!program.isGroup) {
+        // Individual Program: Update specific participant
+        const updatedParticipants = t.participants.map(p => {
+          if (p.chestNumber === chestNumber) {
+            const updates: any = { [field]: field === 'grade' ? value : Number(value) };
 
-      // Recalculate team totals if needed (simple sum/max logic)
-      // For now, we trust the manual edit.
-      return {
-        ...t,
-        participants: updatedParticipants,
-        [field]: field === 'grade' ? value : Number(value) // Update team level too for display consistency
-      };
+            // Auto-calculate points if score or grade changes
+            if (field === 'score' || field === 'grade') {
+              const newScore = field === 'score' ? Number(value) : (p.score || 0);
+              const newGrade = field === 'grade' ? value : (p.grade || '');
+              updates.points = calculatePoints(newScore, newGrade, false);
+            }
+
+            return { ...p, ...updates };
+          }
+          return p;
+        });
+        return { ...t, participants: updatedParticipants };
+      } else {
+        // Group Program
+        const pIndex = t.participants.findIndex(p => p.chestNumber === chestNumber);
+        if (pIndex === -1) return t;
+
+        const limit = (program.membersPerGroup && program.membersPerGroup > 0) ? program.membersPerGroup : 999;
+
+        // Determine chunk range
+        // If standard group (not split), chunk is entire array
+        // If split group, chunk is [start, end)
+        let startIndex = 0;
+        let endIndex = t.participants.length;
+
+        if (t.participants.length > limit) {
+          const chunkIndex = Math.floor(pIndex / limit);
+          startIndex = chunkIndex * limit;
+          endIndex = Math.min(startIndex + limit, t.participants.length);
+        }
+
+        const updatedParticipants = t.participants.map((p, idx) => {
+          if (idx >= startIndex && idx < endIndex) {
+            return {
+              ...p,
+              [field]: field === 'grade' ? value : Number(value)
+            };
+          }
+          return p;
+        });
+
+        // Update Team Level fields only if it's NOT a split team scenario?
+        // Actually, if we update a chunk, we shouldn't overwrite the team score with a partial score.
+        // We will leave team.score as is for split teams to avoid ambiguity.
+        // But for standard teams (one chunk), we update team score too.
+
+        const isSplit = t.participants.length > limit;
+        const updates: any = { participants: updatedParticipants };
+
+        if (!isSplit) {
+          updates[field] = field === 'grade' ? value : Number(value);
+        }
+
+        return { ...t, ...updates };
+      }
     }));
   };
 
@@ -344,17 +382,56 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                         </tr>
                       ))
                     ) : (
-                      // GROUP ITEM: Row per Team
-                      editedTeams.map((team) => (
-                        <tr key={team.id} className="hover:bg-slate-50/50">
+                      // GROUP ITEM: Row per Team (or Sub-Team if split)
+                      editedTeams.flatMap(team => {
+                        const limit = (program.membersPerGroup && program.membersPerGroup > 0) ? program.membersPerGroup : 999;
+                        if (team.participants.length <= limit) {
+                          return [{
+                            ...team,
+                            displayName: team.teamName,
+                            displayScore: team.score,
+                            displayGrade: team.grade,
+                            displayPoints: team.points
+                          }];
+                        }
+
+                        // Split logic
+                        const subTeams = [];
+                        const pList = team.participants;
+                        let subIndex = 0;
+                        for (let i = 0; i < pList.length; i += limit) {
+                          const chunk = pList.slice(i, i + limit);
+                          const suffix = String.fromCharCode(65 + subIndex);
+
+                          // Use first participant's data as the "sub-team" data
+                          const chunkScore = chunk[0].score;
+                          const chunkGrade = chunk[0].grade;
+                          const chunkPoints = chunk[0].points;
+
+                          subTeams.push({
+                            ...team,
+                            participants: chunk,
+                            displayName: `${team.teamName} ${suffix}`,
+                            displayScore: chunkScore,
+                            displayGrade: chunkGrade,
+                            displayPoints: chunkPoints,
+                            isVirtual: true,
+                            virtualId: `${team.id}_sub${subIndex}`
+                          });
+                          subIndex++;
+                        }
+                        return subTeams;
+                      }).map((team, idx) => (
+                        <tr key={team.isVirtual ? team.virtualId : team.id} className="hover:bg-slate-50/50">
                           <td className="px-3 py-3">
                             <div className="flex flex-col">
                               <span className="font-bold text-slate-800">{team.participants[0]?.chestNumber || 'N/A'}</span>
                               <span className="text-slate-400 text-[9px]">Code: {team.participants[0]?.codeLetter || '-'}</span>
+                              {team.isVirtual && <span className="text-[9px] text-indigo-500 font-bold uppercase tracking-wider mt-1">Split Team</span>}
                             </div>
                           </td>
                           <td className="px-3 py-3">
-                            <p className="font-bold text-slate-700">{team.teamName}</p>
+                            <p className="font-bold text-slate-700">{team.displayName}</p>
                             <div className="flex flex-col gap-1 mt-1">
                               {team.participants.map((p, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
@@ -371,12 +448,12 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                 type="number"
                                 step="0.1"
                                 className="w-16 text-center border border-slate-300 rounded p-1"
-                                value={team.score || ''}
+                                value={team.displayScore || ''}
                                 onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'score', e.target.value)}
                               />
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
-                                <span className="font-bold text-slate-800">{team.score || '-'}</span>
+                                <span className="font-bold text-slate-800">{team.displayScore || '-'}</span>
                               ) : '-'
                             )}
                           </td>
@@ -386,12 +463,12 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                               <input
                                 type="text"
                                 className="w-12 text-center border border-slate-300 rounded p-1 uppercase"
-                                value={team.grade || ''}
+                                value={team.displayGrade || ''}
                                 onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'grade', e.target.value)}
                               />
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
-                                <span className="font-bold text-emerald-600">{team.grade || '-'}</span>
+                                <span className="font-bold text-emerald-600">{team.displayGrade || '-'}</span>
                               ) : '-'
                             )}
                           </td>
@@ -399,9 +476,18 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           <td className="px-3 py-3 text-center">
                             {isEditingScores ? (
                               (() => {
-                                const score = team.score || 0;
-                                const grade = team.grade || '';
-                                const points = calculatePoints(score, grade, true);
+                                const score = team.displayScore || 0;
+                                const grade = team.displayGrade || '';
+                                // Check if this is truly a group program for points calculation
+                                // The user says "calculate 4 point different", which is exactly 20% of 20 vs 10 maybe?
+                                // If calculatePoints(..., true) gives max 20, calculatePoints(..., false) gives max 10.
+                                // If the user sees 'less', maybe they expect Group points (20) but getting Individual (10)?
+                                // Or vice versa.
+                                // Arts Fest rules: Group items max 10, Individual max 5? OR Group 20, Ind 10?
+                                // Let's check calculatePoints.ts: const maxPoints = isGroup ? 20 : 10;
+                                // So passing 'true' is correct for group items.
+
+                                const points = calculatePoints(score, grade, true); // Always true for this "Group Item" block
                                 return (
                                   <div className="w-12 text-center bg-slate-100 border border-slate-300 rounded p-1 font-bold text-emerald-600">
                                     {points}
@@ -410,7 +496,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                               })()
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
-                                <span className="font-bold text-slate-800">{team.points || '0'}</span>
+                                <span className="font-bold text-slate-800">{team.displayPoints || '0'}</span>
                               ) : '-'
                             )}
                           </td>

@@ -27,36 +27,96 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
             return;
         }
 
-        const allParticipants = program.teams.flatMap(t => t.participants);
-        const totalCount = allParticipants.length;
-        console.log('👥 Total participants:', totalCount);
+        let updatedTeams;
 
-        const pool: string[] = [];
-        for (let i = 0; i < totalCount; i++) {
-            pool.push(String.fromCharCode(65 + i));
-        }
+        if (program.isGroup) {
+            const memberLimit = (program.membersPerGroup && program.membersPerGroup > 0) ? program.membersPerGroup : 999;
 
-        const shuffledPool = shuffleArray(pool);
-        console.log('🎲 Shuffled codes:', shuffledPool);
+            // Calculate total sub-teams
+            let totalSubTeams = 0;
+            program.teams.forEach(t => {
+                if (t.participants.length > 0) {
+                    totalSubTeams += Math.ceil(t.participants.length / memberLimit);
+                }
+            });
+            console.log('👥 Total sub-groups:', totalSubTeams);
 
-        let letterIdx = 0;
-        const updatedTeams = program.teams.map(t => ({
-            ...t,
-            participants: t.participants.map(pt => {
-                // Determine new code letter (preserve existing if present)
-                const newCode = pt.codeLetter || shuffledPool[letterIdx++];
+            const pool: string[] = [];
+            for (let i = 0; i < totalSubTeams; i++) {
+                pool.push(String.fromCharCode(65 + i));
+            }
+            const shuffledPool = shuffleArray(pool);
+            console.log('🎲 Shuffled group codes:', shuffledPool);
 
-                // Determine if code should be revealed
-                // Use existing reveal state OR reveal if this is the participant we just clicked
-                const shouldReveal = pt.isCodeRevealed || (participantChestToReveal && pt.chestNumber === participantChestToReveal);
+            let letterIdx = 0;
+            updatedTeams = program.teams.map(t => {
+                const hasParticipants = t.participants.length > 0;
+                if (!hasParticipants) return t;
+
+                const newParticipants: any[] = [];
+                const pList = [...t.participants];
+
+                // Process in chunks
+                for (let i = 0; i < pList.length; i += memberLimit) {
+                    const chunk = pList.slice(i, i + memberLimit);
+
+                    // Check logic for this chunk
+                    // 1. Does it already have a code? (Check first member)
+                    const existingCode = chunk.find(p => p.codeLetter)?.codeLetter;
+                    const chunkCode = existingCode || shuffledPool[letterIdx++];
+
+                    // 2. Should we reveal this chunk?
+                    const isChunkBeingRevealed = participantChestToReveal && chunk.some(p => p.chestNumber === participantChestToReveal);
+
+                    // Map chunk members
+                    const processedChunk = chunk.map(pt => {
+                        const shouldReveal = pt.isCodeRevealed || isChunkBeingRevealed;
+                        return {
+                            ...pt,
+                            codeLetter: chunkCode,
+                            isCodeRevealed: shouldReveal || false
+                        };
+                    });
+                    newParticipants.push(...processedChunk);
+                }
 
                 return {
-                    ...pt,
-                    codeLetter: newCode,
-                    isCodeRevealed: shouldReveal || false
+                    ...t,
+                    participants: newParticipants
                 };
-            })
-        }));
+            });
+        } else {
+            const allParticipants = program.teams.flatMap(t => t.participants);
+            const totalCount = allParticipants.length;
+            console.log('👥 Total participants:', totalCount);
+
+            const pool: string[] = [];
+            for (let i = 0; i < totalCount; i++) {
+                pool.push(String.fromCharCode(65 + i));
+            }
+
+            const shuffledPool = shuffleArray(pool);
+            console.log('🎲 Shuffled codes:', shuffledPool);
+
+            let letterIdx = 0;
+            updatedTeams = program.teams.map(t => ({
+                ...t,
+                participants: t.participants.map(pt => {
+                    // Determine new code letter (preserve existing if present)
+                    const newCode = pt.codeLetter || shuffledPool[letterIdx++];
+
+                    // Determine if code should be revealed
+                    // Use existing reveal state OR reveal if this is the participant we just clicked
+                    const shouldReveal = pt.isCodeRevealed || (participantChestToReveal && pt.chestNumber === participantChestToReveal);
+
+                    return {
+                        ...pt,
+                        codeLetter: newCode,
+                        isCodeRevealed: shouldReveal || false
+                    };
+                })
+            }));
+        }
 
         console.log('📝 Updated teams:', JSON.stringify(updatedTeams, null, 2));
 
