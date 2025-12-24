@@ -289,18 +289,18 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
                         <select
                             value={zoneFilter}
                             onChange={(e) => setZoneFilter(e.target.value as any)}
-                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            className="px-3 w-20 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                         >
-                            <option value="All">All Zones</option>
-                            <option value="A">Zone A</option>
-                            <option value="B">Zone B</option>
-                            <option value="C">Zone C</option>
-                            <option value="General">General/Unassigned</option>
+                            <option value="All">All</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="General">Gen/Un</option>
                         </select>
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value as 'name' | 'chestNumber')}
-                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                            className="px-3 w-20 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                         >
                             <option value="name">Sort by Name</option>
                             <option value="chestNumber">Sort by Chest No</option>
