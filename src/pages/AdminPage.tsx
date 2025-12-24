@@ -20,11 +20,29 @@ const CATEGORIES = [
     "A zone stage",
     "A zone no stage",
     "A zone general stage",
-    "A zone general non stage"
+    "A zone general non stage",
+    "B zone stage senior",
+    "B zone stage junior",
+    "B zone no stage senior",
+    "B zone no stage junior",
+    "B zone general stage senior",
+    "B zone general stage junior",
+    "B zone general non stage senior",
+    "B zone general non stage junior",
+    "C zone stage senior",
+    "C zone stage junior",
+    "C zone no stage senior",
+    "C zone no stage junior",
+    "C zone general stage senior",
+    "C zone general stage junior",
+    "C zone general non stage senior",
+    "C zone general non stage junior",
+
 ];
 
 export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, addProgram, updateProgram, deleteProgram, onShowModal }) => {
     const [adminSubView, setAdminSubView] = useState<'PROGRAMS' | 'PARTICIPANTS'>('PROGRAMS');
+    const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('All');
     const [showModal, setShowModal] = useState(false);
     const [editingProgram, setEditingProgram] = useState<Program | null>(null);
     const [isGroup, setIsGroup] = useState(false);
@@ -42,19 +60,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, add
         }
     }, [onShowModal]);
 
+    const filteredPrograms = useMemo(() => {
+        if (selectedZoneFilter === 'All') return programs;
+        return programs.filter(p => p.category.startsWith(selectedZoneFilter));
+    }, [programs, selectedZoneFilter]);
+
     const stats: FestivalStats = useMemo(() => {
-        const total = programs.length;
-        const completed = programs.filter(p => p.status === ProgramStatus.COMPLETED).length;
-        const pending = programs.filter(p => p.status === ProgramStatus.PENDING).length;
-        const cancelled = programs.filter(p => p.status === ProgramStatus.CANCELLED).length;
+        const total = filteredPrograms.length;
+        const completed = filteredPrograms.filter(p => p.status === ProgramStatus.COMPLETED).length;
+        const pending = filteredPrograms.filter(p => p.status === ProgramStatus.PENDING).length;
+        const cancelled = filteredPrograms.filter(p => p.status === ProgramStatus.CANCELLED).length;
         const participantsSet = new Set();
-        programs.forEach(p => p.teams.forEach(t => t.participants.forEach(pr => participantsSet.add(pr.name))));
+        filteredPrograms.forEach(p => p.teams.forEach(t => t.participants.forEach(pr => participantsSet.add(pr.name))));
 
         return {
             totalPrograms: total, completedCount: completed, pendingCount: pending,
             cancelledCount: cancelled, totalParticipants: participantsSet.size, averageScore: 0
         };
-    }, [programs]);
+    }, [filteredPrograms]);
 
     const handleSaveProgram = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -175,15 +198,31 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, add
                 <MetricsCard label="Waitlist" value={stats.pendingCount} colorClass="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
             </section>
 
-            <div className="mb-6 flex space-x-6 border-b border-slate-200">
-                <button onClick={() => setAdminSubView('PROGRAMS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubView === 'PROGRAMS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Programs Tracker</button>
-                <button onClick={() => setAdminSubView('PARTICIPANTS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubView === 'PARTICIPANTS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>All Performers</button>
+            <div className="mb-6 flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-slate-200 pb-2">
+                <div className="flex space-x-6">
+                    <button onClick={() => setAdminSubView('PROGRAMS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubView === 'PROGRAMS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Programs Tracker</button>
+                    <button onClick={() => setAdminSubView('PARTICIPANTS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubView === 'PARTICIPANTS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>All Performers</button>
+                </div>
+                <div className="flex items-center gap-2 pb-2 md:pb-0">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Filter Zone:</span>
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        {['All', 'A', 'B', 'C'].map(zone => (
+                            <button
+                                key={zone}
+                                onClick={() => setSelectedZoneFilter(zone)}
+                                className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${selectedZoneFilter === zone ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {zone === 'All' ? 'All' : `Zone ${zone}`}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             {adminSubView === 'PROGRAMS' ? (
-                <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setIsGroup(p.isGroup); setShowModal(true); }} />
+                <ProgramList programs={filteredPrograms} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setIsGroup(p.isGroup); setShowModal(true); }} />
             ) : (
-                <ParticipantList programs={programs} />
+                <ParticipantList programs={filteredPrograms} />
             )}
 
             <ProgramFormModal
