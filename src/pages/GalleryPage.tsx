@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { subscribeToGalleryImages } from '../services/firestore.service';
 import { GalleryImage } from '../types';
+import { MasonryGridGallery } from './MasonryGridGallery';
 
 export const GalleryPage: React.FC = () => {
     const [images, setImages] = useState<GalleryImage[]>([]);
@@ -73,80 +74,7 @@ export const GalleryPage: React.FC = () => {
                         Capturing the vibrant moments and memories from Intensia Arts Fest 2025
                     </p>
                 </div>
-
-                {/* Gallery Grid */}
-                {images.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {images.map((image, index) => (
-                            <div
-                                key={image.id}
-                                className="group relative aspect-square rounded-[2rem] overflow-hidden bg-slate-100 shadow-lg hover:shadow-2xl transition-all duration-300 animate-in fade-in zoom-in"
-                                style={{ animationDelay: `${index * 50}ms` }}
-                            >
-                                <img
-                                    src={image.imageUrl}
-                                    alt={`Gallery image ${index + 1}`}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                    onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%23f1f5f9" width="400" height="400"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="18" dy="50%25" dx="50%25" text-anchor="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
-                                    }}
-                                />
-                                {/* Overlay on hover */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
-                                        <p className="text-white text-sm font-bold">
-                                            {image.createdAt?.toDate ?
-                                                new Date(image.createdAt.toDate()).toLocaleDateString('en-US', {
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                    day: 'numeric'
-                                                })
-                                                : 'Recent'
-                                            }
-                                        </p>
-                                        {/* Download Button */}
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    const response = await fetch(image.imageUrl);
-                                                    const blob = await response.blob();
-                                                    const url = window.URL.createObjectURL(blob);
-                                                    const link = document.createElement('a');
-                                                    link.href = url;
-                                                    link.download = `intensia-2025-gallery-${image.id}.jpg`;
-                                                    document.body.appendChild(link);
-                                                    link.click();
-                                                    document.body.removeChild(link);
-                                                    window.URL.revokeObjectURL(url);
-                                                } catch (error) {
-                                                    console.error('Download failed:', error);
-                                                }
-                                            }}
-                                            className="px-3 py-2 bg-white/90 hover:bg-white text-teal-600 rounded-lg text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-1.5 shadow-lg hover:shadow-xl"
-                                            title="Download Image"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                            </svg>
-                                            <span className="hidden sm:inline">Download</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-20 bg-slate-50 rounded-[2rem] border border-slate-200 border-dashed">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                        </div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">No Images Yet</h3>
-                        <p className="text-slate-500 font-medium">Gallery images will appear here once they are uploaded</p>
-                    </div>
-                )}
+                <MasonryGridGallery images={images} />
             </div>
 
             {/* Footer */}
@@ -165,3 +93,80 @@ export const GalleryPage: React.FC = () => {
         </div>
     );
 };
+
+
+{/* Gallery Grid */ }
+/*
+    images.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {images.map((image, index) => (
+                <div
+                    key={image.id}
+                    className="group relative aspect-square rounded-[2rem] overflow-hidden bg-slate-100 shadow-lg hover:shadow-2xl transition-all duration-300 animate-in fade-in zoom-in"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                >
+                    <img
+                        src={image.imageUrl}
+                        alt={`Gallery image ${index + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%23f1f5f9" width="400" height="400"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="18" dy="50%25" dx="50%25" text-anchor="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
+                        }}
+                    />
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
+                            <p className="text-white text-sm font-bold">
+                                {image.createdAt?.toDate ?
+                                    new Date(image.createdAt.toDate()).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })
+                                    : 'Recent'
+                                }
+                            </p>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const response = await fetch(image.imageUrl);
+                                        const blob = await response.blob();
+                                        const url = window.URL.createObjectURL(blob);
+                                        const link = document.createElement('a');
+                                        link.href = url;
+                                        link.download = `intensia-2025-gallery-${image.id}.jpg`;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        window.URL.revokeObjectURL(url);
+                                    } catch (error) {
+                                        console.error('Download failed:', error);
+                                    }
+                                }}
+                                className="px-3 py-2 bg-white/90 hover:bg-white text-teal-600 rounded-lg text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-1.5 shadow-lg hover:shadow-xl"
+                                title="Download Image"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span className="hidden sm:inline">Download</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    ) : (
+    <div className="text-center py-20 bg-slate-50 rounded-[2rem] border border-slate-200 border-dashed">
+        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+        </div>
+        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">No Images Yet</h3>
+        <p className="text-slate-500 font-medium">Gallery images will appear here once they are uploaded</p>
+    </div>
+)
+}
+*/

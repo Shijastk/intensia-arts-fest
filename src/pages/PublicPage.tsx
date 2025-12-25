@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Program, ProgramStatus, GalleryImage } from '../types';
 import { Link } from 'react-router-dom';
 import { subscribeToGalleryImages } from '../services/firestore.service';
+import { MasonryGridGallery } from './MasonryGridGallery';
 
 interface PublicPageProps {
     programs: Program[];
@@ -48,8 +49,6 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             }));
     }, [programs]);
 
-
-    console.log(completedPrograms, "cmhjglwejg")
 
     const upcomingPrograms = useMemo(() =>
         programs.filter(p => p.status !== ProgramStatus.COMPLETED && p.status !== ProgramStatus.CANCELLED).sort((a, b) =>
@@ -363,58 +362,11 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                         </div>
 
                         {/* Gallery Grid - Latest 3 images */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {galleryImages.map((image, index) => (
-                                <div
-                                    key={image.id}
-                                    className="group relative aspect-square rounded-[2rem] overflow-hidden bg-slate-100 shadow-lg hover:shadow-2xl transition-all duration-300"
-                                >
-                                    <img
-                                        src={image.imageUrl}
-                                        alt={`Gallery ${index + 1}`}
-                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                        onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Crect fill="%23f1f5f9" width="400" height="400"/%3E%3Ctext fill="%2394a3b8" font-family="sans-serif" font-size="18" dy="50%25" dx="50%25" text-anchor="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
-                                        }}
-                                    />
-                                    {/* Overlay */}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                        <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
-                                            <p className="text-white text-xs font-bold uppercase tracking-wide">
-                                                Intensia 2025
-                                            </p>
-                                            {/* Download Button */}
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const response = await fetch(image.imageUrl);
-                                                        const blob = await response.blob();
-                                                        const url = window.URL.createObjectURL(blob);
-                                                        const link = document.createElement('a');
-                                                        link.href = url;
-                                                        link.download = `intensia-2025-gallery-${image.id}.jpg`;
-                                                        document.body.appendChild(link);
-                                                        link.click();
-                                                        document.body.removeChild(link);
-                                                        window.URL.revokeObjectURL(url);
-                                                    } catch (error) {
-                                                        console.error('Download failed:', error);
-                                                    }
-                                                }}
-                                                className="px-3 py-2 bg-white/90 hover:bg-white text-teal-600 rounded-lg text-xs font-bold uppercase tracking-wide transition-all flex items-center gap-1.5 shadow-lg hover:shadow-xl"
-                                                title="Download Image"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                                </svg>
-                                                <span className="hidden sm:inline">Download</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <MasonryGridGallery
+                            images={galleryImages}
+                            limit={3}
+                        />
+
                     </div>
                 </div>
             )}
