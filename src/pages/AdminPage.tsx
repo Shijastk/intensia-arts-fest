@@ -17,6 +17,10 @@ interface AdminPageProps {
 }
 
 const CATEGORIES = [
+    "A zone stage",
+    "A zone no stage",
+    "A zone general stage",
+    "A zone general non stage",
     "B zone stage senior",
     "B zone stage junior",
     "B zone no stage senior",
@@ -29,7 +33,6 @@ const CATEGORIES = [
     "C zone no stage junior",
     "C zone general stage",
     "C zone general non stage",
-
 ];
 
 export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, addProgram, updateProgram, deleteProgram, onShowModal }) => {

@@ -32,6 +32,8 @@ const USERS: User[] = [
   { username: 'ahsani', password: 'ahsani', role: 'judge', displayName: 'Ahsani Usthad', judgePanel: 'Ahsani Usthad' },
   { username: 'ajmal', password: 'ajmal', role: 'judge', displayName: 'Ajmal Usthad', judgePanel: 'Ajmal Usthad' },
   { username: 'suhail', password: 'suhail', role: 'judge', displayName: 'Suhail Usthad', judgePanel: 'Suhail Usthad' },
+  { username: 'MainJudge', password: 'MainJudge123', role: 'judge', displayName: 'Main Stage Judge', judgePanel: 'Main stage Judge' },
+  { username: 'suhail', password: 'suhail', role: 'judge', displayName: 'Suhail Usthad', judgePanel: 'Suhail Usthad' },
   { username: 'SAPIENTIA', password: 'team1pass', role: 'teamleader', displayName: 'SAPIENTIA', teamName: 'SAPIENTIA' },
   { username: 'PRUDENTIA', password: 'team2pass', role: 'teamleader', displayName: 'PRUDENTIA', teamName: 'PRUDENTIA' },
   { username: 'TEST', password: 'testpassword', role: 'teamleader', displayName: 'TEST TEAM', teamName: 'TEST' }
