@@ -20,11 +20,36 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
         return () => unsubscribe();
     }, []);
 
-    const completedPrograms = useMemo(() =>
-        programs.filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished).sort((a, b) =>
-            (b.startTime || '').localeCompare(a.startTime || '')
-        ).slice(0, 3), // Show only latest 3 results
-        [programs]);
+   const completedPrograms = useMemo(() => {
+  return programs
+    .filter(
+      p =>
+        p.status === ProgramStatus.COMPLETED &&
+        p.isResultPublished
+    )
+    // Latest programs first
+    .sort((a, b) =>
+      (b.startTime || '').localeCompare(a.startTime || '')
+    )
+    .slice(0, 3)
+    // 🔥 RANK SORTING LOGIC
+    .map(program => ({
+      ...program,
+      teams: [...program.teams]
+        // 1️⃣ Sort teams by rank
+        .sort((a, b) => a.rank - b.rank)
+        .map(team => ({
+          ...team,
+          // 2️⃣ Sort participants by rank
+          participants: [...(team.participants || [])].sort(
+            (a, b) => a.rank - b.rank
+          )
+        }))
+    }));
+}, [programs]);
+
+
+        console.log(completedPrograms,"cmhjglwejg")
 
     const upcomingPrograms = useMemo(() =>
         programs.filter(p => p.status !== ProgramStatus.COMPLETED && p.status !== ProgramStatus.CANCELLED).sort((a, b) =>
