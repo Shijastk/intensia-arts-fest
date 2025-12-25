@@ -431,7 +431,7 @@ export default function App() {
     const cleanUsername = username.trim().toLowerCase();
     const cleanPassword = password.trim();
 
-    console.log('Login attempt:', { cleanUsername, cleanPassword }); // Debug log
+    // console.log('Login attempt:', { cleanUsername, cleanPassword }); // Debug log
 
     const user = USERS.find(u =>
       u.username.toLowerCase() === cleanUsername &&
@@ -439,7 +439,7 @@ export default function App() {
     );
 
     if (user) {
-      console.log('User found:', user.username, user.role);
+      // console.log('User found:', user.username, user.role);
       // Block non-admins during maintenance
       if (isMaintenanceMode && user.role !== 'admin') {
         console.warn('Login blocked by maintenance mode');

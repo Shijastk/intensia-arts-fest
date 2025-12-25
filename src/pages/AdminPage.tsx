@@ -34,6 +34,8 @@ const CATEGORIES = [
 
 export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, addProgram, updateProgram, deleteProgram, onShowModal }) => {
     const [adminSubView, setAdminSubView] = useState<'PROGRAMS' | 'PARTICIPANTS'>('PROGRAMS');
+    const [adminSubViewStatus, setAdminSubViewStatus] = useState<'STATUS' | 'PROGRAMS'>('PROGRAMS');
+
     const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('All');
     const [showModal, setShowModal] = useState(false);
     const [editingProgram, setEditingProgram] = useState<Program | null>(null);
@@ -244,9 +246,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, add
                     </button>
                 </div>
             </div>
-
-            {/* Live Leaderboard */}
-            <LiveLeaderboard programs={programs} />
+            <div className="mb-6 flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-slate-200 pb-2">
+                <div className="flex space-x-6">
+                    <button onClick={() => setAdminSubViewStatus('PROGRAMS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubViewStatus === 'PROGRAMS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Programs</button>
+                    <button onClick={() => setAdminSubViewStatus('STATUS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubViewStatus === 'STATUS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>With status</button>
+                </div>
+            </div>
+            {adminSubViewStatus == "STATUS"&&<LiveLeaderboard programs={programs} />}
+    
 
             {/* Existing Metrics and View Toggle */}
 
@@ -283,7 +290,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, add
             ) : (
                 <ParticipantList programs={filteredPrograms} onDeleteParticipant={handleGlobalDeleteParticipant} />
             )}
-
             <ProgramFormModal
                 show={showModal}
                 onClose={() => setShowModal(false)}

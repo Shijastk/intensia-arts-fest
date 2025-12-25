@@ -26,23 +26,23 @@ export const GalleryUpload: React.FC = () => {
         setMessage(null);
 
         try {
-            console.log('🔵 Attempting to add gallery image:', imageUrl);
+            // console.log('🔵 Attempting to add gallery image:', imageUrl);
             const result = await addGalleryImage(imageUrl, 'Green Room');
-            console.log('📊 Result from addGalleryImage:', result);
+            // console.log('📊 Result from addGalleryImage:', result);
 
             if (result) {
-                console.log('✅ Image added successfully with ID:', result);
+                // console.log('✅ Image added successfully with ID:', result);
                 setMessage({ type: 'success', text: 'Image added to gallery successfully!' });
                 setImageUrl('');
             } else {
-                console.error('❌ addGalleryImage returned null - Check Firebase rules and permissions');
+                // console.error('❌ addGalleryImage returned null - Check Firebase rules and permissions');
                 setMessage({
                     type: 'error',
                     text: 'Failed to add image. Please check Firebase permissions or see console for details.'
                 });
             }
         } catch (error) {
-            console.error('❌ Error adding gallery image:', error);
+            // console.error('❌ Error adding gallery image:', error);
             setMessage({
                 type: 'error',
                 text: `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`

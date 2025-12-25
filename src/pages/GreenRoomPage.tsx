@@ -20,7 +20,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 
 export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram }) => {
     const assignShuffledCodes = async (programId: string, participantChestToReveal?: string) => {
-        console.log('🔵 assignShuffledCodes called for program:', programId);
+        // console.log('🔵 assignShuffledCodes called for program:', programId);
         const program = programs.find(p => p.id === programId);
         if (!program) {
             console.error('❌ Program not found:', programId);
@@ -46,7 +46,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                 pool.push(String.fromCharCode(65 + i));
             }
             const shuffledPool = shuffleArray(pool);
-            console.log('🎲 Shuffled group codes:', shuffledPool);
+            // console.log('🎲 Shuffled group codes:', shuffledPool);
 
             let letterIdx = 0;
             updatedTeams = program.teams.map(t => {
@@ -88,7 +88,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
         } else {
             const allParticipants = program.teams.flatMap(t => t.participants);
             const totalCount = allParticipants.length;
-            console.log('👥 Total participants:', totalCount);
+            // console.log('👥 Total participants:', totalCount);
 
             const pool: string[] = [];
             for (let i = 0; i < totalCount; i++) {
@@ -96,7 +96,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
             }
 
             const shuffledPool = shuffleArray(pool);
-            console.log('🎲 Shuffled codes:', shuffledPool);
+            // console.log('🎲 Shuffled codes:', shuffledPool);
 
             let letterIdx = 0;
             updatedTeams = program.teams.map(t => ({
@@ -118,12 +118,12 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
             }));
         }
 
-        console.log('📝 Updated teams:', JSON.stringify(updatedTeams, null, 2));
+        // console.log('📝 Updated teams:', JSON.stringify(updatedTeams, null, 2));
 
         // Save to Firebase
-        console.log('💾 Saving to Firebase...');
+        // console.log('💾 Saving to Firebase...');
         const result = await updateProgram(programId, { teams: updatedTeams });
-        console.log('✅ Firebase save result:', result);
+        // console.log('✅ Firebase save result:', result);
     };
 
     const revealCode = async (programId: string, participantChest: string) => {

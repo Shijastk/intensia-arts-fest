@@ -338,12 +338,12 @@ export const batchUpdatePrograms = async (updates: { id: string; data: Partial<P
  */
 export const initializeMockData = async (mockPrograms: Omit<Program, 'id'>[]): Promise<void> => {
     try {
-        console.log('Initializing Firestore with mock data...');
+        // console.log('Initializing Firestore with mock data...');
 
         // Check if data already exists
         const existing = await getAllPrograms();
         if (existing.length > 0) {
-            console.log('Data already exists in Firestore. Skipping initialization.');
+            // console.log('Data already exists in Firestore. Skipping initialization.');
             return;
         }
 
@@ -359,7 +359,7 @@ export const initializeMockData = async (mockPrograms: Omit<Program, 'id'>[]): P
         });
 
         await batch.commit();
-        console.log('✅ Mock data initialized successfully!');
+        // console.log('✅ Mock data initialized successfully!');
     } catch (error) {
         console.error('❌ Error initializing mock data:', error);
     }
@@ -379,7 +379,7 @@ export const clearAllPrograms = async (): Promise<boolean> => {
         });
 
         await batch.commit();
-        console.log('All programs cleared');
+        // console.log('All programs cleared');
         return true;
     } catch (error) {
         console.error('Error clearing programs:', error);
@@ -399,7 +399,7 @@ export const addGalleryImage = async (imageUrl: string, uploadedBy?: string): Pr
             uploadedBy,
             createdAt: Timestamp.now()
         });
-        console.log('✅ Gallery image added:', docRef.id);
+        // console.log('✅ Gallery image added:', docRef.id);
         return docRef.id;
     } catch (error) {
         console.error('❌ Error adding gallery image:', error);
@@ -447,7 +447,7 @@ export const subscribeToGalleryImages = (callback: (images: any[]) => void) => {
 export const deleteGalleryImage = async (id: string): Promise<boolean> => {
     try {
         await deleteDoc(doc(db, COLLECTIONS.GALLERY, id));
-        console.log('✅ Gallery image deleted:', id);
+        // console.log('✅ Gallery image deleted:', id);
         return true;
     } catch (error) {
         console.error('❌ Error deleting gallery image:', error);
