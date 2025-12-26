@@ -140,7 +140,9 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                 grade: bestParticipant.grade,
                 // Don't set rank yet - will be calculated after all teams are processed
                 rank: undefined,
-                points: updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0) // Sum points from all participants in the team
+                // For group programs, all participants have the same points (judge gives points to team)
+                // So take first participant's points instead of summing (which would double/triple the points)
+                points: selectedProgram.isGroup ? (updatedParticipants[0]?.points || 0) : updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0)
             };
         });
 

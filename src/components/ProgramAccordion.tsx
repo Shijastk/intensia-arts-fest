@@ -398,7 +398,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                               ) : '-'
                             )}
                           </td>
-                          
+
                           {/* Points */}
                           <td className="px-3 py-3 text-center">
                             {isEditingScores ? (
@@ -498,6 +498,10 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                 Remove Team
                               </button>
                             )}
+                          </td>
+                          {/* Rank */}
+                          <td className="px-3 py-3 text-center text-red-500">
+                            {`#${team.participants[0]?.rank || '-'}`}
                           </td>
                           {/* Score */}
                           <td className="px-3 py-3 text-center">

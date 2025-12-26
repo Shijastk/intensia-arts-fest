@@ -318,10 +318,12 @@ export interface ZoneStats {
   leadingTeam: TeamScore | null;
   kalaPrathibha: CategoryChampion | null;
   sargaPrathibha: CategoryChampion | null;
-  categories: { [key: string]: {
-    kalaPrathibha: CategoryChampion | null;
-    sargaPrathibha: CategoryChampion | null;
-  }};
+  categories: {
+    [key: string]: {
+      kalaPrathibha: CategoryChampion | null;
+      sargaPrathibha: CategoryChampion | null;
+    }
+  };
 }
 
 export interface LeaderboardStats {
@@ -341,13 +343,13 @@ export interface LeaderboardStats {
  * Uses correct scoring: Sum of all participants' points, but only one per codeLetter per event.
  */
 const calculateZoneScores = (programs: Program[], targetZone: string): { [key: string]: number } => {
-  
+
   const scores: { [key: string]: number } = {
     "PRUDENTIA": 0,
     "SAPIENTIA": 0,
   };
 
-  
+
   // 1. Filter events by 'COMPLETED' status and target zone
   const completedTargetZoneEvents = programs.filter(
     (event) =>
@@ -369,7 +371,7 @@ const calculateZoneScores = (programs: Program[], targetZone: string): { [key: s
           // For quiz events: Take one participant per code letter
           const participants = team.participants || [];
           const uniqueByCodeLetter = new Map<string, number>();
-          
+
           participants.forEach(p => {
             const codeLetter = p.codeLetter || '';
             const points = p.points || 0;
@@ -377,16 +379,18 @@ const calculateZoneScores = (programs: Program[], targetZone: string): { [key: s
               uniqueByCodeLetter.set(codeLetter, points);
             }
           });
-          
+
           eventPoints = Array.from(uniqueByCodeLetter.values()).reduce((sum, points) => sum + points, 0);
         } else {
-          // For other group events: Use team.points or sum of all participants' points
+          // For other group events: Use team.points or first participant's points
+          // IMPORTANT: Do NOT sum participants' points because they all have the same value
+          // (judge gives points to the team, database stores same points for each participant)
           if (team.points !== undefined) {
             eventPoints = team.points;
           } else {
-            // Fallback: sum all participants' points
+            // Fallback: take first participant's points (they all have the same value)
             const participants = team.participants || [];
-            eventPoints = participants.reduce((sum, p) => sum + (p.points || 0), 0);
+            eventPoints = participants.length > 0 ? (participants[0].points || 0) : 0;
           }
         }
       } else {
@@ -394,7 +398,7 @@ const calculateZoneScores = (programs: Program[], targetZone: string): { [key: s
         // Sum of all participants' points, but only one per codeLetter
         const participants = team.participants || [];
         const uniqueByCodeLetter = new Map<string, number>();
-        
+
         participants.forEach(p => {
           const codeLetter = p.codeLetter || '';
           const points = p.points || 0;
@@ -402,7 +406,7 @@ const calculateZoneScores = (programs: Program[], targetZone: string): { [key: s
             uniqueByCodeLetter.set(codeLetter, points);
           }
         });
-        
+
         eventPoints = Array.from(uniqueByCodeLetter.values()).reduce((sum, points) => sum + points, 0);
       }
 
@@ -429,14 +433,14 @@ function aggregateIndividualScores(
   zoneFilter: RegExp,
   nonStageOnly: boolean = false
 ): { name: string; chestNumber: string; teamName: string; totalPoints: number }[] {
-  const individualScores = new Map<string, { 
-    name: string; 
-    chestNumber: string; 
-    teamName: string; 
-    totalPoints: number; 
-  }>(); 
+  const individualScores = new Map<string, {
+    name: string;
+    chestNumber: string;
+    teamName: string;
+    totalPoints: number;
+  }>();
 
-  const filteredPrograms = programs.filter(program => 
+  const filteredPrograms = programs.filter(program =>
     program.status === ProgramStatus.COMPLETED &&
     program.isGroup === false && // Only individual programs
     zoneFilter.test(program.category) &&
@@ -463,7 +467,7 @@ function aggregateIndividualScores(
       });
     });
   });
-  
+
   // Sort and map to the required output format
   return Array.from(individualScores.values()).map(s => ({
     name: s.name,
@@ -478,7 +482,7 @@ function aggregateIndividualScores(
  */
 const getAllZones = (programs: Program[]): string[] => {
   const zones = new Set<string>();
-  
+
   programs.forEach(program => {
     const category = program.category || '';
     // Extract zone letter from category (e.g., "A zone no stage" -> "A")
@@ -487,7 +491,7 @@ const getAllZones = (programs: Program[]): string[] => {
       zones.add(match[1].toUpperCase());
     }
   });
-  
+
   return Array.from(zones).sort();
 };
 
@@ -497,10 +501,10 @@ const getAllZones = (programs: Program[]): string[] => {
 const extractCategoryType = (category: string, zoneKey: string): string => {
   // Remove zone prefix and any extra whitespace
   const withoutZone = category.replace(new RegExp(`${zoneKey}\\s*zone`, 'i'), '').trim();
-  
+
   // If there's nothing left, return 'general'
   if (!withoutZone) return 'general';
-  
+
   // Return the remaining category type
   return withoutZone.toLowerCase();
 };
@@ -511,12 +515,12 @@ const extractCategoryType = (category: string, zoneKey: string): string => {
 export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats => {
   const allTeams = ['PRUDENTIA', 'SAPIENTIA'];
   const zoneKeys = getAllZones(programs);
-  
+
   const overallScores: { [key: string]: number } = {
     'PRUDENTIA': 0,
     'SAPIENTIA': 0,
   };
-  
+
   const zoneStats: { [key: string]: ZoneStats } = {};
 
   // 1. Calculate scores for each zone using the corrected scoring logic
@@ -539,9 +543,9 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
     // 2. Calculate Individual Toppers for the zone
     let zoneKP: CategoryChampion | null = null;
     let zoneSP: CategoryChampion | null = null;
-    
+
     const zoneRegex = new RegExp(`^${zoneKey}\\s*zone`, 'i');
-    
+
     const zoneOverallToppers = aggregateIndividualScores(programs, zoneRegex, false);
     const topKP = zoneOverallToppers[0];
     if (topKP) zoneKP = { ...topKP, points: topKP.totalPoints };
@@ -551,39 +555,41 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
     if (topSP) zoneSP = { ...topSP, points: topSP.totalPoints };
 
     // 3. Calculate category-level champions
-    const categories: { [key: string]: { 
-      kalaPrathibha: CategoryChampion | null; 
-      sargaPrathibha: CategoryChampion | null;
-    }} = {};
-    
+    const categories: {
+      [key: string]: {
+        kalaPrathibha: CategoryChampion | null;
+        sargaPrathibha: CategoryChampion | null;
+      }
+    } = {};
+
     // Get all categories in this zone
-    const zonePrograms = programs.filter(p => 
-      p.status === ProgramStatus.COMPLETED && 
+    const zonePrograms = programs.filter(p =>
+      p.status === ProgramStatus.COMPLETED &&
       zoneRegex.test(p.category)
     );
-    
+
     const zoneCategories = new Set<string>();
     zonePrograms.forEach(p => {
       const categoryType = extractCategoryType(p.category, zoneKey);
       zoneCategories.add(categoryType);
     });
-    
+
     // For each category, find champions
     zoneCategories.forEach(categoryType => {
       // Create regex that matches this specific zone + category type
       const categoryRegex = new RegExp(`^${zoneKey}\\s*zone.*${categoryType.replace(/\s+/g, '.*')}`, 'i');
-      
+
       const categoryOverallToppers = aggregateIndividualScores(programs, categoryRegex, false);
       const categoryNonStageToppers = aggregateIndividualScores(programs, categoryRegex, true);
-      
+
       categories[categoryType] = {
-        kalaPrathibha: categoryOverallToppers[0] ? { 
-          ...categoryOverallToppers[0], 
-          points: categoryOverallToppers[0].totalPoints 
+        kalaPrathibha: categoryOverallToppers[0] ? {
+          ...categoryOverallToppers[0],
+          points: categoryOverallToppers[0].totalPoints
         } : null,
-        sargaPrathibha: categoryNonStageToppers[0] ? { 
-          ...categoryNonStageToppers[0], 
-          points: categoryNonStageToppers[0].totalPoints 
+        sargaPrathibha: categoryNonStageToppers[0] ? {
+          ...categoryNonStageToppers[0],
+          points: categoryNonStageToppers[0].totalPoints
         } : null,
       };
     });
@@ -599,11 +605,11 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
   }
 
   // 4. Calculate Overall Festival Leaderboard and Toppers
-  const overallScoresArray = Object.entries(overallScores).map(([name, score]) => ({ 
-    name, 
-    score: parseFloat(score.toFixed(1)) 
+  const overallScoresArray = Object.entries(overallScores).map(([name, score]) => ({
+    name,
+    score: parseFloat(score.toFixed(1))
   }));
-  
+
   overallScoresArray.sort((a, b) => b.score - a.score);
 
   const leadingTeam = overallScoresArray[0] ?? { name: '', score: 0 };
@@ -612,20 +618,20 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
   // Calculate overall champions
   const overallToppers = aggregateIndividualScores(programs, /./i, false);
   const overallKP = overallToppers[0];
-  
+
   const overallNonStageToppers = aggregateIndividualScores(programs, /./i, true);
   const overallSP = overallNonStageToppers[0];
 
   return {
     leadingTeam,
     trailingTeam,
-    kalaPrathibha: overallKP ? { 
-      ...overallKP, 
-      points: overallKP.totalPoints 
+    kalaPrathibha: overallKP ? {
+      ...overallKP,
+      points: overallKP.totalPoints
     } : null,
-    sarkhaPrathibha: overallSP ? { 
-      ...overallSP, 
-      points: overallSP.totalPoints 
+    sarkhaPrathibha: overallSP ? {
+      ...overallSP,
+      points: overallSP.totalPoints
     } : null,
     zones: zoneStats,
   };
@@ -650,7 +656,7 @@ export const getDetailedTeamScores = (programs: Program[]): {
   completedEvents.forEach(event => {
     // Create unique event key that includes category and name
     const eventKey = `${event.category}: ${event.name}`;
-    
+
     let prudentiaPoints = 0;
     let sapientiaPoints = 0;
 
@@ -663,7 +669,7 @@ export const getDetailedTeamScores = (programs: Program[]): {
           // For quiz events: deduplicate by codeLetter
           const participants = team.participants || [];
           const uniqueByCodeLetter = new Map<string, number>();
-          
+
           participants.forEach(p => {
             const codeLetter = p.codeLetter || '';
             const points = p.points || 0;
@@ -671,22 +677,24 @@ export const getDetailedTeamScores = (programs: Program[]): {
               uniqueByCodeLetter.set(codeLetter, points);
             }
           });
-          
+
           eventPoints = Array.from(uniqueByCodeLetter.values()).reduce((sum, points) => sum + points, 0);
         } else {
-          // For other group events
+          // For other group events: Use team.points or first participant's points
+          // IMPORTANT: Do NOT sum participants' points because they all have the same value
           if (team.points !== undefined) {
             eventPoints = team.points;
           } else {
+            // Fallback: take first participant's points (they all have the same value)
             const participants = team.participants || [];
-            eventPoints = participants.reduce((sum, p) => sum + (p.points || 0), 0);
+            eventPoints = participants.length > 0 ? (participants[0].points || 0) : 0;
           }
         }
       } else {
         // For individual events: deduplicate by codeLetter
         const participants = team.participants || [];
         const uniqueByCodeLetter = new Map<string, number>();
-        
+
         participants.forEach(p => {
           const codeLetter = p.codeLetter || '';
           const points = p.points || 0;
@@ -694,7 +702,7 @@ export const getDetailedTeamScores = (programs: Program[]): {
             uniqueByCodeLetter.set(codeLetter, points);
           }
         });
-        
+
         eventPoints = Array.from(uniqueByCodeLetter.values()).reduce((sum, points) => sum + points, 0);
       }
 
