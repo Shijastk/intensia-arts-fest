@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Program, ProgramStatus } from '../types';
-import { calculatePoints, getGradeBreakdown } from '../utils/pointsCalculator';
+import { calculatePoints, getGradeBreakdown, getGradeFromScore } from '../utils/pointsCalculator';
 
 interface JudgesPageProps {
     programs: Program[];
@@ -49,6 +49,15 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
     };
 
     const handleScoreChange = (chestNumber: string, field: 'score' | 'grade', value: string) => {
+        // Calculate auto-grade if score changes
+        let autoGrade: string | null = null;
+        if (field === 'score') {
+            const numVal = parseFloat(value);
+            if (!isNaN(numVal)) {
+                autoGrade = getGradeFromScore(numVal);
+            }
+        }
+
         if (selectedProgram?.isGroup) {
             // Find the team AND the specific chunk this participant belongs to
             const team = selectedProgram.teams.find(t => t.participants.some(p => p.chestNumber === chestNumber));
@@ -68,9 +77,17 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
                 setScores(prev => {
                     const newScores = { ...prev };
                     targetParticipants.forEach(p => {
+                        const current = newScores[p.chestNumber] || { score: '', grade: '' };
+                        const updates: any = { [field]: value };
+
+                        // Apply auto-grade if applicable
+                        if (autoGrade !== null) {
+                            updates.grade = autoGrade;
+                        }
+
                         newScores[p.chestNumber] = {
-                            ...(newScores[p.chestNumber] || { score: '', grade: '' }),
-                            [field]: value
+                            ...current,
+                            ...updates
                         };
                     });
                     return newScores;
@@ -78,13 +95,23 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({ programs, setPrograms, c
             }
         } else {
             // Individual update
-            setScores(prev => ({
-                ...prev,
-                [chestNumber]: {
-                    ...prev[chestNumber],
-                    [field]: value
+            setScores(prev => {
+                const current = prev[chestNumber] || { score: '', grade: '' };
+                const updates: any = { [field]: value };
+
+                // Apply auto-grade if applicable
+                if (autoGrade !== null) {
+                    updates.grade = autoGrade;
                 }
-            }));
+
+                return {
+                    ...prev,
+                    [chestNumber]: {
+                        ...current,
+                        ...updates
+                    }
+                };
+            });
         }
     };
 

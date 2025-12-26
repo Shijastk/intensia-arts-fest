@@ -47,7 +47,22 @@ export const calculatePoints = (score: number, grade: string, isGroup: boolean):
     const sPoints = (score / 100) * (maxP / 2);
     const gPoints = (GRADE_POINTS[grade] || 0) * (isGroup ? 2 : 1);
     const total = sPoints + gPoints;
-    return Math.min(Math.round(total * 10) / 10, maxP);
+
+    // Round to nearest 0.5 to avoid .7, .3, .4 values
+    return Math.min(Math.round(total * 2) / 2, maxP);
+};
+
+/**
+ * Get grade based on score
+ * @param score - Score out of 100
+ * @returns Grade string
+ */
+export const getGradeFromScore = (score: number): string => {
+    if (score >= 80) return 'A+';
+    if (score >= 70) return 'A';
+    if (score >= 50) return 'B';
+    if (score >= 30) return 'C';
+    return '';
 };
 
 /**
