@@ -92,8 +92,8 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ programs }) => {
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase">{team.teamName}</p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-black text-emerald-600">{team.points}</p>
-                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Points</p>
+                                                    {/* <p className="text-sm font-black text-emerald-600">{team.points}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Points</p> */}
                                                 </div>
                                             </div>
                                         ))}
