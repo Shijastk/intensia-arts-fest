@@ -1,10 +1,19 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Program, ProgramStatus } from '../types';
 import { Link } from 'react-router-dom';
 
 /* =====================================================
    HELPERS
 ===================================================== */
+
+// -------- EXTRACT ZONE FROM CATEGORY --------
+const extractZone = (category: string): string => {
+  const catLower = category.toLowerCase();
+  if (catLower.includes('a zone')) return 'A';
+  if (catLower.includes('b zone')) return 'B';
+  if (catLower.includes('c zone')) return 'C';
+  return 'General';
+};
 
 // -------- GROUP PROGRAM (Quiz) --------
 const getGroupResults = (teams: any[]) => {
@@ -67,13 +76,12 @@ const ResultRow = ({ data, index }: any) => (
   <div className="flex items-center justify-between bg-slate-50 rounded-xl p-4">
     <div className="flex items-center gap-3">
       <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${
-          index === 0
-            ? 'bg-yellow-200 text-yellow-800'
-            : index === 1
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${index === 0
+          ? 'bg-yellow-200 text-yellow-800'
+          : index === 1
             ? 'bg-slate-200 text-slate-600'
             : 'bg-orange-200 text-orange-800'
-        }`}
+          }`}
       >
         {index + 1}
       </div>
@@ -87,15 +95,6 @@ const ResultRow = ({ data, index }: any) => (
         </p>
       </div>
     </div>
-
-    {/* <div className="text-right">
-      <p className="text-sm font-black text-emerald-600">
-        {data.points}
-      </p>
-      <p className="text-[9px] font-bold uppercase text-slate-400">
-        Points
-      </p>
-    </div> */}
   </div>
 );
 
@@ -108,6 +107,11 @@ interface ResultsPageProps {
 }
 
 export const ResultsPage: React.FC<ResultsPageProps> = ({ programs }) => {
+  // State for search and filter
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedZone, setSelectedZone] = useState<string>('All');
+
+  // Get all completed and published programs
   const completedPrograms = useMemo(
     () =>
       programs.filter(
@@ -117,6 +121,44 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ programs }) => {
       ),
     [programs]
   );
+
+  // Filter programs based on search and zone
+  const filteredPrograms = useMemo(() => {
+    let filtered = completedPrograms;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.category.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply zone filter
+    if (selectedZone !== 'All') {
+      filtered = filtered.filter(p => extractZone(p.category) === selectedZone);
+    }
+
+    // Sort by zone
+    return filtered.sort((a, b) => {
+      const zoneA = extractZone(a.category);
+      const zoneB = extractZone(b.category);
+
+      // Sort order: A, B, C, General
+      const zoneOrder: Record<string, number> = { 'A': 1, 'B': 2, 'C': 3, 'General': 4 };
+      return (zoneOrder[zoneA] || 5) - (zoneOrder[zoneB] || 5);
+    });
+  }, [completedPrograms, searchQuery, selectedZone]);
+
+  // Get unique zones for filter dropdown
+  const availableZones = useMemo(() => {
+    const zones = new Set<string>();
+    completedPrograms.forEach(p => {
+      zones.add(extractZone(p.category));
+    });
+    return Array.from(zones).sort();
+  }, [completedPrograms]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -142,46 +184,98 @@ export const ResultsPage: React.FC<ResultsPageProps> = ({ programs }) => {
             Published Results
           </h1>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {completedPrograms.map(prog => (
-              <div
-                key={prog.id}
-                className="bg-white rounded-[2rem] p-3 border border-slate-100"
+          {/* Search and Filter Controls */}
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
+            {/* Search Input */}
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search by program name or category..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm font-medium"
+              />
+            </div>
+
+            {/* Zone Filter */}
+            <div className="md:w-64">
+              <select
+                value={selectedZone}
+                onChange={(e) => setSelectedZone(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm font-bold uppercase cursor-pointer"
               >
-                {/* Program Header */}
-                <div className="h-36 bg-slate-100 rounded-[1.5rem] p-4 relative">
-                  <span className="inline-block bg-white px-3 py-1 rounded-lg text-[10px] font-black uppercase">
-                    {prog.category}
-                  </span>
+                <option value="All">All Zones</option>
+                {availableZones.map(zone => (
+                  <option key={zone} value={zone}>
+                    {zone === 'General' ? 'General' : `Zone ${zone}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-                  <div className="absolute bottom-4 left-4">
-                    <h3 className="text-xl font-black uppercase">
-                      {prog.name}
-                    </h3>
+          {/* Results Count */}
+          <p className="text-sm font-bold uppercase text-slate-500 mb-6">
+            Showing {filteredPrograms.length} of {completedPrograms.length} programs
+          </p>
+
+          {/* Programs Grid */}
+          {filteredPrograms.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredPrograms.map(prog => (
+                <div
+                  key={prog.id}
+                  className="bg-white rounded-3xl p-4 border border-slate-200 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                >
+                  {/* Program Header */}
+                  <div className="h-36 bg-slate-100 rounded-[1.5rem] p-4 relative">
+                    <div className="flex gap-2">
+                      <span className="inline-block bg-white px-3 py-1 rounded-lg text-[10px] font-black uppercase">
+                        {prog.category}
+                      </span>
+                      <span className="inline-block bg-emerald-500 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase">
+                        Zone {extractZone(prog.category)}
+                      </span>
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-xl font-black uppercase">
+                        {prog.name}
+                      </h3>
+                    </div>
                   </div>
-                </div>
 
-                {/* Results */}
-                <div className="p-4 space-y-3">
-                  {prog.isGroup
-                    ? getGroupResults(prog.teams).map((r, index) => (
+                  {/* Results */}
+                  <div className="p-4 space-y-3">
+                    {prog.isGroup
+                      ? getGroupResults(prog.teams).map((r, index) => (
                         <ResultRow
                           key={index}
                           data={r}
                           index={index}
                         />
                       ))
-                    : getIndividualResults(prog.teams).map((r, index) => (
+                      : getIndividualResults(prog.teams).map((r, index) => (
                         <ResultRow
                           key={index}
                           data={r}
                           index={index}
                         />
                       ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20">
+              <p className="text-2xl font-black uppercase text-slate-300 mb-2">
+                No Results Found
+              </p>
+              <p className="text-sm font-bold text-slate-400">
+                Try adjusting your search or filter criteria
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

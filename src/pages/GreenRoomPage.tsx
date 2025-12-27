@@ -18,6 +18,14 @@ const shuffleArray = <T,>(array: T[]): T[] => {
     return shuffled;
 };
 
+const extractZone = (category: string): string => {
+    const catLower = category.toLowerCase();
+    if (catLower.includes('a zone')) return 'A';
+    if (catLower.includes('b zone')) return 'B';
+    if (catLower.includes('c zone')) return 'C';
+    return 'General';
+};
+
 export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram }) => {
     const assignShuffledCodes = async (programId: string, participantChestToReveal?: string) => {
         // console.log('🔵 assignShuffledCodes called for program:', programId);
@@ -186,7 +194,35 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
         })
         .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
-    const [activeTab, setActiveTab] = React.useState<'PROGRAMS' | 'GALLERY'>('PROGRAMS');
+    // Calculate zone-wise team scores for published results
+    const completedPrograms = programs.filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished);
+
+    const zoneScores = React.useMemo(() => {
+        const scores: Record<string, { PRUDENTIA: number; SAPIENTIA: number; publishedCount: number }> = {};
+
+        completedPrograms.forEach(program => {
+            const zone = extractZone(program.category);
+
+            if (!scores[zone]) {
+                scores[zone] = { PRUDENTIA: 0, SAPIENTIA: 0, publishedCount: 0 };
+            }
+
+            scores[zone].publishedCount += 1;
+
+            program.teams.forEach(team => {
+                const teamName = team.teamName as 'PRUDENTIA' | 'SAPIENTIA';
+                team.participants?.forEach(p => {
+                    if (p.points != null && (teamName === 'PRUDENTIA' || teamName === 'SAPIENTIA')) {
+                        scores[zone][teamName] += p.points;
+                    }
+                });
+            });
+        });
+
+        return scores;
+    }, [completedPrograms]);
+
+    const [activeTab, setActiveTab] = React.useState<'PROGRAMS' | 'GALLERY' | 'STATUS'>('PROGRAMS');
 
     return (
         <div className="space-y-6 text-left animate-in fade-in duration-500">
@@ -202,6 +238,12 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                             className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${activeTab === 'PROGRAMS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                         >
                             Programs
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('STATUS')}
+                            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${activeTab === 'STATUS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            Status
                         </button>
                         <button
                             onClick={() => setActiveTab('GALLERY')}
@@ -221,6 +263,145 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
 
             {activeTab === 'GALLERY' ? (
                 <GalleryUpload />
+            ) : activeTab === 'STATUS' ? (
+                <div className="space-y-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-3xl font-black uppercase bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
+                                Team Scores by Zone
+                            </h2>
+                            <div className="text-right">
+                                <p className="text-sm font-bold uppercase text-slate-400">Total Programs</p>
+                                <p className="text-2xl font-black text-slate-900">{completedPrograms.length}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                            {Object.entries(zoneScores)
+                                .sort(([zoneA], [zoneB]) => {
+                                    const zoneOrder: Record<string, number> = { 'A': 1, 'B': 2, 'C': 3, 'General': 4 };
+                                    return (zoneOrder[zoneA] || 5) - (zoneOrder[zoneB] || 5);
+                                })
+                                .map(([zone, scores]) => {
+                                    const prudentiaScore = scores.PRUDENTIA;
+                                    const sapientiaScore = scores.SAPIENTIA;
+                                    const totalZoneScore = prudentiaScore + sapientiaScore;
+                                    const leader = prudentiaScore > sapientiaScore ? 'PRUDENTIA' :
+                                        sapientiaScore > prudentiaScore ? 'SAPIENTIA' : 'TIE';
+                                    const prudentiaPercentage = totalZoneScore > 0 ? (prudentiaScore / totalZoneScore) * 100 : 50;
+                                    const sapientiaPercentage = totalZoneScore > 0 ? (sapientiaScore / totalZoneScore) * 100 : 50;
+
+                                    return (
+                                        <div
+                                            key={zone}
+                                            className="bg-white rounded-3xl p-6 border border-slate-200 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+                                        >
+                                            {/* Zone Header */}
+                                            <div className="text-center mb-6">
+                                                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-6 py-3 rounded-2xl shadow-md">
+                                                    <span className="text-2xl">
+                                                        {zone === 'A' ? '🅰️' : zone === 'B' ? '🅱️' : zone === 'C' ? '©️' : '🌟'}
+                                                    </span>
+                                                    <span className="text-base font-black uppercase tracking-wide">
+                                                        {zone === 'General' ? 'General' : `Zone ${zone}`}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs font-bold uppercase text-slate-400 mt-3">
+                                                    {scores.publishedCount} {scores.publishedCount === 1 ? 'Result' : 'Results'} Published
+                                                </p>
+                                            </div>
+
+                                            {/* Progress Bar */}
+                                            <div className="mb-6">
+                                                <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 shadow-inner">
+                                                    <div
+                                                        className="bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
+                                                        style={{ width: `${prudentiaPercentage}%` }}
+                                                    />
+                                                    <div
+                                                        className="bg-gradient-to-r from-red-500 to-red-600 transition-all duration-500"
+                                                        style={{ width: `${sapientiaPercentage}%` }}
+                                                    />
+                                                </div>
+                                                <div className="flex justify-between mt-2 text-xs font-bold text-slate-400">
+                                                    <span>{prudentiaPercentage.toFixed(0)}%</span>
+                                                    <span>{sapientiaPercentage.toFixed(0)}%</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                {/* PRUDENTIA Score */}
+                                                <div
+                                                    className={`relative rounded-2xl p-4 transition-all duration-300 ${leader === 'PRUDENTIA'
+                                                        ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white shadow-xl shadow-blue-500/50 scale-105'
+                                                        : 'bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150'
+                                                        }`}
+                                                >
+                                                    {leader === 'PRUDENTIA' && (
+                                                        <div className="absolute -top-3 -right-3 bg-yellow-400 text-yellow-900 w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-lg animate-pulse">
+                                                            👑
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className={`text-xs font-black uppercase tracking-wider mb-1 ${leader === 'PRUDENTIA' ? 'text-blue-100' : 'text-blue-600'
+                                                                }`}>
+                                                                PRUDENTIA
+                                                            </p>
+                                                            <p className={`text-3xl font-black ${leader === 'PRUDENTIA' ? 'text-white' : 'text-blue-700'
+                                                                }`}>
+                                                                {prudentiaScore.toFixed(1)}
+                                                            </p>
+                                                        </div>
+                                                        <div className={`text-5xl ${leader === 'PRUDENTIA' ? 'opacity-20' : 'opacity-10'}`}>
+                                                            🔵
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* SAPIENTIA Score */}
+                                                <div
+                                                    className={`relative rounded-2xl p-4 transition-all duration-300 ${leader === 'SAPIENTIA'
+                                                        ? 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 text-white shadow-xl shadow-red-500/50 scale-105'
+                                                        : 'bg-gradient-to-br from-red-50 to-red-100 hover:from-red-100 hover:to-red-150'
+                                                        }`}
+                                                >
+                                                    {leader === 'SAPIENTIA' && (
+                                                        <div className="absolute -top-3 -right-3 bg-yellow-400 text-yellow-900 w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-lg animate-pulse">
+                                                            👑
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className={`text-xs font-black uppercase tracking-wider mb-1 ${leader === 'SAPIENTIA' ? 'text-red-100' : 'text-red-600'
+                                                                }`}>
+                                                                SAPIENTIA
+                                                            </p>
+                                                            <p className={`text-3xl font-black ${leader === 'SAPIENTIA' ? 'text-white' : 'text-red-700'
+                                                                }`}>
+                                                                {sapientiaScore.toFixed(1)}
+                                                            </p>
+                                                        </div>
+                                                        <div className={`text-5xl ${leader === 'SAPIENTIA' ? 'opacity-20' : 'opacity-10'}`}>
+                                                            🔴
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Zone Total */}
+                                            <div className="mt-4 pt-4 border-t border-slate-200">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-bold uppercase text-slate-400">Zone Total</span>
+                                                    <span className="text-lg font-black text-slate-700">{totalZoneScore.toFixed(1)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                    </div>
+                </div>
             ) : (
                 <div className="space-y-10">
                     {filteredPrograms.length === 0 ? (
