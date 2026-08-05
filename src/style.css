@@ -1,0 +1,316 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Bricolage Grotesque", "Bricolage Grotesque Fallback", sans-serif;
+  --font-poppins: "Poppins", sans-serif;
+
+  --shadow-cause-shadow: 0px 4px 17px 0px #00000008;
+  --shadow-featureShadow: 0px 72px 129px 0px #0000001a;
+
+  --spacing-70\%: 70%;
+
+  --color-primary: #0057ff;
+  --color-midnight_text: #001b50;
+  --color-Lightsuccess: #e7f8f2;
+  --color-deepSlate: #6493ea;
+
+  --text-86: 5.375rem;
+  --text-86--line-height: 1.2;
+
+  --background-image-header: linear-gradient(120.3deg,
+      #e8f6ff 0%,
+      #f8fafc 100%);
+  --background-image-testimonial-bg: url('/images/people/bg-line.png');
+
+  --leading-130: 130%;
+  --leading-140: 140%;
+  --leading-180: 180%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.font-poppins {
+  font-family: var(--font-poppins);
+}
+
+@layer base {
+
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
+  /* Custom Thin Light Scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.3);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.5);
+  }
+}
+
+@layer utilities {
+  .container {
+    @apply max-w-7xl mx-auto w-full px-4;
+  }
+
+  /* ==========================================================================
+     Modern Tactile Skeuomorphism Design Utilities
+     ========================================================================== */
+
+  .skeuo-card,
+  .clay-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
+    backdrop-filter: blur(16px);
+    border-radius: 1.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow:
+      0 14px 36px -10px rgba(15, 23, 42, 0.09),
+      0 4px 12px -2px rgba(15, 23, 42, 0.04),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 1),
+      inset 0 -1.5px 0 0 rgba(0, 0, 0, 0.04);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .skeuo-card:hover,
+  .clay-card:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 20px 42px -10px rgba(15, 23, 42, 0.13),
+      0 8px 18px -4px rgba(15, 23, 42, 0.06),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 1),
+      inset 0 -1.5px 0 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .skeuo-card-flat,
+  .clay-card-flat {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+    backdrop-filter: blur(12px);
+    border-radius: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow:
+      0 8px 24px -6px rgba(15, 23, 42, 0.06),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.03);
+  }
+
+  .skeuo-button-primary,
+  .clay-button-primary {
+    background: linear-gradient(180deg, #1d6dff 0%, #0047e1 100%);
+    color: #ffffff;
+    border-radius: 9999px;
+    border: 1px solid #003cc2;
+    box-shadow:
+      0 6px 16px -2px rgba(0, 87, 255, 0.4),
+      0 2px 4px 0 rgba(0, 0, 0, 0.1),
+      inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 1px 0 rgba(0, 0, 0, 0.25);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+  }
+
+  .skeuo-button-primary:hover,
+  .clay-button-primary:hover {
+    background: linear-gradient(180deg, #2b77ff 0%, #004ff0 100%);
+    transform: translateY(-2px);
+    box-shadow:
+      0 8px 20px -2px rgba(0, 87, 255, 0.48),
+      0 3px 6px 0 rgba(0, 0, 0, 0.12),
+      inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -2px 1px 0 rgba(0, 0, 0, 0.25);
+  }
+
+  .skeuo-button-primary:active,
+  .clay-button-primary:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 2px 6px 0 rgba(0, 87, 255, 0.3),
+      inset 0 2px 4px 0 rgba(0, 0, 0, 0.35);
+  }
+
+  .skeuo-button-secondary,
+  .clay-button-secondary {
+    background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+    color: #0f172a;
+    border-radius: 9999px;
+    border: 1px solid rgba(203, 213, 225, 0.8);
+    box-shadow:
+      0 4px 12px -2px rgba(15, 23, 42, 0.08),
+      0 2px 4px 0 rgba(0, 0, 0, 0.03),
+      inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 1),
+      inset 0 -1.5px 1px 0 rgba(15, 23, 42, 0.06);
+    transition: all 0.2s ease;
+  }
+
+  .skeuo-button-secondary:hover,
+  .clay-button-secondary:hover {
+    background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%);
+    color: #0057ff;
+    transform: translateY(-2px);
+    box-shadow:
+      0 6px 16px -2px rgba(15, 23, 42, 0.12),
+      0 2px 4px 0 rgba(0, 0, 0, 0.04),
+      inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 1),
+      inset 0 -1.5px 1px 0 rgba(15, 23, 42, 0.08);
+  }
+
+  .skeuo-button-secondary:active,
+  .clay-button-secondary:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 2px 4px 0 rgba(15, 23, 42, 0.06),
+      inset 0 2px 4px 0 rgba(15, 23, 42, 0.1);
+  }
+
+  .skeuo-chip,
+  .clay-chip {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #0f172a;
+    border-radius: 9999px;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    box-shadow:
+      0 3px 8px -1px rgba(15, 23, 42, 0.08),
+      inset 0 1px 0 0 rgba(255, 255, 255, 1),
+      inset 0 -1px 0 0 rgba(15, 23, 42, 0.04);
+    transition: all 0.2s ease;
+  }
+
+  .skeuo-chip-emerald,
+  .clay-chip-emerald {
+    background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+    color: #ffffff;
+    border-radius: 9999px;
+    border: 1px solid #065f46;
+    box-shadow:
+      0 4px 10px -1px rgba(16, 185, 129, 0.35),
+      inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1.5px 1px 0 rgba(0, 0, 0, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .skeuo-chip-indigo,
+  .clay-chip-indigo,
+  .clay-chip-primary {
+    background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
+    color: #ffffff;
+    border-radius: 9999px;
+    border: 1px solid #3730a3;
+    box-shadow:
+      0 4px 10px -1px rgba(99, 102, 241, 0.35),
+      inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1.5px 1px 0 rgba(0, 0, 0, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .skeuo-chip-rose,
+  .clay-chip-rose,
+  .clay-chip-coral {
+    background: linear-gradient(180deg, #f43f5e 0%, #be123c 100%);
+    color: #ffffff;
+    border-radius: 9999px;
+    border: 1px solid #9f1239;
+    box-shadow:
+      0 4px 10px -1px rgba(244, 63, 94, 0.35),
+      inset 0 1.5px 0.5px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1.5px 1px 0 rgba(0, 0, 0, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .skeuo-nav,
+  .clay-nav {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+    backdrop-filter: blur(20px);
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow:
+      0 12px 32px -6px rgba(15, 23, 42, 0.1),
+      0 4px 10px -2px rgba(15, 23, 42, 0.04),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 1),
+      inset 0 -1.5px 0 0 rgba(0, 0, 0, 0.05);
+  }
+
+  /* ==========================================================================
+     Iconic Star Keyframe Animations & Utilities
+     ========================================================================== */
+
+  @keyframes star-spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes star-spin-reverse {
+    from {
+      transform: rotate(360deg);
+    }
+
+    to {
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes star-pulse-rotate {
+    0% {
+      transform: rotate(0deg) scale(0.92);
+      opacity: 0.15;
+    }
+
+    50% {
+      transform: rotate(180deg) scale(1.15);
+      opacity: 0.35;
+    }
+
+    100% {
+      transform: rotate(360deg) scale(0.92);
+      opacity: 0.15;
+    }
+  }
+
+  .animate-star-spin {
+    animation: star-spin 20s linear infinite;
+  }
+
+  .animate-star-spin-fast {
+    animation: star-spin 10s linear infinite;
+  }
+
+  .animate-star-spin-reverse {
+    animation: star-spin-reverse 25s linear infinite;
+  }
+
+  .animate-star-pulse {
+    animation: star-pulse-rotate 12s ease-in-out infinite;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
