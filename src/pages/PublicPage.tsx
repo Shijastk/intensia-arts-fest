@@ -1,25 +1,28 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Program, ProgramStatus, GalleryImage } from '../types';
 import { Link } from 'react-router-dom';
-import { subscribeToGalleryImages } from '../services/firestore.service';
-import { MasonryGridGallery } from './MasonryGridGallery';
+// import { getGallery } from '../services/gas.service';
+import { MasonryGridGallery } from '../components/MasonryGridGallery';
 
 interface PublicPageProps {
     programs: Program[];
 }
 
-export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
+export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({ programs, festId }) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [activeTab, setActiveTab] = useState<'HOME' | 'RESULTS'>('HOME');
     const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
-    // Subscribe to gallery images
-    useEffect(() => {
-        const unsubscribe = subscribeToGalleryImages((images) => {
-            setGalleryImages(images.slice(0, 3)); // Only show latest 3 images
-        });
-        return () => unsubscribe();
-    }, []);
+    // Fetch gallery images from GAS (replaces Firestore subscription)
+    // useEffect(() => {
+    //     let mounted = true;
+    //     getGallery().then((res) => {
+    //         if (mounted && res.success && res.data) {
+    //             setGalleryImages((res.data as any[]).slice(0, 3));
+    //         }
+    //     });
+    //     return () => { mounted = false; };
+    // }, []);
 
     const completedPrograms = useMemo(() => {
         return programs
@@ -81,7 +84,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                         <div className="hidden md:flex items-center gap-8">
                             <a href="#home" className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">Home</a>
                             <a href="#about" className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">About</a>
-                            <a href="#results" className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">Results</a>
+                            <Link to={`/fests/${festId}/results`} className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">Results</Link>
                             <a href="#gallery" className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">Gallery</a>
                         </div>
 
@@ -113,7 +116,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-400">Creativity</span>
                             </h1>
                             <p className="text-lg text-slate-500 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
-                                Experience the pinnacle of artistic expression at the Darul Falah Campus Fest. Where talent meets tradition in a celebration of culture.
+                                Experience the pinnacle of artistic expression at Intensia Arts Fest. Where talent meets tradition in a celebration of culture.
                             </p>
                         </div>
 
@@ -175,11 +178,11 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
             <div className="bg-slate-900 py-4 overflow-hidden -skew-y-1 relative z-10">
                 <div className="flex gap-16 animate-marquee whitespace-nowrap text-slate-400 text-sm font-black uppercase tracking-[0.2em] opacity-80">
                     <span>★ Live Results</span>
-                    <span>★ Darul Falah Campus</span>
+                    <span>★ Intensia Arts Fest</span>
                     <span>★ Intensia 2025</span>
                     <span>★ The Art Form of Creativity</span>
                     <span>★ Live Results</span>
-                    <span>★ Darul Falah Campus</span>
+                    <span>★ Intensia Arts Fest</span>
                     <span>★ Intensia 2025</span>
                     <span>★ The Art Form of Creativity</span>
                 </div>
@@ -207,11 +210,11 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                         </div>
                         <div className="md:w-1/2 space-y-8">
                             <div>
-                                <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight mb-4">Darul Falah<br />Campus Fest</h2>
+                                <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight mb-4">Intensia<br />Arts Fest</h2>
                                 <div className="w-20 h-2 bg-gradient-to-r from-teal-500 to-emerald-400 rounded-full"></div>
                             </div>
                             <p className="text-slate-600 text-lg leading-relaxed font-medium">
-                                Experience no limits where melodies transcend boundaries. Immerse yourself in the rhythmic vibes of our annual arts festival. Join us at the Darul Falah Campus for two days of unlimited creativity and competition.
+                                Experience no limits where melodies transcend boundaries. Immerse yourself in the rhythmic vibes of our annual arts festival. Join us at Intensia Arts Fest for two days of unlimited creativity and competition.
                             </p>
 
                             <div className="grid grid-cols-2 gap-6">
@@ -227,7 +230,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                     </div>
                                     <h4 className="text-sm font-black text-slate-900 uppercase mb-1">Kalpetta</h4>
-                                    <p className="text-xs font-medium text-slate-400">Darul Falah Campus</p>
+                                    <p className="text-xs font-medium text-slate-400">Main Campus Stage</p>
                                 </div>
                             </div>
                         </div>
@@ -314,7 +317,7 @@ export const PublicPage: React.FC<PublicPageProps> = ({ programs }) => {
                     </div>
                     <h2 className="text-3xl font-black uppercase tracking-tight mb-4">Intensia Arts Fest 2025</h2>
                     <p className="text-slate-400 text-sm font-medium max-w-lg mx-auto mb-8">
-                        The ultimate celebration of creativity and talent under the guidance of Darul Falah Islamic College.
+                        The ultimate celebration of creativity and talent at Intensia Arts Fest.
                     </p>
                     <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em]">&copy; 2025 INTENSIA. All rights reserved.</p>
                 </div>

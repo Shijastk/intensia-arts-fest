@@ -1,92 +1,116 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Program } from '../types';
 
 interface ProgramFormModalProps {
-    show: boolean;
-    onClose: () => void;
-    onSave: (e: React.FormEvent<HTMLFormElement>) => void;
-    editingProgram: Program | null;
-    isGroup: boolean;
-    setIsGroup: (value: boolean) => void;
-    categories: string[];
+  show: boolean;
+  onClose: () => void;
+  onSave: (e: React.FormEvent<HTMLFormElement>) => void;
+  editingProgram: Program | null;
+  isGroup: boolean;
+  setIsGroup: (val: boolean) => void;
+  categories: string[];
+  zones: string[];
 }
 
 export const ProgramFormModal: React.FC<ProgramFormModalProps> = ({
-    show,
-    onClose,
-    onSave,
-    editingProgram,
-    isGroup,
-    setIsGroup,
-    categories
+  show,
+  onClose,
+  onSave,
+  editingProgram,
+  isGroup,
+  setIsGroup,
+  categories,
+  zones
 }) => {
-    if (!show) return null;
+  useEffect(() => {
+    if (editingProgram) {
+      setIsGroup(editingProgram.isGroup || false);
+    } else {
+      setIsGroup(false);
+    }
+  }, [editingProgram, setIsGroup, show]);
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in slide-in-from-bottom-6">
-                <div className="bg-indigo-600 px-8 py-6 flex justify-between items-center text-white">
-                    <h3 className="text-sm font-black uppercase tracking-widest">{editingProgram ? 'Update Event Config' : 'Initialize New Event'}</h3>
-                    <button onClick={onClose} className="opacity-70 hover:opacity-100 transition-opacity"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                </div>
-                <form onSubmit={onSave} className="p-8 space-y-6 text-left">
-                    <div className="grid grid-cols-2 gap-5">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Event Name</label>
-                            <input name="name" defaultValue={editingProgram?.name} required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" placeholder="e.g. Solo Verse" />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Category</label>
-                            <select name="category" defaultValue={editingProgram?.category} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none cursor-pointer focus:border-indigo-500">
-                                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Time Slot</label>
-                                <input name="startTime" defaultValue={editingProgram?.startTime} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none" placeholder="10:00 AM" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Venue</label>
-                                <input name="venue" defaultValue={editingProgram?.venue} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none" placeholder="Auditorium A" />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-5 items-center">
-                        {!isGroup && (
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Participants</label>
-                                <input name="participantsCount" type="number" defaultValue={editingProgram?.participantsCount || 0} required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none" />
-                            </div>
-                        )}
-                        <div className={`${isGroup ? 'col-span-2' : ''} pt-5 flex items-center`}>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" checked={isGroup} onChange={(e) => setIsGroup(e.target.checked)} className="sr-only peer" />
-                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                                <span className="ml-3 text-[11px] font-black text-slate-500 uppercase tracking-widest">Is Group Event?</span>
-                            </label>
-                        </div>
-                    </div>
-                    {isGroup && (
-                        <div className="grid grid-cols-2 gap-5 p-6 bg-indigo-50/30 rounded-3xl border border-indigo-100 animate-in slide-in-from-top-2">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">Groups Count</label>
-                                <input name="groupCount" type="number" defaultValue={editingProgram?.groupCount || 0} className="w-full px-4 py-3 bg-white border border-indigo-200 rounded-2xl text-sm outline-none" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">Per Group Count</label>
-                                <input name="membersPerGroup" type="number" defaultValue={editingProgram?.membersPerGroup || 0} className="w-full px-4 py-3 bg-white border border-indigo-200 rounded-2xl text-sm outline-none" />
-                            </div>
-                        </div>
-                    )}
-                    <div className="flex justify-end gap-4 pt-8 border-t border-slate-100">
-                        <button type="button" onClick={onClose} className="px-6 py-4 text-[12px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-slate-600 transition-colors">Dismiss</button>
-                        <button type="submit" className="px-12 py-4 bg-indigo-600 text-white rounded-[2rem] text-[12px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">Save Config</button>
-                    </div>
-                </form>
-            </div>
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+          <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">
+            {editingProgram ? 'Edit Program' : 'Create New Program'}
+          </h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-lg leading-none">✕</button>
         </div>
-    );
+
+        {/* Form Body (Scrollable) */}
+        <form onSubmit={onSave} className="flex flex-col overflow-hidden">
+          <div className="p-5 overflow-y-auto space-y-4 flex-1">
+            
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Program Name</label>
+              <input type="text" name="name" defaultValue={editingProgram?.name} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="e.g. Oppana, Duffmuttu" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Category</label>
+                <select name="category" defaultValue={editingProgram?.category || ''} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
+                  <option value="" disabled>Select Category</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Zone</label>
+                <select name="zone" defaultValue={editingProgram?.zone || ''} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
+                  <option value="" disabled>Select Zone</option>
+                  {zones.map(z => <option key={z} value={z}>{z}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
+              <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Duration (in minutes)</label>
+              <input type="number" name="duration" min="5" defaultValue={editingProgram?.duration || 30} required className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="e.g. 30" />
+              <p className="text-[10px] text-slate-500 mt-1 font-medium">Time and venue will be assigned later in the Schedule Manager.</p>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 mt-2">
+              <label className="flex items-center gap-2 cursor-pointer mb-4">
+                <input type="checkbox" checked={isGroup} onChange={(e) => setIsGroup(e.target.checked)} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-600" />
+                <span className="text-xs font-black text-slate-800 uppercase">Is this a Group Event?</span>
+              </label>
+
+              {isGroup ? (
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Total Groups Allowed</label>
+                    <input type="number" name="groupCount" min="1" defaultValue={editingProgram?.groupCount || ''} required={isGroup} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="Total slots" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Members per Group</label>
+                    <input type="number" name="membersPerGroup" min="2" defaultValue={editingProgram?.membersPerGroup || ''} required={isGroup} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="E.g., 7 for Oppana" />
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Total Participants Allowed</label>
+                  <input type="number" name="participantsCount" min="1" defaultValue={editingProgram?.participantsCount || ''} required={!isGroup} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="Total single slots" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-xl flex gap-3 justify-end">
+            <button type="button" onClick={onClose} className="px-5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold transition-all">Cancel</button>
+            <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all">
+              {editingProgram ? 'Save Changes' : 'Create Program'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };

@@ -1,427 +1,315 @@
 import React, { useState, useMemo } from 'react';
-import { Program, ProgramStatus, FestivalStats } from '../types';
-import { MetricsCard } from '../components/MetricsCard';
+import { Program, ProgramStatus, Staff } from '../types';
+import { StaffCredentialModal } from '../components/StaffCredentialModal';
 import { ProgramList } from '../components/ProgramList';
 import { ParticipantList } from '../components/ParticipantList';
 import { ProgramFormModal } from '../components/ProgramFormModal';
-import { LiveLeaderboard } from '../components/LiveLeaderboard';
-import { fixTeamAssignments, generateFixReport } from '../utils/teamDataFixer';
+import { ConsolidationView } from '../components/ConsolidationView';
+import { ScheduleManager } from '../components/ScheduleManager';
+import { CATEGORIES, ZONES } from '../constants/categories';
 
 interface AdminPageProps {
-    programs: Program[];
-    setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
-    addProgram: (program: Omit<Program, 'id'>) => Promise<boolean>;
-    updateProgram: (id: string, updates: Partial<Program>) => Promise<boolean>;
-    deleteProgram: (id: string) => Promise<boolean>;
-    onShowModal?: () => void;
+  programs: Program[];
+  setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
+  addProgram: (data: Omit<Program, 'id' | 'festId'>) => Promise<boolean>;
+  updateProgram: (id: string, updates: Partial<Program>) => Promise<boolean>;
+  deleteProgram: (id: string) => Promise<boolean>;
+  staffs: Staff[];
+  addStaff: (data: Omit<Staff, 'id'>) => Promise<boolean>;
+  updateStaff: (id: string, updates: Partial<Staff>) => Promise<boolean>;
+  deleteStaff: (id: string) => Promise<boolean>;
+  settings?: any;
 }
 
-const CATEGORIES = [
-    "A zone stage",
-    "A zone no stage",
-    "A zone general stage",
-    "A zone general non stage",
-    "B zone stage senior",
-    "B zone stage junior",
-    "B zone no stage senior",
-    "B zone no stage junior",
-    "B zone general stage",
-    "B zone general non stage",
-    "C zone stage senior",
-    "C zone stage junior",
-    "C zone no stage senior",
-    "C zone no stage junior",
-    "C zone general stage",
-    "C zone general non stage",
-];
+export const AdminPage: React.FC<AdminPageProps> = ({
+  programs, setPrograms, addProgram, updateProgram, deleteProgram,
+  staffs, addStaff, updateStaff, deleteStaff, settings
+}) => {
+  // Added 'results' and 'scheduler' to the state
+  const [subTab, setSubTab] = useState<'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results'>('tracker');
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null);
+  const [isGroup, setIsGroup] = useState(false);
+  
+  // Staff Modal State
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
+  
+  // Custom Confirmation Modal State for Staff Deletion
+  const [staffDeleteId, setStaffDeleteId] = useState<string | null>(null);
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    message: ''
+  });
 
-export const AdminPage: React.FC<AdminPageProps> = ({ programs, setPrograms, addProgram, updateProgram, deleteProgram, onShowModal }) => {
-    const [adminSubView, setAdminSubView] = useState<'PROGRAMS' | 'PARTICIPANTS'>('PROGRAMS');
-    const [adminSubViewStatus, setAdminSubViewStatus] = useState<'STATUS' | 'PROGRAMS'>('PROGRAMS');
+  const pendingRequests = useMemo(() => {
+    const reqs: { programId: string; programName: string; teamName: string; participantChest: string; participantName: string }[] = [];
+    programs.forEach(p => {
+      (p.teams || []).forEach(t => {
+        (t.participants || []).forEach(part => {
+          if ((part as any).removalRequested) {
+            reqs.push({ programId: p.id, programName: p.name, teamName: t.teamName, participantChest: part.chestNumber, participantName: part.name });
+          }
+        });
+      });
+    });
+    return reqs;
+  }, [programs]);
 
-    const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('All');
-    const [showModal, setShowModal] = useState(false);
-    const [editingProgram, setEditingProgram] = useState<Program | null>(null);
-    const [isGroup, setIsGroup] = useState(false);
-    const [showFixModal, setShowFixModal] = useState(false);
-    const [isFixing, setIsFixing] = useState(false);
-
-    // Expose setShowModal to parent if callback provided
-    React.useEffect(() => {
-        if (onShowModal) {
-            (window as any).__openAdminModal = () => {
-                setEditingProgram(null);
-                setIsGroup(false);
-                setShowModal(true);
-            };
-        }
-    }, [onShowModal]);
-
-    const filteredPrograms = useMemo(() => {
-        if (selectedZoneFilter === 'All') return programs;
-        return programs.filter(p => p.category.startsWith(selectedZoneFilter));
-    }, [programs, selectedZoneFilter]);
-
-    const stats: FestivalStats = useMemo(() => {
-        const total = filteredPrograms.length;
-        const completed = filteredPrograms.filter(p => p.status === ProgramStatus.COMPLETED).length;
-        const pending = filteredPrograms.filter(p => p.status === ProgramStatus.PENDING).length;
-        const cancelled = filteredPrograms.filter(p => p.status === ProgramStatus.CANCELLED).length;
-        const participantsSet = new Set();
-        filteredPrograms.forEach(p => p.teams.forEach(t => t.participants.forEach(pr => participantsSet.add(pr.name))));
-
-        return {
-            totalPrograms: total, completedCount: completed, pendingCount: pending,
-            cancelledCount: cancelled, totalParticipants: participantsSet.size, averageScore: 0
-        };
-    }, [filteredPrograms]);
-
-    const handleSaveProgram = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const name = formData.get('name') as string;
-        const category = formData.get('category') as string;
-        const startTime = formData.get('startTime') as string;
-        const venue = formData.get('venue') as string;
-        const participantsCount = parseInt(formData.get('participantsCount') as string || '0');
-        const membersPerGroup = parseInt(formData.get('membersPerGroup') as string || '0');
-        const groupCount = parseInt(formData.get('groupCount') as string || '0');
-
-        if (editingProgram) {
-            // Update existing program in Firebase
-            const success = await updateProgram(editingProgram.id, {
-                name, category, startTime, venue, participantsCount, isGroup, membersPerGroup, groupCount
-            });
-            if (!success) {
-                console.error('Failed to update program');
-                return;
-            }
+  const handleRequestAction = async (programId: string, teamName: string, chestNo: string, action: 'approve' | 'reject') => {
+    const program = programs.find(p => p.id === programId);
+    if (!program) return;
+    const updatedTeams = program.teams.map(t => {
+      if (t.teamName === teamName) {
+        if (action === 'approve') {
+          return { ...t, participants: t.participants.filter(p => p.chestNumber !== chestNo) };
         } else {
-            // Create new program in Firebase
-            const newProgram: Omit<Program, 'id'> = {
-                name, category, startTime, venue,
-                status: ProgramStatus.PENDING,
-                teams: [], description: '', participantsCount, isGroup, membersPerGroup, groupCount,
-                isPublished: false, isAllocatedToJudge: false
-            };
-            const success = await addProgram(newProgram);
-            if (!success) {
-                console.error('Failed to add program');
-                return;
-            }
+          return {
+            ...t,
+            participants: t.participants.map(p => {
+              if (p.chestNumber === chestNo) {
+                const { removalRequested, ...rest } = p as any;
+                return rest;
+              }
+              return p;
+            })
+          };
         }
-        setShowModal(false);
-        setEditingProgram(null);
+      }
+      return t;
+    });
+    await updateProgram(programId, { teams: updatedTeams });
+  };
+
+  const handleSaveProgram = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const programData = {
+      name: formData.get('name') as string,
+      category: formData.get('category') as string,
+      zone: formData.get('zone') as string,
+      duration: Number(formData.get('duration')) || 30,
+      startTime: editingProgram?.startTime, // Preserved, assigned in ScheduleManager
+      endTime: editingProgram?.endTime,
+      venue: editingProgram?.venue,
+      isGroup,
+      participantsCount: Number(formData.get('participantsCount')) || 0,
+      groupCount: Number(formData.get('groupCount')) || 0,
+      membersPerGroup: Number(formData.get('membersPerGroup')) || 0,
+      status: editingProgram ? editingProgram.status : ProgramStatus.PENDING,
+      teams: editingProgram ? (editingProgram.teams || []) : [],
+      description: editingProgram ? editingProgram.description : '',
     };
+    if (editingProgram) await updateProgram(editingProgram.id, programData);
+    else await addProgram(programData as Omit<Program, 'id' | 'festId'>);
+    setShowProgramModal(false);
+    setEditingProgram(null);
+    setIsGroup(false);
+  };
 
-    const handleFixTeamData = async () => {
-        if (!confirm('This will reorganize all participants into correct teams based on chest numbers.\n\nPRUDENTIA: 200-299\nSAPIENTIA: 300-399\n\nAll scores and data will be preserved.\n\nContinue?')) {
-            return;
-        }
+  const handleSaveStaff = async (staffData: Omit<Staff, 'id'>, editId?: string) => {
+    if (editId) {
+      await updateStaff(editId, staffData);
+    } else {
+      await addStaff(staffData);
+    }
+  };
 
-        setIsFixing(true);
-        try {
-            // Generate report first
-            const report = generateFixReport(programs);
+  const confirmDeleteStaff = (id: string, username: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Staff Member',
+      message: `Are you sure you want to delete staff account "${username}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        await deleteStaff(id);
+        setStaffDeleteId(null);
+      }
+    });
+  };
 
-            if (report.movedParticipants.length === 0) {
-                alert('No changes needed! All participants are already in correct teams.');
-                setShowFixModal(false);
-                setIsFixing(false);
-                return;
-            }
+  return (
+    <div className="max-w-7xl mx-auto space-y-6 font-sans">
+      
+      {/* HEADER - Image 1 Style */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+        <div>
+          <h1 className="text-[28px] font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
+            Welcome back, Admin! <span className="text-2xl animate-wave origin-bottom-right">👋</span>
+          </h1>
+          <p className="text-sm text-slate-500 font-medium mt-1">Here's what's happening at your festival.</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
+            className="px-6 py-3 bg-[#3B3BFA] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            Add Event
+          </button>
+        </div>
+      </div>
+      
+      {/* TABS NAVIGATION - Image 1 Style */}
+      <div className="flex justify-between items-center bg-white rounded-2xl px-2 shadow-sm border border-slate-100 overflow-x-auto custom-scrollbar">
+        {[
+          { id: 'tracker', label: 'Tracker', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg> },
+          { id: 'scheduler', label: 'Scheduler', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+          { id: 'results', label: 'Live Results', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg> },
+          { id: 'performers', label: 'Performers', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
+          { id: 'requests', label: 'Requests', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> },
+          { id: 'staff', label: 'Staff Access', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> }
+        ].map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setSubTab(tab.id as any)} 
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-5 text-xs font-black uppercase tracking-widest whitespace-nowrap border-b-[3px] transition-all
+              ${subTab === tab.id ? 'border-[#3B3BFA] text-[#3B3BFA]' : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-200'}`}
+          >
+            {tab.icon}
+            {tab.label}
+            {tab.id === 'requests' && pendingRequests.length > 0 && (
+              <span className="bg-[#3B3BFA] text-white px-2 py-0.5 rounded-full text-[10px] ml-1">{pendingRequests.length}</span>
+            )}
+          </button>
+        ))}
+      </div>
+      
+      {/* TAB CONTENT */}
+      <div>
+        {subTab === 'tracker' && <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} />}
+        
+        {subTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} />}
+        
+        {/* NEW TAB RENDER LOGIC */}
+        {subTab === 'results' && (
+          <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden shadow-sm">
+            <ConsolidationView programs={programs} />
+          </div>
+        )}
 
-            // Apply fixes
-            const fixedPrograms = fixTeamAssignments(programs);
-
-            // Update ONLY programs that have changed
-            const updates: Promise<boolean>[] = [];
-            let updatedCount = 0;
-
-            for (let i = 0; i < programs.length; i++) {
-                const original = programs[i];
-                const fixed = fixedPrograms[i];
-
-                // Simple deep comparison of teams
-                if (JSON.stringify(original.teams) !== JSON.stringify(fixed.teams)) {
-                    updates.push(updateProgram(fixed.id, { teams: fixed.teams }));
-                    updatedCount++;
-                }
-            }
-
-            if (updatedCount === 0) {
-                // Should not happen if report said changes exist, but safe guard
-                alert('No impactful changes detected after processing.');
-                setIsFixing(false);
-                return;
-            }
-
-            const results = await Promise.all(updates);
-            const successfulUpdates = results.filter(r => r).length;
-
-            if (successfulUpdates === updatedCount) {
-                alert(`✅ Team Data Fixed Successfully!\n\n${report.movedParticipants.length} participants moved.\n${successfulUpdates} programs updated.\n\nPlease check the Team Leader pages to verify.`);
-                setShowFixModal(false);
-            } else {
-                alert(`⚠️ Partial Success. Updated ${successfulUpdates} out of ${updatedCount} programs.\nSome updates may have failed.`);
-            }
-
-        } catch (error) {
-            console.error('Error fixing team data:', error);
-            alert('❌ Failed to fix team data. Please try again or contact support.');
-        } finally {
-            setIsFixing(false);
-        }
-    };
-
-    const handleGlobalDeleteParticipant = async (chestNumber: string) => {
-        if (!confirm(`Are you sure you want to completely remove participant with Chest No. ${chestNumber} from ALL programs? This cannot be undone.`)) {
-            return;
-        }
-
-        setIsFixing(true); // Reusing loading state
-        try {
-            const updates: Promise<boolean>[] = [];
-
-            programs.forEach(program => {
-                let modified = false;
-                const updatedTeams = program.teams.map(team => {
-                    const originalCount = team.participants.length;
-                    const newParticipants = team.participants.filter(p => p.chestNumber !== chestNumber);
-
-                    if (newParticipants.length !== originalCount) {
-                        modified = true;
-                        return { ...team, participants: newParticipants };
-                    }
-                    return team;
-                }).filter(t => t.participants.length > 0); // Remove empty teams
-
-                // If team count changed (empty team removed) or participant count changed
-                if (program.teams.length !== updatedTeams.length) modified = true;
-
-                if (modified) {
-                    updates.push(updateProgram(program.id, { teams: updatedTeams }));
-                }
-            });
-
-            if (updates.length > 0) {
-                await Promise.all(updates);
-                alert(`Participant ${chestNumber} removed from ${updates.length} programs.`);
-            } else {
-                alert('Participant not found in any programs.');
-            }
-
-        } catch (error) {
-            console.error('Error deleting participant:', error);
-            alert('Failed to delete participant.');
-        } finally {
-            setIsFixing(false);
-        }
-    };
-
-    return (
-        <>
-            {/* Header with New Event Button */}
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Admin Dashboard</h2>
-                    <p className="text-sm text-slate-500 font-medium">Manage programs, participants, and festival operations</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowFixModal(true)}
-                        className="px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg flex items-center gap-2"
-                        title="Fix team assignments based on chest numbers"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                        </svg>
-                        Fix Team Data
-                    </button>
-                    <button
-                        onClick={() => { setEditingProgram(null); setIsGroup(false); setShowModal(true); }}
-                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg flex items-center gap-2"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        New Event
-                    </button>
-                </div>
-            </div>
-            <div className="mb-6 flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-slate-200 pb-2">
-                <div className="flex space-x-6">
-                    <button onClick={() => setAdminSubViewStatus('PROGRAMS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubViewStatus === 'PROGRAMS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Programs</button>
-                    <button onClick={() => setAdminSubViewStatus('STATUS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubViewStatus === 'STATUS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>With status</button>
-                </div>
-            </div>
-            {adminSubViewStatus == "STATUS"&&<LiveLeaderboard programs={programs} />}
-    
-
-            {/* Existing Metrics and View Toggle */}
-
-            <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 text-left">
-                <MetricsCard label="Programs" value={stats.totalPrograms} colorClass="bg-indigo-50 text-indigo-600" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>} />
-                <MetricsCard label="Performers" value={stats.totalParticipants} colorClass="bg-violet-50 text-violet-600" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>} />
-                <MetricsCard label="Completed" value={stats.completedCount} colorClass="bg-emerald-50 text-emerald-600" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>} />
-                <MetricsCard label="Waitlist" value={stats.pendingCount} colorClass="bg-amber-50 text-amber-600" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
-            </section>
-
-            <div className="mb-6 flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-slate-200 pb-2">
-                <div className="flex space-x-6">
-                    <button onClick={() => setAdminSubView('PROGRAMS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubView === 'PROGRAMS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>Programs Tracker</button>
-                    <button onClick={() => setAdminSubView('PARTICIPANTS')} className={`pb-3 px-1 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all ${adminSubView === 'PARTICIPANTS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>All Performers</button>
-                </div>
-                <div className="flex items-center gap-2 pb-2 md:pb-0">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Filter Zone:</span>
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                        {['All', 'A', 'B', 'C'].map(zone => (
-                            <button
-                                key={zone}
-                                onClick={() => setSelectedZoneFilter(zone)}
-                                className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${selectedZoneFilter === zone ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                {zone === 'All' ? 'All' : `Zone ${zone}`}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {adminSubView === 'PROGRAMS' ? (
-                <ProgramList programs={filteredPrograms} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setIsGroup(p.isGroup); setShowModal(true); }} />
+        {subTab === 'performers' && <ParticipantList programs={programs} />}
+                 
+        {subTab === 'requests' && (
+          <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden divide-y divide-slate-100">
+            {pendingRequests.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">No pending removal requests.</div>
             ) : (
-                <ParticipantList programs={filteredPrograms} onDeleteParticipant={handleGlobalDeleteParticipant} />
-            )}
-            <ProgramFormModal
-                show={showModal}
-                onClose={() => setShowModal(false)}
-                onSave={handleSaveProgram}
-                editingProgram={editingProgram}
-                isGroup={isGroup}
-                setIsGroup={setIsGroup}
-                categories={CATEGORIES}
-            />
-
-            {/* Fix Team Data Modal */}
-            {showFixModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-slate-200">
-                        <div className="bg-amber-600 px-6 py-4 flex justify-between items-center text-white sticky top-0">
-                            <h3 className="text-sm font-black uppercase tracking-widest">Fix Team Assignments</h3>
-                            <button
-                                onClick={() => setShowFixModal(false)}
-                                disabled={isFixing}
-                                className="opacity-70 hover:opacity-100 transition-opacity disabled:opacity-50"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-                            {/* Warning Banner */}
-                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                                <div className="flex items-start gap-3">
-                                    <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <div>
-                                        <h4 className="text-sm font-bold text-amber-900 mb-2">What This Does</h4>
-                                        <ul className="text-xs text-amber-800 space-y-1">
-                                            <li>• Moves participants to correct teams based on chest numbers</li>
-                                            <li>• <strong>PRUDENTIA</strong>: Chest numbers 200-299</li>
-                                            <li>• <strong>SAPIENTIA</strong>: Chest numbers 300-399</li>
-                                            <li>• All scores, ranks, and grades will be preserved</li>
-                                            <li>• Changes will be reflected in Team Leader pages immediately</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Preview */}
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Preview Changes</h4>
-                                {(() => {
-                                    const report = generateFixReport(programs);
-
-                                    if (report.movedParticipants.length === 0) {
-                                        return (
-                                            <div className="text-center py-8 bg-green-50 rounded-xl border border-green-200">
-                                                <svg className="w-12 h-12 text-green-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                <p className="text-sm font-bold text-green-900">All participants are already in correct teams!</p>
-                                                <p className="text-xs text-green-700 mt-1">No changes needed.</p>
-                                            </div>
-                                        );
-                                    }
-
-                                    return (
-                                        <>
-                                            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                                <div className="grid grid-cols-3 gap-4 text-center">
-                                                    <div>
-                                                        <p className="text-2xl font-black text-indigo-600">{report.totalPrograms}</p>
-                                                        <p className="text-xs font-bold text-slate-500 uppercase">Total Programs</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-2xl font-black text-amber-600">{report.affectedPrograms}</p>
-                                                        <p className="text-xs font-bold text-slate-500 uppercase">Will Be Updated</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-2xl font-black text-violet-600">{report.movedParticipants.length}</p>
-                                                        <p className="text-xs font-bold text-slate-500 uppercase">Participants Moved</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2 max-h-64 overflow-y-auto">
-                                                {report.movedParticipants.map((move, idx) => (
-                                                    <div key={idx} className="bg-white border border-slate-200 rounded-lg p-3 flex items-center justify-between">
-                                                        <div className="flex-1">
-                                                            <p className="text-sm font-bold text-slate-900">{move.name}</p>
-                                                            <p className="text-xs text-slate-500">Chest: {move.chestNumber} • {move.programName}</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="px-2 py-1 bg-red-50 text-red-700 rounded text-xs font-bold">{move.from}</span>
-                                                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                                            </svg>
-                                                            <span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-bold">{move.to}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </>
-                                    );
-                                })()}
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="sticky bottom-0 bg-white border-t border-slate-200 px-6 py-4 flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setShowFixModal(false)}
-                                disabled={isFixing}
-                                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleFixTeamData}
-                                disabled={isFixing || generateFixReport(programs).movedParticipants.length === 0}
-                                className="px-8 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isFixing ? 'Processing...' : 'Apply Fix'}
-                            </button>
-                        </div>
+              pendingRequests.map((req, idx) => (
+                <div key={idx} className="p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white hover:bg-slate-50 transition-colors">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 bg-rose-50 text-rose-600 text-[10px] font-black uppercase rounded border border-rose-100">Removal Request</span>
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{req.teamName}</span>
                     </div>
+                    <h4 className="text-sm font-black text-slate-900 uppercase">{req.participantName} (Chest: {req.participantChest})</h4>
+                    <p className="text-[11px] text-slate-500 font-medium mt-1">From Program: <span className="font-black text-slate-700">{req.programName}</span></p>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button onClick={() => handleRequestAction(req.programId, req.teamName, req.participantChest, 'reject')} className="flex-1 sm:flex-none px-5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold transition-all">Reject</button>
+                    <button onClick={() => handleRequestAction(req.programId, req.teamName, req.participantChest, 'approve')} className="flex-1 sm:flex-none px-5 py-2.5 bg-rose-600 text-white hover:bg-rose-700 rounded-lg text-xs font-bold transition-all shadow-sm">Approve Removal</button>
+                  </div>
                 </div>
+              ))
             )}
-        </>
-    );
+          </div>
+        )}
+
+        {subTab === 'staff' && (
+          <div className="space-y-4 pt-4">
+            <div className="flex justify-between items-center bg-white border border-slate-200 p-4 rounded-xl">
+              <div>
+                <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">Registered Staff ({staffs?.length || 0})</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Manage access for Green Room, Judges & Leaders</p>
+              </div>
+              <button onClick={() => { setEditingStaff(null); setShowStaffModal(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold shadow-sm transition-all">+ Add Staff</button>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
+              {(!staffs || staffs.length === 0) ? (
+                 <div className="p-12 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">No staff accounts created yet.</div>
+              ) : (
+                staffs.map(staff => (
+                  <div key={staff.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full flex flex-col items-center justify-center font-black border ${staff.role === 'JUDGE' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : staff.role === 'TEAM_LEADER' ? 'bg-purple-50 text-purple-600 border-purple-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
+                        <span className="text-[9px] uppercase">{staff.role === 'GREEN_ROOM' ? 'GR' : staff.role === 'JUDGE' ? 'JDG' : 'LDR'}</span>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 uppercase">{staff.username}</h4>
+                        <div className="flex gap-2 items-center mt-1">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Pass: <span className="font-mono bg-slate-100 px-1 rounded">{staff.password}</span></span>
+                          {(staff.stage || staff.panelName) && (
+                            <>
+                              <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                              <span className="text-[10px] font-bold text-indigo-600 uppercase">{staff.stage || staff.panelName}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <button onClick={() => { setEditingStaff(staff); setShowStaffModal(true); }} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:border-indigo-400 rounded-lg text-xs font-bold transition-all">Edit</button>
+                      <button onClick={() => confirmDeleteStaff(staff.id, staff.username)} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-all">Delete</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+             
+      <ProgramFormModal show={showProgramModal} onClose={() => { setShowProgramModal(false); setEditingProgram(null); setIsGroup(false); }} onSave={handleSaveProgram} editingProgram={editingProgram} isGroup={isGroup} setIsGroup={setIsGroup} categories={settings?.categories || CATEGORIES} zones={ZONES} />
+      <StaffCredentialModal 
+         festId={programs[0]?.festId || 'default-fest'}
+         isOpen={showStaffModal}
+         onClose={() => { setShowStaffModal(false); setEditingStaff(null); }}
+         onSave={handleSaveStaff}
+        editingStaff={editingStaff}
+      />
+
+      {/* Styled Modern Custom Modal */}
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 transform transition-all">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-rose-100 text-rose-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">{modalConfig.title || 'Confirmation'}</h4>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 mb-5 leading-relaxed pl-1">{modalConfig.message}</p>
+                         
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+                className="px-3.5 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (modalConfig.onConfirm) modalConfig.onConfirm();
+                  setModalConfig(prev => ({ ...prev, isOpen: false }));
+                }}
+                className="px-3.5 py-1.5 text-xs font-bold text-white rounded-lg transition-colors cursor-pointer shadow-sm bg-rose-600 hover:bg-rose-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
