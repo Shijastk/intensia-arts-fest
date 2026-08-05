@@ -30,9 +30,12 @@ export interface Team {
 
 export interface Program {
   id: string;
+  festId: string;
   name: string;
   category: string;
   startTime?: string;
+  endTime?: string;
+  duration?: number; // in minutes
   venue?: string;
   status: ProgramStatus;
   teams: Team[];
@@ -41,6 +44,7 @@ export interface Program {
   isGroup: boolean;
   groupCount?: number;
   membersPerGroup?: number;
+  zone?: string;
   isPublished?: boolean; // Flag for Green Room visibility (Publish to Green Room)
   isResultPublished?: boolean; // Flag for Public Result visibility (Publish to Website)
   isAllocatedToJudge?: boolean; // Flag for Green Room allocation
@@ -71,4 +75,41 @@ export interface GalleryImage {
   imageUrl: string;
   createdAt: any; // Firestore Timestamp
   uploadedBy?: string;
+}
+
+export type UserRole = 'admin' | 'greenroom' | 'judge' | 'teamleader';
+export type ViewType = 'ADMIN' | 'GREEN_ROOM' | 'TEAM_LEADER' | 'JUDGES' | 'SETTINGS';
+
+export interface User {
+  uid: string;
+  username: string;
+  role: UserRole;
+  festId: string;
+  displayName: string;
+  teamName?: string;
+  judgePanel?: string;
+}
+
+export const STORAGE_KEYS = {
+  USER: 'Intensia_current_user',
+  VIEW: 'Intensia_current_view'
+} as const;
+
+
+export interface Staff {
+  id: string;
+  festId: string;
+  role: 'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER';
+  username: string;
+  password?: string;
+  panelName?: string; // For Judges or Team Leaders
+  stage?: string;     // For Green Room or Judges
+  judgePanel?: string; // Additional property to fix TS error
+  teamName?: string; // Additional property to fix TS error
+}
+
+export interface Settings {
+  categories: string[];
+  maxStudentsPerTeam: number;
+  maxNonGeneralPerStudent: number;
 }
