@@ -105,11 +105,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       teams: editingProgram ? (editingProgram.teams || []) : [],
       description: editingProgram ? editingProgram.description : '',
     };
-    if (editingProgram) await updateProgram(editingProgram.id, programData);
-    else await addProgram(programData as Omit<Program, 'id' | 'festId'>);
-    setShowProgramModal(false);
-    setEditingProgram(null);
-    setIsGroup(false);
+    let success = false;
+    if (editingProgram) {
+      success = await updateProgram(editingProgram.id, programData);
+    } else {
+      success = await addProgram(programData as Omit<Program, 'id' | 'festId'>);
+    }
+    
+    if (success) {
+      setShowProgramModal(false);
+      setEditingProgram(null);
+      setIsGroup(false);
+    } else {
+      alert("Failed to save program. Please check console or try again.");
+    }
   };
 
   const handleSaveStaff = async (staffData: Omit<Staff, 'id'>, editId?: string) => {

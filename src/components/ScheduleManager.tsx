@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Program } from '../types';
 import { detectClashes, ClashDetail } from '../utils/scheduleCalculator';
 import { 
@@ -50,7 +52,7 @@ const DraggableProgram: React.FC<{ program: Program }> = ({ program }) => {
   );
 };
 
-const SortableProgramCard = ({ program, formatTime, onUnschedule }: any) => {
+const SortableProgramCard = ({ program, formatTime, onUnschedule, onEditTime }: any) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: program.id,
     data: { type: 'SortableProgram', program }
@@ -79,6 +81,14 @@ const SortableProgramCard = ({ program, formatTime, onUnschedule }: any) => {
         <span className="bg-indigo-50 text-indigo-700 px-1.5 py-1 rounded border border-indigo-100">{program.duration || 30}m</span>
       </div>
       <button 
+        onClick={(e) => { e.stopPropagation(); onEditTime(program); }} 
+        onPointerDown={(e) => e.stopPropagation()}
+        className="absolute top-1.5 right-8 opacity-0 group-hover:opacity-100 text-indigo-500 hover:text-indigo-700 bg-indigo-50 rounded p-1 transition-all no-print-btn" 
+        title="Edit Time"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+      </button>
+      <button 
         onClick={(e) => { e.stopPropagation(); onUnschedule(program.id); }} 
         onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking unschedule
         className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 bg-rose-50 rounded p-1 transition-all no-print-btn" 
@@ -90,7 +100,7 @@ const SortableProgramCard = ({ program, formatTime, onUnschedule }: any) => {
   );
 };
 
-const DroppableVenue = ({ venue, programs, updateProgram, formatTime }: any) => {
+const DroppableVenue = ({ venue, programs, updateProgram, formatTime, onEditTime }: any) => {
   const { isOver, setNodeRef } = useDroppable({
     id: venue,
     data: { type: 'Venue', venue }
@@ -110,6 +120,7 @@ const DroppableVenue = ({ venue, programs, updateProgram, formatTime }: any) => 
               program={p} 
               formatTime={formatTime} 
               onUnschedule={(id: string) => updateProgram(id, { startTime: '', endTime: '', venue: '' })} 
+              onEditTime={onEditTime}
             />
           ))}
         </SortableContext>
@@ -135,6 +146,17 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
   // Custom Stages Feature
   const [customStages, setCustomStages] = useState<string[]>([]);
   const [newStageName, setNewStageName] = useState('');
+  
+  // Time Edit Feature
+  const [timeEditProgram, setTimeEditProgram] = useState<Program | null>(null);
+
+  // Baseline Time for new venues
+  const [pendingBaselineDrop, setPendingBaselineDrop] = useState<{
+    newOrderedVenuePrograms: Program[],
+    targetVenue: string,
+    activeId: string,
+    activeProgram: Program
+  } | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -161,23 +183,41 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
     }
   };
 
+  const handleAutoGenerateStages = () => {
+    const num = parseInt(window.prompt("How many stages do you want to generate?", "3") || "0", 10);
+    if (!isNaN(num) && num > 0) {
+      const newStages = Array.from({ length: num }, (_, i) => `Stage ${i + 1}`);
+      setCustomStages(prev => {
+        const set = new Set([...prev, ...newStages]);
+        return Array.from(set);
+      });
+    }
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const program = programs.find(p => p.id === active.id);
     if (program) setActiveDragProgram(program);
   };
 
-  const calculateCascadingTimes = (orderedPrograms: Program[], targetVenue: string) => {
-    let currentTime = new Date();
-    currentTime.setHours(9, 0, 0, 0); // Start at 9:00 AM
+  const calculateCascadingTimes = (orderedPrograms: Program[], targetVenue: string, explicitStartTime?: Date) => {
+    let currentTime = explicitStartTime;
+    if (!currentTime) {
+      const firstScheduled = orderedPrograms.find(p => p.startTime);
+      if (firstScheduled) {
+        currentTime = new Date(firstScheduled.startTime!);
+      } else {
+        return null; // Need baseline time from user
+      }
+    }
 
     const updates: { id: string, updates: Partial<Program> }[] = [];
 
     orderedPrograms.forEach(p => {
       const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-      const localStart = (new Date(currentTime.getTime() - tzoffset)).toISOString().slice(0, -1);
+      const localStart = (new Date(currentTime!.getTime() - tzoffset)).toISOString().slice(0, -1);
       
-      const endObj = new Date(currentTime.getTime() + (p.duration || 30) * 60 * 1000);
+      const endObj = new Date(currentTime!.getTime() + (p.duration || 30) * 60 * 1000);
       const localEnd = (new Date(endObj.getTime() - tzoffset)).toISOString().slice(0, -1);
       
       updates.push({
@@ -189,6 +229,39 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
     });
 
     return updates;
+  };
+
+  const processBatchUpdates = async (batchUpdates: { id: string, updates: Partial<Program> }[], activeId: string, activeProgram: Program, targetVenue: string) => {
+    // Check clashes ONLY for the actively dragged item to avoid spamming the user
+    const targetUpdate = batchUpdates.find(u => u.id === activeId);
+    if (targetUpdate) {
+      // Temporarily mock the program state for clash calculation
+      const tempPrograms = programs.map(p => {
+        const up = batchUpdates.find(b => b.id === p.id);
+        return up ? { ...p, ...up.updates } : p;
+      });
+      
+      const clashes = detectClashes(
+        {...activeProgram, ...targetUpdate.updates}, 
+        targetUpdate.updates.startTime!, 
+        targetVenue, 
+        tempPrograms
+      );
+
+      if (clashes.length > 0) {
+        setClashWarning({ 
+          targetId: activeId, 
+          clashes, 
+          pendingUpdate: targetUpdate.updates,
+          updatesToSave: batchUpdates // Need to save ALL if they approve
+        });
+        return; // Pause execution
+      }
+    }
+
+    // No clashes (or ignored), save all updates
+    const updatePromises = batchUpdates.map(u => updateProgram(u.id, u.updates));
+    await Promise.all(updatePromises);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -234,36 +307,18 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
     // Recalculate times for the entire affected venue
     const batchUpdates = calculateCascadingTimes(newOrderedVenuePrograms, targetVenue);
     
-    // Check clashes ONLY for the actively dragged item to avoid spamming the user
-    const targetUpdate = batchUpdates.find(u => u.id === activeId);
-    if (targetUpdate) {
-      // Temporarily mock the program state for clash calculation
-      const tempPrograms = programs.map(p => {
-        const up = batchUpdates.find(b => b.id === p.id);
-        return up ? { ...p, ...up.updates } : p;
+    if (!batchUpdates) {
+      // Need baseline!
+      setPendingBaselineDrop({
+        newOrderedVenuePrograms,
+        targetVenue,
+        activeId,
+        activeProgram
       });
-      
-      const clashes = detectClashes(
-        {...activeProgram, ...targetUpdate.updates}, 
-        targetUpdate.updates.startTime!, 
-        targetVenue, 
-        tempPrograms
-      );
-
-      if (clashes.length > 0) {
-        setClashWarning({ 
-          targetId: activeId, 
-          clashes, 
-          pendingUpdate: targetUpdate.updates,
-          updatesToSave: batchUpdates // Need to save ALL if they approve
-        });
-        return; // Pause execution
-      }
+      return;
     }
 
-    // No clashes (or ignored), save all updates
-    const updatePromises = batchUpdates.map(u => updateProgram(u.id, u.updates));
-    await Promise.all(updatePromises);
+    await processBatchUpdates(batchUpdates, activeId, activeProgram, targetVenue);
   };
 
   const handleIgnoreWarningAndSave = async () => {
@@ -280,10 +335,61 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
   };
   
   const downloadPDF = async () => {
-    // html2canvas (used by html2pdf) does not support modern CSS oklch() colors used by Tailwind v4.
-    // The most robust solution is to use the native browser print dialog, which perfectly renders all modern CSS.
-    // The @media print CSS below handles formatting it perfectly as a landscape PDF.
-    window.print();
+    setIsExporting(true);
+    try {
+      const doc = new jsPDF('landscape');
+      
+      // Header
+      doc.setFontSize(22);
+      doc.setTextColor(59, 59, 250); // Indigo
+      doc.text("Intensia Arts Fest - Schedule", 14, 20);
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
+      
+      let startY = 40;
+
+      for (const venue of uniqueVenues) {
+        const venuePrograms = scheduledPrograms.filter(p => p.venue === venue);
+        if (venuePrograms.length === 0) continue;
+
+        doc.setFontSize(14);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Venue: ${venue}`, 14, startY);
+        
+        const tableData = venuePrograms.map(p => [
+          p.name,
+          p.category || 'N/A',
+          formatTime(p.startTime),
+          formatTime(p.endTime),
+          `${p.duration || 30} mins`
+        ]);
+
+        autoTable(doc, {
+          startY: startY + 5,
+          head: [['Program Name', 'Category', 'Start Time', 'End Time', 'Duration']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: { fillColor: [59, 59, 250] }, // matches #3B3BFA
+          margin: { bottom: 20 },
+        });
+
+        startY = (doc as any).lastAutoTable.finalY + 15;
+        
+        // Add new page if space is low
+        if (startY > doc.internal.pageSize.getHeight() - 40) {
+          doc.addPage();
+          startY = 20;
+        }
+      }
+
+      doc.save(`Intensia_Schedule_${new Date().toISOString().slice(0,10)}.pdf`);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      alert("Failed to generate PDF. Check console for details.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -354,6 +460,9 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                   <button onClick={handleAddStage} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-black uppercase transition-all">
                     + Add Stage
                   </button>
+                  <button onClick={handleAutoGenerateStages} className="px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded text-[10px] font-black uppercase transition-all whitespace-nowrap ml-1">
+                    Auto Create Stages
+                  </button>
                 </div>
               </div>
               
@@ -385,6 +494,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                     programs={scheduledPrograms.filter(p => p.venue === venue)} 
                     updateProgram={updateProgram}
                     formatTime={formatTime}
+                    onEditTime={setTimeEditProgram}
                   />
                 ))}
               </div>
@@ -425,6 +535,125 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                     className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-black uppercase tracking-wider transition-all"
                   >
                     Ignore & Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Time Edit Modal */}
+          {timeEditProgram && (
+            <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h4 className="text-sm font-black text-slate-900 uppercase">Edit Schedule Time</h4>
+                  <button onClick={() => setTimeEditProgram(null)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
+                <div className="p-5">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">{timeEditProgram.name} • {timeEditProgram.venue}</p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 uppercase mb-1">Start Time</label>
+                      <input 
+                        type="datetime-local" 
+                        id="timeEditStart"
+                        defaultValue={timeEditProgram.startTime ? new Date(new Date(timeEditProgram.startTime).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 uppercase mb-1">End Time</label>
+                      <input 
+                        type="datetime-local" 
+                        id="timeEditEnd"
+                        defaultValue={timeEditProgram.endTime ? new Date(new Date(timeEditProgram.endTime).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
+                  <button 
+                    onClick={() => setTimeEditProgram(null)} 
+                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[10px] font-black uppercase tracking-wider transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      const startInput = (document.getElementById('timeEditStart') as HTMLInputElement).value;
+                      const endInput = (document.getElementById('timeEditEnd') as HTMLInputElement).value;
+                      
+                      if (startInput && endInput) {
+                        const newStart = new Date(startInput).toISOString();
+                        const newEnd = new Date(endInput).toISOString();
+                        await updateProgram(timeEditProgram.id, { startTime: newStart, endTime: newEnd });
+                      }
+                      setTimeEditProgram(null);
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-black uppercase tracking-wider transition-all"
+                  >
+                    Save Time
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Baseline Time Modal for New Venue */}
+          {pendingBaselineDrop && (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h4 className="text-sm font-black text-slate-900 uppercase">Set Venue Start Time</h4>
+                  <button onClick={() => setPendingBaselineDrop(null)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
+                <div className="p-5">
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">First program in {pendingBaselineDrop.targetVenue}</p>
+                  
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-700 uppercase mb-1">When does the first program start?</label>
+                    <input 
+                      type="datetime-local" 
+                      id="baselineStart"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                    />
+                  </div>
+                </div>
+                <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
+                  <button 
+                    onClick={() => setPendingBaselineDrop(null)} 
+                    className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[10px] font-black uppercase tracking-wider transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const startInput = (document.getElementById('baselineStart') as HTMLInputElement).value;
+                      if (startInput) {
+                        const explicitStart = new Date(startInput);
+                        const batchUpdates = calculateCascadingTimes(
+                          pendingBaselineDrop.newOrderedVenuePrograms, 
+                          pendingBaselineDrop.targetVenue, 
+                          explicitStart
+                        );
+                        if (batchUpdates) {
+                          processBatchUpdates(
+                            batchUpdates, 
+                            pendingBaselineDrop.activeId, 
+                            pendingBaselineDrop.activeProgram, 
+                            pendingBaselineDrop.targetVenue
+                          );
+                        }
+                        setPendingBaselineDrop(null);
+                      } else {
+                        alert("Please select a date and time");
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-black uppercase tracking-wider transition-all"
+                  >
+                    Start Schedule
                   </button>
                 </div>
               </div>

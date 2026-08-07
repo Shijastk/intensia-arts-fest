@@ -2,6 +2,15 @@ import { db } from '../config/firebase';
 import { ref, set, update, remove, push, onValue } from 'firebase/database';
 import { Program } from '../types';
 
+const cleanData = (obj: any) => {
+  return Object.entries(obj).reduce((acc: any, [key, value]) => {
+    if (value !== undefined) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+};
+
 export const programService = {
   subscribeToPrograms: (festId: string, callback: (programs: Program[]) => void) => {
     const programsRef = ref(db, `fests/${festId}/programs`);
@@ -26,17 +35,20 @@ export const programService = {
   addProgram: async (festId: string, programData: Omit<Program, 'id' | 'festId'>): Promise<string> => {
     const programsRef = ref(db, `fests/${festId}/programs`);
     const newProgramRef = push(programsRef);
-    await set(newProgramRef, {
+    
+    const finalData = cleanData({
       ...programData,
       festId,
       id: newProgramRef.key
     });
+    
+    await set(newProgramRef, finalData);
     return newProgramRef.key as string;
   },
 
   updateProgram: async (festId: string, id: string, updates: Partial<Program>): Promise<boolean> => {
     const programRef = ref(db, `fests/${festId}/programs/${id}`);
-    await update(programRef, updates);
+    await update(programRef, cleanData(updates));
     return true;
   },
 
