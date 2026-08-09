@@ -266,7 +266,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                  </div>
                  
                  <div className="w-[100px] flex justify-center flex-shrink-0">
-                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${program.category.toLowerCase() === 'music' ? 'bg-indigo-50 text-indigo-600' : program.category.toLowerCase() === 'dance' ? 'bg-purple-50 text-purple-600' : program.category.toLowerCase() === 'fine arts' ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${program.category.toLowerCase().includes('stage') && !program.category.toLowerCase().includes('off') ? 'bg-indigo-50 text-indigo-600' : program.category.toLowerCase().includes('off-stage') ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
                         {program.category}
                     </span>
                  </div>

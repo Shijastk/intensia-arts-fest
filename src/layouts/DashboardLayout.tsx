@@ -6,6 +6,7 @@ import { TeamLeaderPage } from '../pages/TeamLeaderPage';
 import { JudgesPage } from '../pages/JudgesPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { Toast } from '../components/ui/Toast';
+import { Logo } from '../components/Logo';
 
 interface DashboardLayoutProps {
   currentUser: User;
@@ -217,11 +218,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-[#FF3366] rounded-xl flex items-center justify-center text-white font-black text-xl rotate-[-10deg] shadow-lg">
-               ★
-            </div>
+            <Logo className="w-12 h-12" />
             <div>
-              <h1 className="text-xl font-black tracking-tight uppercase leading-none">Artflow</h1>
+              <h1 className="text-xl font-black tracking-tight uppercase leading-none mt-1">Artflow</h1>
               <h1 className="text-xl font-black tracking-tight uppercase text-white/70 leading-none">Arts Fest</h1>
             </div>
           </div>
@@ -341,8 +340,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {/* MOBILE HEADER */}
         <div className="lg:hidden bg-[#3B3BFA] text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md">
           <div className="flex items-center gap-3">
-             <div className="w-8 h-8 bg-[#FF3366] rounded-lg flex items-center justify-center text-white font-black text-sm rotate-[-10deg]">★</div>
-             <span className="font-black uppercase tracking-tight text-lg">Artflow</span>
+             <Logo className="w-8 h-8" />
+             <span className="font-black uppercase tracking-tight text-lg mt-1">Artflow</span>
           </div>
           <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>

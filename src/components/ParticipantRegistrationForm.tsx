@@ -92,7 +92,7 @@ export const ParticipantRegistrationForm: React.FC<ParticipantRegistrationFormPr
                                 value={role}
                                 onChange={(e) => setRole(e.target.value)}
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                                placeholder="E.g., Lead, Vocalist, Dancer"
+                                placeholder="E.g., Lead, Vocalist, Speaker"
                             />
                         </div>
                     )}

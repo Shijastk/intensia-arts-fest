@@ -1,4 +1,5 @@
 import React from 'react';
+import { Logo } from '../Logo';
 
 export const MarketingFooter: React.FC = () => {
   const smoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
@@ -13,8 +14,11 @@ export const MarketingFooter: React.FC = () => {
     <footer className="bg-[#FFFDF8] py-16 border-t-[4px] border-black relative z-20">
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-8">
         <div className="flex flex-col items-center md:items-start">
-          <div className="text-[32px] font-black tracking-tight text-black mb-2 uppercase">
-            Artflow.
+          <div className="flex items-center gap-4 mb-2">
+            <Logo className="w-24 h-24" />
+            <div className="text-[48px] font-black tracking-tight text-black uppercase mt-2">
+              Artflow.
+            </div>
           </div>
           <div className="text-[14px] text-black/60 font-bold uppercase tracking-widest">
             Copyright © {new Date().getFullYear()} Festloom. All rights reserved.

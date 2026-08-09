@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
+import { Logo } from '../components/Logo';
 
 interface LoginPageProps {
   onLogin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -56,11 +57,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoogleLogin, is
         
         {/* Top Brand Logo */}
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-black text-lg">
-              A
-            </div>
-            <span className="text-xl font-black tracking-tight uppercase">Artflow</span>
+          <div className="flex items-center gap-3">
+            <Logo className="w-10 h-10" />
+            <span className="text-2xl font-black tracking-tight uppercase mt-1">Artflow</span>
           </div>
         </div>
 

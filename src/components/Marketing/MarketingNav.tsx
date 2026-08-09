@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import { Logo } from '../Logo';
 
 export const MarketingNav: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -20,8 +21,9 @@ export const MarketingNav: React.FC = () => {
       <div className="fixed w-full top-0 z-50 flex justify-center pt-6 px-4 pointer-events-none">
         <nav className="pointer-events-auto w-full max-w-[1024px] transition-all duration-500 rounded-full px-8 py-3 flex items-center justify-between gap-12 bg-white border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
           {/* Logo */}
-          <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={(e) => smoothScroll(e as any, 'hero')}>
-            <span className="text-[24px] font-black tracking-tight text-black">
+          <div className="flex-shrink-0 flex items-center cursor-pointer gap-3" onClick={(e) => smoothScroll(e as any, 'hero')}>
+            <Logo className="w-16 h-16" />
+            <span className="text-[32px] font-black tracking-tight text-black mt-1">
               Artflow.
             </span>
           </div>

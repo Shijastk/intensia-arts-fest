@@ -74,7 +74,7 @@ export const MarketingHero: React.FC = () => {
             </div>
             <div className="text-left">
               <div className="text-[12px] font-black uppercase text-black/50">New Score</div>
-              <div className="text-[16px] font-black text-black">Dance A+</div>
+              <div className="text-[16px] font-black text-black">Speech A+</div>
             </div>
           </div>
 
