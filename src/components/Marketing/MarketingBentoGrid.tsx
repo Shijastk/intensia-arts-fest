@@ -41,11 +41,22 @@ export const MarketingBentoGrid: React.FC = () => {
                 </p>
               </div>
               <div className="flex-1 w-full flex items-end justify-center pt-8 relative overflow-hidden">
-                <div className="w-[85%] h-[140px] bg-white rounded-t-[24px] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] border-[4px] border-b-0 border-black flex items-center justify-center relative transform group-hover:-translate-y-4 transition-transform duration-500">
-                  <div className="w-20 h-20 rounded-full border-[6px] border-black border-r-[#FFD166] flex items-center justify-center bg-[#fcfcfd]">
-                    <span className="text-black font-black text-3xl">♪</span>
+                <div className="w-[85%] h-[140px] bg-white rounded-t-[24px] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] border-[4px] border-b-0 border-black flex items-end justify-center relative transform group-hover:-translate-y-4 transition-transform duration-500 pb-0 gap-3 px-4">
+                  {/* 2nd Place */}
+                  <div className="w-14 h-[60%] bg-[#23B5D3] border-[4px] border-b-0 border-black rounded-t-lg flex justify-center pt-2">
+                     <span className="font-black text-white text-xl">2</span>
                   </div>
-                  <div className="absolute top-[-24px] right-2 bg-[#06D6A0] text-black px-4 py-2 rounded-xl border-[3px] border-black font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-[16px] rotate-6 group-hover:rotate-12 transition-transform">
+                  {/* 1st Place */}
+                  <div className="w-16 h-[85%] bg-[#FFD166] border-[4px] border-b-0 border-black rounded-t-lg flex justify-center pt-2 relative z-10 group-hover:-translate-y-2 transition-transform duration-300">
+                     <span className="absolute -top-8 text-4xl drop-shadow-[0_2px_0_rgba(0,0,0,1)]">👑</span>
+                     <span className="font-black text-black text-xl">1</span>
+                  </div>
+                  {/* 3rd Place */}
+                  <div className="w-14 h-[40%] bg-[#EF476F] border-[4px] border-b-0 border-black rounded-t-lg flex justify-center pt-2">
+                     <span className="font-black text-white text-xl">3</span>
+                  </div>
+                  
+                  <div className="absolute top-[-20px] right-2 bg-[#06D6A0] text-black px-3 py-1.5 rounded-xl border-[3px] border-black font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-[14px] rotate-6 group-hover:rotate-12 transition-transform z-20">
                     1,235 pts
                   </div>
                 </div>
@@ -61,11 +72,23 @@ export const MarketingBentoGrid: React.FC = () => {
                 </p>
               </div>
               <div className="flex-1 w-full flex items-end justify-center px-8 pb-8 relative">
-                <div className="w-full h-36 relative flex items-end group-hover:scale-105 transition-transform duration-500 bg-white border-[4px] border-black rounded-[24px] p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                  <svg viewBox="0 0 100 40" className="w-full h-full overflow-visible">
-                    <path d="M0,40 Q20,40 30,30 T50,20 T70,10 T100,5" fill="none" stroke="#EF476F" strokeWidth="4" strokeLinecap="round" />
-                    <circle cx="50" cy="20" r="5" fill="#118AB2" className="shadow-lg border-[3px] border-black" />
-                  </svg>
+                <div className="w-48 h-[140px] relative flex flex-col justify-center gap-3 group-hover:scale-105 group-hover:-rotate-3 transition-transform duration-500 bg-white border-[4px] border-black rounded-[20px] p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                  {/* Header line */}
+                  <div className="w-1/2 h-3 bg-gray-200 rounded-full mb-1"></div>
+                  {/* Winner 1 */}
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-[#FFD166] border-2 border-black flex items-center justify-center flex-shrink-0 text-xs font-black">1</div>
+                    <div className="w-full h-3 bg-gray-200 rounded-full"></div>
+                  </div>
+                  {/* Winner 2 */}
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-[#A388EE] border-2 border-black flex items-center justify-center flex-shrink-0 text-xs font-black text-white">2</div>
+                    <div className="w-3/4 h-3 bg-gray-200 rounded-full"></div>
+                  </div>
+                  {/* Seal */}
+                  <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-[#06D6A0] rounded-full border-[3px] border-black flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rotate-12 group-hover:rotate-[24deg] transition-transform">
+                     <span className="text-xl">🏆</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -79,13 +102,13 @@ export const MarketingBentoGrid: React.FC = () => {
                 </p>
               </div>
               <div className="flex-1 w-full flex items-center justify-center relative mt-4">
-                <div className="relative w-[200px] h-[140px] transform group-hover:scale-110 transition-transform duration-500">
-                  <div className="absolute left-0 top-0 w-28 h-28 bg-[#FF90E8] rounded-[20px] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-[4px] border-black flex items-center justify-center -rotate-6">
-                    <div className="w-14 h-14 rounded-full border-[6px] border-black border-t-white"></div>
-                  </div>
-                  <div className="absolute right-0 bottom-0 w-28 h-28 bg-white rounded-[20px] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] border-[4px] border-black flex items-center justify-center rotate-6">
-                    <div className="w-14 h-14 rounded-full border-[6px] border-black border-l-[#A388EE]"></div>
-                    <span className="absolute text-[14px] font-black text-black bg-[#FFD166] px-3 py-1.5 rounded-full border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] top-[-16px] right-[-16px] rotate-12">A+</span>
+                <div className="relative w-[160px] h-[140px] transform group-hover:scale-110 transition-transform duration-500 flex items-center justify-center">
+                  <div className="absolute w-[120px] h-[140px] bg-[#FF90E8] rounded-xl border-[4px] border-black -rotate-12 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"></div>
+                  <div className="absolute w-[120px] h-[140px] bg-white rounded-xl border-[4px] border-black rotate-3 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center justify-center relative">
+                    <span className="text-[64px] font-black text-[#EF476F] leading-none">A</span>
+                    <span className="absolute top-2 right-3 text-[32px] font-black text-[#EF476F]">+</span>
+                    <div className="w-16 h-2 bg-gray-200 rounded-full mt-2"></div>
+                    <div className="w-12 h-2 bg-gray-200 rounded-full mt-2"></div>
                   </div>
                 </div>
               </div>
@@ -105,8 +128,25 @@ export const MarketingBentoGrid: React.FC = () => {
                 </p>
               </div>
               <div className="w-full md:w-2/5 flex items-center justify-center relative">
-                 <div className="w-36 h-36 bg-white rounded-full border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center group-hover:scale-110 group-hover:rotate-12 transition-all duration-500">
-                    <div className="w-24 h-24 rounded-full border-t-[8px] border-l-[8px] border-black border-r-[8px] border-gray-200 border-dashed transform rotate-45"></div>
+                 <div className="flex items-center justify-center gap-3 group-hover:scale-110 transition-transform duration-500 relative w-full h-full min-h-[140px]">
+                    {/* Device 1 */}
+                    <div className="w-16 h-24 bg-white rounded-xl border-[4px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-2 flex flex-col gap-2 -rotate-12 z-10">
+                       <div className="w-full h-2 bg-gray-200 rounded-full"></div>
+                       <div className="w-3/4 h-2 bg-gray-200 rounded-full"></div>
+                       <div className="mt-auto w-full h-6 bg-[#06D6A0] rounded-sm border-2 border-black"></div>
+                    </div>
+                    
+                    {/* Sync Arrows */}
+                    <div className="w-12 h-12 bg-[#FFD166] rounded-full border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center z-20 group-hover:rotate-180 transition-transform duration-700">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
+                    </div>
+                    
+                    {/* Device 2 */}
+                    <div className="w-16 h-24 bg-white rounded-xl border-[4px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-2 flex flex-col gap-2 rotate-12 z-10">
+                       <div className="w-full h-2 bg-gray-200 rounded-full"></div>
+                       <div className="w-3/4 h-2 bg-gray-200 rounded-full"></div>
+                       <div className="mt-auto w-full h-6 bg-[#06D6A0] rounded-sm border-2 border-black"></div>
+                    </div>
                  </div>
               </div>
             </div>
@@ -120,12 +160,25 @@ export const MarketingBentoGrid: React.FC = () => {
                 </p>
               </div>
               <div className="w-full md:w-2/5 flex items-center justify-center relative">
-                 <div className="relative w-40 h-28 flex flex-col items-center justify-end group-hover:scale-110 transition-transform duration-500 bg-white rounded-t-full border-[4px] border-b-0 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-4">
-                    <svg viewBox="0 0 100 50" className="w-full overflow-visible absolute top-5 left-0 px-3">
-                      <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="#f3f4f6" strokeWidth="12" strokeLinecap="round" />
-                      <path d="M10,50 A40,40 0 0,1 70,15" fill="none" stroke="#FFD166" strokeWidth="12" strokeLinecap="round" />
-                    </svg>
-                    <span className="text-[44px] font-black text-black z-10 mt-2">98</span>
+                 <div className="w-56 h-24 bg-white rounded-2xl border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-3 flex flex-row items-center gap-3 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500 relative mt-4 md:mt-0">
+                    {/* Avatar */}
+                    <div className="w-14 h-14 bg-[#A388EE] rounded-full border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center overflow-hidden flex-shrink-0">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    {/* Details */}
+                    <div className="flex flex-col gap-1.5 flex-1">
+                       <div className="w-full h-2.5 bg-gray-200 rounded-full"></div>
+                       <div className="w-1/2 h-2.5 bg-gray-200 rounded-full"></div>
+                       {/* Score */}
+                       <div className="mt-1 flex items-baseline gap-1">
+                          <span className="font-black text-2xl text-[#EF476F] leading-none">98</span>
+                          <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">pts</span>
+                       </div>
+                    </div>
+                    
+                    <div className="absolute -top-4 -right-4 bg-[#FFD166] w-10 h-10 rounded-full border-[3px] border-black flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rotate-12 group-hover:rotate-[24deg] transition-transform">
+                      <span className="text-xl">⭐</span>
+                    </div>
                  </div>
               </div>
             </div>
