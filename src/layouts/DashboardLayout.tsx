@@ -93,10 +93,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     localStorage.setItem(STORAGE_KEYS.VIEW, view);
   }, [view]);
 
-  // FIX: Converted role to lowercase for proper checking
+  // FIX: Converted role to lowercase and removed underscores for proper checking
   useEffect(() => {
     if (currentUser) {
-      const userRole = String(currentUser.role).toLowerCase();
+      const userRole = String(currentUser.role).toLowerCase().replace('_', '');
       switch (userRole) {
         case 'admin':
           if (view !== 'ADMIN' && view !== 'GREEN_ROOM' && view !== 'TEAM_LEADER' && view !== 'JUDGES' && view !== 'SETTINGS') setView('ADMIN');
@@ -108,10 +108,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }
   }, [currentUser, view]);
 
-  // FIX: Converted role to lowercase for proper permission matching
+  // FIX: Converted role to lowercase and removed underscores for proper permission matching
   const canAccessView = (viewType: ViewType): boolean => {
     if (!currentUser) return false;
-    const userRole = String(currentUser.role).toLowerCase();
+    const userRole = String(currentUser.role).toLowerCase().replace('_', '');
     switch (userRole) {
       case 'admin': return viewType === 'ADMIN' || viewType === 'GREEN_ROOM' || viewType === 'TEAM_LEADER' || viewType === 'JUDGES' || viewType === 'SETTINGS';
       case 'greenroom': return viewType === 'GREEN_ROOM';
@@ -155,6 +155,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             updateStaff={updateStaff!}
             deleteStaff={deleteStaff!}
             settings={settings}
+            updateSettings={updateSettings}
           />
         );
       case 'GREEN_ROOM':
@@ -174,6 +175,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             availablePanels={allPanels}
             onPanelChange={setAdminActiveJudgePanel}
             activePanel={adminActiveJudgePanel}
+            settings={settings}
           />
         );
       }
@@ -199,7 +201,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         );
       }
       case 'SETTINGS':
-        return <SettingsPage settings={settings} updateSettings={updateSettings} />;
+        return <SettingsPage settings={settings} updateSettings={updateSettings} programs={programs} />;
       default:
         return null;
     }
@@ -219,7 +221,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                ★
             </div>
             <div>
-              <h1 className="text-xl font-black tracking-tight uppercase leading-none">Intensia</h1>
+              <h1 className="text-xl font-black tracking-tight uppercase leading-none">Artflow</h1>
               <h1 className="text-xl font-black tracking-tight uppercase text-white/70 leading-none">Arts Fest</h1>
             </div>
           </div>
@@ -309,7 +311,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </div>
 
           <div className="flex gap-2">
-            {currentUser.role === 'admin' && (
+            {String(currentUser.role).toLowerCase() === 'admin' && (
               <button 
                 onClick={handleCopyLink} 
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black uppercase transition-all"
@@ -340,7 +342,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <div className="lg:hidden bg-[#3B3BFA] text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md">
           <div className="flex items-center gap-3">
              <div className="w-8 h-8 bg-[#FF3366] rounded-lg flex items-center justify-center text-white font-black text-sm rotate-[-10deg]">★</div>
-             <span className="font-black uppercase tracking-tight text-lg">Intensia</span>
+             <span className="font-black uppercase tracking-tight text-lg">Artflow</span>
           </div>
           <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>

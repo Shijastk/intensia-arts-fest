@@ -19,6 +19,26 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+const parseToValidDate = (timeStr?: string): Date | null => {
+  if (!timeStr) return null;
+  let d = new Date(timeStr);
+  if (!isNaN(d.getTime())) return d;
+  
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const ampm = match[3]?.toUpperCase();
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    
+    d = new Date();
+    d.setHours(hours, minutes, 0, 0);
+    return d;
+  }
+  return null;
+};
+
 interface ScheduleManagerProps {
   programs: Program[];
   updateProgram: (id: string, updates: Partial<Program>) => Promise<boolean>;
@@ -167,7 +187,11 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
   );
 
   const unscheduledPrograms = useMemo(() => programs.filter(p => !p.startTime), [programs]);
-  const scheduledPrograms = useMemo(() => programs.filter(p => !!p.startTime).sort((a,b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime()), [programs]);
+  const scheduledPrograms = useMemo(() => programs.filter(p => !!p.startTime).sort((a,b) => {
+    const da = parseToValidDate(a.startTime);
+    const db = parseToValidDate(b.startTime);
+    return (da?.getTime() || 0) - (db?.getTime() || 0);
+  }), [programs]);
 
   const uniqueVenues = useMemo(() => {
     const v = new Set(scheduledPrograms.map(p => p.venue).filter(Boolean) as string[]);
@@ -205,7 +229,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
     if (!currentTime) {
       const firstScheduled = orderedPrograms.find(p => p.startTime);
       if (firstScheduled) {
-        currentTime = new Date(firstScheduled.startTime!);
+        currentTime = parseToValidDate(firstScheduled.startTime!);
+        if (!currentTime) return null;
       } else {
         return null; // Need baseline time from user
       }
@@ -558,7 +583,11 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                       <input 
                         type="datetime-local" 
                         id="timeEditStart"
-                        defaultValue={timeEditProgram.startTime ? new Date(new Date(timeEditProgram.startTime).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''}
+                        defaultValue={(() => {
+                          const d = parseToValidDate(timeEditProgram.startTime);
+                          if (!d) return '';
+                          return new Date(d.getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+                        })()}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
                       />
                     </div>
@@ -567,7 +596,11 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                       <input 
                         type="datetime-local" 
                         id="timeEditEnd"
-                        defaultValue={timeEditProgram.endTime ? new Date(new Date(timeEditProgram.endTime).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''}
+                        defaultValue={(() => {
+                          const d = parseToValidDate(timeEditProgram.endTime);
+                          if (!d) return '';
+                          return new Date(d.getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+                        })()}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
                       />
                     </div>

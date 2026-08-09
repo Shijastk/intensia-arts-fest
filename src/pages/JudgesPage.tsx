@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Program, ProgramStatus } from '../types';
+import { Program, ProgramStatus, Settings } from '../types';
 import { calculatePoints, getGradeFromScore } from '../utils/pointsCalculator';
 
 interface JudgesPageProps {
@@ -11,6 +11,7 @@ interface JudgesPageProps {
     availablePanels?: string[];
     onPanelChange?: (panel: string) => void;
     activePanel?: string;
+    settings?: Settings;
 }
 
 export const JudgesPage: React.FC<JudgesPageProps> = ({ 
@@ -21,7 +22,8 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
     isAdminView,
     availablePanels,
     onPanelChange,
-    activePanel
+    activePanel,
+    settings
 }) => {
     const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
     const [scores, setScores] = useState<{ [key: string]: { score: string, grade: string } }>({});
@@ -139,11 +141,13 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                 currentRank = i + 1;
             }
             allParticipantsRaw[i].rank = currentRank;
+            const customConfig = settings?.customScores?.[selectedProgram.id];
             allParticipantsRaw[i].points = calculatePoints(
                 allParticipantsRaw[i].score, 
                 allParticipantsRaw[i].grade, 
                 selectedProgram.isGroup, 
-                currentRank
+                currentRank,
+                customConfig
             );
         }
 

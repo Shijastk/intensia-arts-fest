@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS: Settings = {
   categories: CATEGORIES,
   maxStudentsPerTeam: 50,
   maxNonGeneralPerStudent: 3,
+  showOverallLeaderboardInPublic: false,
 };
 
 export const useSettings = (festId: string | null) => {

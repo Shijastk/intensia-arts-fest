@@ -18,7 +18,11 @@ export const useStaffs = (festId: string | null) => {
     const unsubscribe = onValue(staffRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        setStaffs(Object.values(data) as Staff[]);
+        const staffsArray = Object.keys(data).map(key => ({
+          ...data[key],
+          id: key
+        }));
+        setStaffs(staffsArray as Staff[]);
       } else {
         setStaffs([]);
       }

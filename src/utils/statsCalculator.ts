@@ -103,7 +103,7 @@ const calculateZoneScores = (programs: Program[], targetZone: string, teamNames:
   const scores = Object.fromEntries(teamNames.map(teamName => [teamName, 0]));
 
   programs
-    .filter(program => program.status === ProgramStatus.COMPLETED && getProgramZone(program) === targetZone)
+    .filter(program => program.status === ProgramStatus.COMPLETED && program.isResultPublished && getProgramZone(program) === targetZone)
     .forEach(program => {
       program.teams.forEach(team => {
         const teamName = normalizeTeamName(team.teamName);
@@ -132,6 +132,7 @@ const aggregateIndividualScores = (
   programs
     .filter(program =>
       program.status === ProgramStatus.COMPLETED &&
+      program.isResultPublished &&
       !program.isGroup &&
       categoryFilter(program.category) &&
       (!nonStageOnly || isOffStageCategory(program.category))

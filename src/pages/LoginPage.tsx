@@ -6,9 +6,10 @@ interface LoginPageProps {
   onLogin: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   onGoogleLogin?: () => Promise<{ success: boolean; error?: string }>;
   isMaintenanceMode: boolean;
+  adminOnly?: boolean;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoogleLogin, isMaintenanceMode }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoogleLogin, isMaintenanceMode, adminOnly = false }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -57,9 +58,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoogleLogin, is
         <div>
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-black text-lg">
-              I
+              A
             </div>
-            <span className="text-xl font-black tracking-tight uppercase">Intensia Arts Fest</span>
+            <span className="text-xl font-black tracking-tight uppercase">Artflow</span>
           </div>
         </div>
 
@@ -93,7 +94,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoogleLogin, is
           )}
 
           {/* 1. ADMIN GOOGLE SIGN-IN SECTION */}
-          {onGoogleLogin && (
+          {onGoogleLogin && (adminOnly || adminOnly === undefined) && (
             <div className="mb-6">
               <div className="text-[11px] font-black text-purple-600 uppercase tracking-wider mb-2">For Convenors & Admins</div>
               <Button
@@ -114,42 +115,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoogleLogin, is
             </div>
           )}
 
-          <div className="flex items-center my-6">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Or staff login</span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
+          {(!adminOnly) && (
+            <>
+              <div className="flex items-center my-6">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Or staff login</span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
 
-          {/* 2. STANDARD LOGIN FORM (Judges, Greenroom, Team Leaders) */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Username / ID</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-purple-600 transition-all font-medium"
-                placeholder="Enter assigned username"
-                required
-              />
-            </div>
+              {/* 2. STANDARD LOGIN FORM (Judges, Greenroom, Team Leaders) */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Username / ID</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-purple-600 transition-all font-medium"
+                    placeholder="Enter assigned username"
+                    required
+                  />
+                </div>
 
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-purple-600 transition-all font-medium"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-purple-600 transition-all font-medium"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
 
-            <Button type="submit" variant="primary" isLoading={loading} className="mt-2">
-              Sign in as Staff / Judge
-            </Button>
-          </form>
+                <Button type="submit" variant="primary" isLoading={loading} className="mt-2">
+                  Sign in as Staff / Judge
+                </Button>
+              </form>
+            </>
+          )}
 
         </div>
 

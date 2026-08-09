@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Program, ProgramStatus } from '../types';
+import { Program, ProgramStatus, CustomProgramScore } from '../types';
 import { calculatePoints } from '../utils/pointsCalculator';
 
 interface ProgramAccordionProps {
@@ -12,6 +12,7 @@ interface ProgramAccordionProps {
   onPublishResult: (id: string) => void;
   onRequestCancel: (id: string) => void;
   onUpdateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
+  customScores?: Record<string, CustomProgramScore>;
 }
 
 export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
@@ -22,8 +23,10 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   onPublish,
   onPublishResult,
   onRequestCancel,
-  onUpdateProgram
+  onUpdateProgram,
+  customScores
 }) => {
+
   const [isOpen, setIsOpen] = useState(false);
 
   // Custom alert / confirmation modal state
@@ -180,11 +183,13 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
         currentRank = i + 1;
       }
       allParticipants[i].rank = currentRank;
+      const customConfig = customScores?.[program.id];
       allParticipants[i].points = calculatePoints(
         allParticipants[i].score || 0, 
         allParticipants[i].grade || '', 
         program.isGroup, 
-        currentRank
+        currentRank,
+        customConfig
       );
     }
 

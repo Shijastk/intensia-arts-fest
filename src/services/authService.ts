@@ -33,7 +33,7 @@ export const authService = {
   },
 
   // 2. Staff / Judge Login (Username & Password)
-  async loginStaff(username: string, pass: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  async loginStaff(username: string, pass: string, specificFestId?: string): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
       const festsRef = ref(db, 'fests');
       const snapshot = await get(festsRef);
@@ -46,7 +46,9 @@ export const authService = {
       let foundUser: any = null;
       let targetFestId = '';
 
-      for (const festId of Object.keys(festsData)) {
+      const festIdsToCheck = specificFestId ? [specificFestId] : Object.keys(festsData);
+
+      for (const festId of festIdsToCheck) {
         // Checking in the generic 'staff' node where we save them now
         const staffList = festsData[festId]?.staff;
         if (staffList) {

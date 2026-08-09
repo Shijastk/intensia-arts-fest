@@ -62,12 +62,13 @@ export const ProgramFormModal: React.FC<ProgramFormModalProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Zone</label>
-                <select name="zone" defaultValue={editingProgram?.zone || ''} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
-                  <option value="" disabled>Select Zone</option>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Zone <span className="text-slate-400 normal-case font-medium">(optional)</span></label>
+                <select name="zone" defaultValue={editingProgram?.zone || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
+                  <option value="">— No Zone —</option>
                   {zones.map(z => <option key={z} value={z}>{z}</option>)}
                 </select>
               </div>
+
             </div>
 
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">

@@ -77,7 +77,7 @@ export interface GalleryImage {
   uploadedBy?: string;
 }
 
-export type UserRole = 'admin' | 'greenroom' | 'judge' | 'teamleader';
+export type UserRole = 'admin' | 'greenroom' | 'judge' | 'teamleader' | 'ADMIN' | 'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER';
 export type ViewType = 'ADMIN' | 'GREEN_ROOM' | 'TEAM_LEADER' | 'JUDGES' | 'SETTINGS';
 
 export interface User {
@@ -99,7 +99,7 @@ export const STORAGE_KEYS = {
 export interface Staff {
   id: string;
   festId: string;
-  role: 'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER';
+  role: 'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER' | 'ADMIN';
   username: string;
   password?: string;
   panelName?: string; // For Judges or Team Leaders
@@ -108,8 +108,27 @@ export interface Staff {
   teamName?: string; // Additional property to fix TS error
 }
 
+export interface CustomProgramScore {
+  gradePoints: {
+    'A+': number;
+    'A': number;
+    'B': number;
+    'C': number;
+    'No Grade': number;
+    '': number;
+  };
+  rankPoints: {
+    1: number;
+    2: number;
+    3: number;
+  };
+}
+
 export interface Settings {
   categories: string[];
+  zones?: string[];           // customizable zone list
   maxStudentsPerTeam: number;
   maxNonGeneralPerStudent: number;
+  customScores?: Record<string, CustomProgramScore>; // keyed by program id
+  showOverallLeaderboardInPublic?: boolean;
 }

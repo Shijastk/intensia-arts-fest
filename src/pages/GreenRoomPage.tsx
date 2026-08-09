@@ -3,6 +3,7 @@ import { Program, ProgramStatus } from '../types';
 import { GreenRoomProgramCard } from '../components/GreenRoomProgramCard';
 import { db } from '../config/firebase';
 import { ref, onValue } from 'firebase/database';
+import { calculateLeaderboardStats } from '../utils/statsCalculator';
 
 interface GreenRoomPageProps {
     programs: Program[];
@@ -25,6 +26,46 @@ const extractZone = (category: string): string => {
     if (catLower.includes('b zone')) return 'B';
     if (catLower.includes('c zone')) return 'C';
     return 'General';
+};
+
+const getGroupResults = (teams: any[]) => {
+  const results = teams.filter(t => (t.rank && t.rank > 0) || (t.points && t.points > 0)).map(team => {
+    return {
+      name: team.teamName,
+      teamName: team.teamName,
+      points: team.points || 0,
+      rank: team.rank || 999
+    };
+  });
+  return results.sort((a, b) => a.rank - b.rank).slice(0, 3);
+};
+
+const getIndividualResults = (teams: any[]) => {
+  const participants: any[] = [];
+  teams.forEach(team => {
+    team.participants?.forEach((p: any) => {
+      if ((p.rank && p.rank > 0) || (p.points && p.points > 0)) {
+        participants.push({
+          name: p.name,
+          teamName: team.teamName,
+          points: p.points || 0,
+          rank: p.rank || 999
+        });
+      }
+    });
+  });
+  return participants.sort((a, b) => a.rank - b.rank).slice(0, 3);
+};
+
+const getWinnerNode = (results: any[], targetRank: number) => {
+    const winner = results.find(r => r.rank === targetRank);
+    if (!winner) return <span className="text-slate-300 text-xs italic">-</span>;
+    return (
+        <div className="flex flex-col">
+            <span className="text-sm font-black text-slate-900 truncate max-w-[200px]" title={winner.name}>{winner.name}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate max-w-[200px]">{winner.teamName}</span>
+        </div>
+    );
 };
 
 export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram }) => {
@@ -168,32 +209,44 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
         .filter(p => {
             const isPublished = p?.isPublished === true;
             const hasParticipants = (p?.teams || []).some(t => (t?.participants?.length ?? 0) > 0);
-            const isNotJudging = p?.status !== ProgramStatus.JUDGING;
-            return isPublished && hasParticipants && isNotJudging;
+            const isPending = p?.status === ProgramStatus.PENDING && !p?.isAllocatedToJudge;
+            return isPublished && hasParticipants && isPending;
         })
         .sort((a, b) => (a?.startTime || '').localeCompare(b?.startTime || ''));
 
-    const completedPrograms = (programs || []).filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished);
-
-    const zoneScores = React.useMemo(() => {
-        const scores: Record<string, { PRUDENTIA: number; SAPIENTIA: number; publishedCount: number }> = {};
-        completedPrograms.forEach(program => {
-            const zone = extractZone(program?.category);
-            if (!scores[zone]) {
-                scores[zone] = { PRUDENTIA: 0, SAPIENTIA: 0, publishedCount: 0 };
+    const stats = React.useMemo(() => calculateLeaderboardStats(programs), [programs]);
+    const availableZones = Object.keys(stats.zones).sort();
+    
+    const overallTeamScoresMap: Record<string, { score: number, zone: string }> = {};
+    Object.entries(stats.zones).forEach(([zoneKey, zone]) => {
+        Object.entries(zone.teamScores).forEach(([teamName, score]) => {
+            if (!overallTeamScoresMap[teamName]) {
+                overallTeamScoresMap[teamName] = { score: 0, zone: zoneKey };
             }
-            scores[zone].publishedCount += 1;
-            (program?.teams || []).forEach(team => {
-                const teamName = team?.teamName as 'PRUDENTIA' | 'SAPIENTIA';
-                (team?.participants || []).forEach(p => {
-                    if (p?.points != null && (teamName === 'PRUDENTIA' || teamName === 'SAPIENTIA')) {
-                        scores[zone][teamName] += p.points;
-                    }
-                });
-            });
+            overallTeamScoresMap[teamName].score += score;
         });
-        return scores;
-    }, [completedPrograms]);
+    });
+    
+    const overallTeamScores = Object.entries(overallTeamScoresMap)
+        .map(([name, data]) => ({ name, score: data.score, zone: data.zone }))
+        .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+
+    const completedPrograms = (programs || []).filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished).reverse();
+
+    const getTeamStyle = (index: number, isLeader: boolean) => {
+        if (isLeader) {
+            return {
+                container: 'bg-[#2563eb] shadow-lg shadow-blue-500/20',
+                name: 'text-blue-100',
+                score: 'text-white'
+            };
+        }
+        return {
+            container: 'bg-[#f8fafc] border border-slate-100/50',
+            name: 'text-slate-500',
+            score: 'text-slate-800'
+        };
+    };
 
     return (
         <div className="space-y-6 text-left animate-in fade-in duration-500">
@@ -224,77 +277,99 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                 </div>
             ) : activeTab === 'STATUS' ? (
                 <div className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-3xl font-black uppercase bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">Team Scores by Zone</h2>
-                            <div className="text-right">
-                                <p className="text-sm font-bold uppercase text-slate-400">Total Programs</p>
-                                <p className="text-2xl font-black text-slate-900">{completedPrograms.length}</p>
+                    <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6">
+                        <div className="flex items-center justify-between mb-6 sm:mb-8">
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-xl sm:text-2xl font-black uppercase bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">Overall Team Scores</h2>
+                                <span className="bg-indigo-100 text-indigo-700 text-[10px] sm:text-xs font-black uppercase px-2 py-1 rounded-lg tracking-wider">
+                                    After {completedPrograms.length} Results
+                                </span>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                            {(Object.entries(zoneScores) as [string, { PRUDENTIA: number; SAPIENTIA: number; publishedCount: number }][])
-                                .sort(([zoneA], [zoneB]) => {
-                                    const zoneOrder: Record<string, number> = { 'A': 1, 'B': 2, 'C': 3, 'General': 4 };
-                                    return (zoneOrder[zoneA] || 5) - (zoneOrder[zoneB] || 5);
-                                })
-                                .map(([zone, scores]) => {
-                                    const prudentiaScore = scores.PRUDENTIA;
-                                    const sapientiaScore = scores.SAPIENTIA;
-                                    const totalZoneScore = prudentiaScore + sapientiaScore;
-                                    const leader = prudentiaScore > sapientiaScore ? 'PRUDENTIA' :
-                                        sapientiaScore > prudentiaScore ? 'SAPIENTIA' : 'TIE';
-                                    const prudentiaPercentage = totalZoneScore > 0 ? (prudentiaScore / totalZoneScore) * 100 : 50;
-                                    const sapientiaPercentage = totalZoneScore > 0 ? (sapientiaScore / totalZoneScore) * 100 : 50;
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {overallTeamScores.map((ts, idx) => {
+                                const isLeader = idx === 0 && ts.score > 0;
+                                const style = getTeamStyle(idx, isLeader);
+                                return (
+                                    <div key={ts.name} className={`rounded-[16px] p-5 transition-all duration-300 ${style.container} ${isLeader ? 'scale-[1.02]' : ''}`}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <p className={`text-[11px] font-bold uppercase tracking-wider ${style.name}`}>{ts.name}</p>
+                                            <span className={`text-[9px] px-2 py-0.5 rounded-md uppercase font-bold tracking-widest ${isLeader ? 'bg-blue-800/40 text-blue-100' : 'bg-slate-200/60 text-slate-500'}`}>
+                                                {ts.zone}
+                                            </span>
+                                        </div>
+                                        <p className={`text-3xl font-black ${style.score}`}>{ts.score.toFixed(1)}</p>
+                                    </div>
+                                );
+                            })}
+                            {overallTeamScores.length === 0 && (
+                                <div className="col-span-full py-12 text-center text-slate-400 font-bold uppercase tracking-widest border-2 border-dashed border-slate-200 rounded-2xl">
+                                    No team scores available yet
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Individual Program Results Table */}
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">Recent Program Results</h2>
+                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                {completedPrograms.length} Published
+                            </span>
+                        </div>
+                        
+                        <div className="flex flex-col">
+                            <div className="hidden lg:grid lg:grid-cols-12 gap-4 px-6 py-4 bg-slate-50 border-b border-slate-200">
+                                <div className="col-span-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Event Details</div>
+                                <div className="col-span-3 text-[10px] font-black text-amber-600 uppercase tracking-widest"><span className="text-base mr-1 drop-shadow-sm">🥇</span> 1st Place</div>
+                                <div className="col-span-3 text-[10px] font-black text-slate-500 uppercase tracking-widest"><span className="text-base mr-1 drop-shadow-sm">🥈</span> 2nd Place</div>
+                                <div className="col-span-3 text-[10px] font-black text-orange-700 uppercase tracking-widest"><span className="text-base mr-1 drop-shadow-sm">🥉</span> 3rd Place</div>
+                            </div>
+                            <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto hide-scrollbar">
+                                {completedPrograms.map((program) => {
+                                    const results = program.isGroup 
+                                        ? getGroupResults(program.teams || [])
+                                        : getIndividualResults(program.teams || []);
+                                    
                                     return (
-                                        <div key={zone} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-                                            <div className="text-center mb-6">
-                                                <div className="inline-flex items-center gap-2 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-6 py-3 rounded-2xl shadow-md">
-                                                    <span className="text-base font-black uppercase tracking-wide">
-                                                        {zone === 'General' ? 'General' : `Zone ${zone}`}
+                                        <div key={program.id} className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-4 px-4 sm:px-6 py-5 hover:bg-slate-50/50 transition-colors group">
+                                            <div className="col-span-12 lg:col-span-3 pb-4 lg:pb-0 border-b border-slate-100 lg:border-0">
+                                                <h3 className="text-base font-black text-slate-900 leading-tight mb-2">{program.name}</h3>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest">
+                                                        {program.category}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">
+                                                        {program.isGroup ? 'GROUP' : 'INDIV'}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs font-bold uppercase text-slate-400 mt-3">
-                                                    {scores.publishedCount} {scores.publishedCount === 1 ? 'Result' : 'Results'} Published
-                                                </p>
                                             </div>
-                                            <div className="mb-6">
-                                                <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 shadow-inner">
-                                                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500" style={{ width: `${prudentiaPercentage}%` }} />
-                                                    <div className="bg-gradient-to-r from-red-500 to-red-600 transition-all duration-500" style={{ width: `${sapientiaPercentage}%` }} />
-                                                </div>
-                                                <div className="flex justify-between mt-2 text-xs font-bold text-slate-400">
-                                                    <span>{prudentiaPercentage.toFixed(0)}%</span>
-                                                    <span>{sapientiaPercentage.toFixed(0)}%</span>
-                                                </div>
+                                            
+                                            <div className="col-span-12 lg:col-span-3 flex lg:block items-center gap-4 lg:border-l lg:border-slate-100/50 lg:px-4">
+                                                <span className="lg:hidden text-2xl drop-shadow-sm w-8 text-center">🥇</span>
+                                                {getWinnerNode(results, 1)}
                                             </div>
-                                            <div className="space-y-4">
-                                                <div className={`relative rounded-2xl p-4 transition-all duration-300 ${leader === 'PRUDENTIA' ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white shadow-xl shadow-blue-500/50 scale-105' : 'bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150'}`}>
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <p className={`text-xs font-black uppercase tracking-wider mb-1 ${leader === 'PRUDENTIA' ? 'text-blue-100' : 'text-blue-600'}`}>PRUDENTIA</p>
-                                                            <p className={`text-3xl font-black ${leader === 'PRUDENTIA' ? 'text-white' : 'text-blue-700'}`}>{prudentiaScore.toFixed(1)}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className={`relative rounded-2xl p-4 transition-all duration-300 ${leader === 'SAPIENTIA' ? 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 text-white shadow-xl shadow-red-500/50 scale-105' : 'bg-gradient-to-br from-red-50 to-red-100 hover:from-red-100 hover:to-red-150'}`}>
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <p className={`text-xs font-black uppercase tracking-wider mb-1 ${leader === 'SAPIENTIA' ? 'text-red-100' : 'text-red-600'}`}>SAPIENTIA</p>
-                                                            <p className={`text-3xl font-black ${leader === 'SAPIENTIA' ? 'text-white' : 'text-red-700'}`}>{sapientiaScore.toFixed(1)}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                            
+                                            <div className="col-span-12 lg:col-span-3 flex lg:block items-center gap-4 lg:border-l lg:border-slate-100/50 lg:px-4">
+                                                <span className="lg:hidden text-2xl drop-shadow-sm w-8 text-center">🥈</span>
+                                                {getWinnerNode(results, 2)}
                                             </div>
-                                            <div className="mt-4 pt-4 border-t border-slate-200">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-xs font-bold uppercase text-slate-400">Zone Total</span>
-                                                    <span className="text-lg font-black text-slate-700">{totalZoneScore.toFixed(1)}</span>
-                                                </div>
+                                            
+                                            <div className="col-span-12 lg:col-span-3 flex lg:block items-center gap-4 lg:border-l lg:border-slate-100/50 lg:px-4">
+                                                <span className="lg:hidden text-2xl drop-shadow-sm w-8 text-center">🥉</span>
+                                                {getWinnerNode(results, 3)}
                                             </div>
                                         </div>
                                     );
                                 })}
+                                {completedPrograms.length === 0 && (
+                                    <div className="text-center py-12 px-4 text-slate-400">
+                                        <p className="text-sm font-bold uppercase tracking-widest">No Results Published Yet</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

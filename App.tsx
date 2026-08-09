@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate, useParams } from 'react-router-dom
 import { User, STORAGE_KEYS } from './src/types'; 
 import { PublicPage } from './src/pages/PublicPage';
 import { ResultsPage } from './src/pages/ResultsPage';
+import { SchedulePage } from './src/pages/SchedulePage';
 import { GalleryPage } from './src/pages/GalleryPage';
 import { MaintenancePage } from './src/pages/MaintenancePage';
 import { LoginPage } from './src/pages/LoginPage';
@@ -28,6 +29,24 @@ const PublicFestRoute = ({ component: Component }: { component: any }) => {
   }
 
   return <Component programs={programs} festId={festId} />;
+};
+
+// Wrapper for Staff Login
+const StaffLoginRoute = ({ onLogin, isMaintenanceMode, currentUser }: { onLogin: any, isMaintenanceMode: boolean, currentUser: any }) => {
+  const { festId } = useParams<{ festId: string }>();
+
+  if (currentUser) {
+    if (currentUser.festId) {
+      return <Navigate to={`/fests/${currentUser.festId}/dashboard`} replace />;
+    }
+    return <Navigate to="/setup-fest" replace />;
+  }
+
+  const handleStaffLogin = (username: string, pass: string) => {
+    return onLogin(username, pass, festId);
+  };
+
+  return <LoginPage onLogin={handleStaffLogin} isMaintenanceMode={isMaintenanceMode} adminOnly={false} />;
 };
 
 export default function App() {
@@ -66,14 +85,14 @@ export default function App() {
     }
   }, [currentUser]);
 
-  const handleLogin = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const handleLogin = async (username: string, password: string, specificFestId?: string): Promise<{ success: boolean; error?: string }> => {
     if (username === 'admin' && password === 'admin') {
-      const mockAdmin: User = { uid: 'admin-1', username: 'admin', role: 'admin', festId: 'default-fest', displayName: 'System Admin' };
+      const mockAdmin: User = { uid: 'admin-1', username: 'admin', role: 'admin', festId: specificFestId || 'default-fest', displayName: 'System Admin' };
       setCurrentUser(mockAdmin);
       return { success: true };
     }
 
-    const res = await authService.loginStaff(username.trim(), password.trim());
+    const res = await authService.loginStaff(username.trim(), password.trim(), specificFestId);
     if (!res.success || !res.user) {
       return { success: false, error: res.error || `Invalid credentials for ${username}` };
     }
@@ -117,17 +136,23 @@ export default function App() {
         {/* Public Fest URLs */}
         <Route path="/fests/:festId" element={<PublicFestRoute component={PublicPage} />} />
         <Route path="/fests/:festId/results" element={<PublicFestRoute component={ResultsPage} />} />
+        <Route path="/fests/:festId/schedule" element={<PublicFestRoute component={SchedulePage} />} />
         <Route path="/fests/:festId/gallery" element={<GalleryPage />} />
 
         {/* Auth Routes */}
         <Route path="/login" element={
           !currentUser ? (
-            <LoginPage onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} isMaintenanceMode={isMaintenanceMode} />
+            <LoginPage onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} isMaintenanceMode={isMaintenanceMode} adminOnly={true} />
           ) : currentUser.festId ? (
             <Navigate to={`/fests/${currentUser.festId}/dashboard`} replace />
           ) : (
             <Navigate to="/setup-fest" replace />
           )
+        } />
+        
+        {/* Staff Specific Login URL */}
+        <Route path="/fests/:festId/login" element={
+          <StaffLoginRoute onLogin={handleLogin} isMaintenanceMode={isMaintenanceMode} currentUser={currentUser} />
         } />
 
         <Route path="/setup-fest" element={

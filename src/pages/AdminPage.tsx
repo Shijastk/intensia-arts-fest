@@ -19,12 +19,23 @@ interface AdminPageProps {
   updateStaff: (id: string, updates: Partial<Staff>) => Promise<boolean>;
   deleteStaff: (id: string) => Promise<boolean>;
   settings?: any;
+  updateSettings?: (updates: any) => Promise<boolean>;
 }
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   programs, setPrograms, addProgram, updateProgram, deleteProgram,
-  staffs, addStaff, updateStaff, deleteStaff, settings
+  staffs, addStaff, updateStaff, deleteStaff, settings, updateSettings
 }) => {
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
+  const showOverallPoints = settings?.showOverallLeaderboardInPublic === true;
+
+  const handleToggleOverallPoints = async () => {
+    if (!updateSettings || isUpdatingSettings) return;
+    setIsUpdatingSettings(true);
+    await updateSettings({ showOverallLeaderboardInPublic: !showOverallPoints });
+    setIsUpdatingSettings(false);
+  };
+
   // Added 'results' and 'scheduler' to the state
   const [subTab, setSubTab] = useState<'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results'>('tracker');
   const [showProgramModal, setShowProgramModal] = useState(false);
@@ -152,12 +163,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1">Here's what's happening at your festival.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center flex-wrap justify-end">
+          {/* Quick Toggle */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200 shadow-sm sm:mr-2">
+             <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-600">Public Leaderboard</span>
+             <button
+               onClick={handleToggleOverallPoints}
+               disabled={isUpdatingSettings}
+               className={`w-10 h-5 rounded-full p-0.5 transition-colors flex shrink-0 ${showOverallPoints ? 'bg-emerald-500' : 'bg-slate-300'} ${isUpdatingSettings ? 'opacity-50' : ''}`}
+             >
+               <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${showOverallPoints ? 'translate-x-5' : 'translate-x-0'}`} />
+             </button>
+          </div>
+          
           <button 
             onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
-            className="px-6 py-3 bg-[#3B3BFA] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+            className="px-6 py-3 bg-[#3B3BFA] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 shrink-0"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
             Add Event
           </button>
         </div>
@@ -190,7 +213,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       
       {/* TAB CONTENT */}
       <div>
-        {subTab === 'tracker' && <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} />}
+        {subTab === 'tracker' && <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} />}
+
         
         {subTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} />}
         
@@ -244,8 +268,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 staffs.map(staff => (
                   <div key={staff.id} className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-full flex flex-col items-center justify-center font-black border ${staff.role === 'JUDGE' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : staff.role === 'TEAM_LEADER' ? 'bg-purple-50 text-purple-600 border-purple-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
-                        <span className="text-[9px] uppercase">{staff.role === 'GREEN_ROOM' ? 'GR' : staff.role === 'JUDGE' ? 'JDG' : 'LDR'}</span>
+                      <div className={`w-12 h-12 rounded-full flex flex-col items-center justify-center font-black border ${staff.role === 'ADMIN' ? 'bg-rose-50 text-rose-600 border-rose-200' : staff.role === 'JUDGE' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : staff.role === 'TEAM_LEADER' ? 'bg-purple-50 text-purple-600 border-purple-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
+                        <span className="text-[9px] uppercase">{staff.role === 'ADMIN' ? 'ADM' : staff.role === 'GREEN_ROOM' ? 'GR' : staff.role === 'JUDGE' ? 'JDG' : 'LDR'}</span>
                       </div>
                       <div>
                         <h4 className="text-sm font-black text-slate-900 uppercase">{staff.username}</h4>
@@ -272,7 +296,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         )}
       </div>
              
-      <ProgramFormModal show={showProgramModal} onClose={() => { setShowProgramModal(false); setEditingProgram(null); setIsGroup(false); }} onSave={handleSaveProgram} editingProgram={editingProgram} isGroup={isGroup} setIsGroup={setIsGroup} categories={settings?.categories || CATEGORIES} zones={ZONES} />
+      <ProgramFormModal show={showProgramModal} onClose={() => { setShowProgramModal(false); setEditingProgram(null); setIsGroup(false); }} onSave={handleSaveProgram} editingProgram={editingProgram} isGroup={isGroup} setIsGroup={setIsGroup} categories={settings?.categories || CATEGORIES} zones={settings?.zones || ZONES} />
+
       <StaffCredentialModal 
          festId={programs[0]?.festId || 'default-fest'}
          isOpen={showStaffModal}
@@ -307,8 +332,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (modalConfig.onConfirm) modalConfig.onConfirm();
+                onClick={async () => {
+                  if (modalConfig.onConfirm) await modalConfig.onConfirm();
                   setModalConfig(prev => ({ ...prev, isOpen: false }));
                 }}
                 className="px-3.5 py-1.5 text-xs font-bold text-white rounded-lg transition-colors cursor-pointer shadow-sm bg-rose-600 hover:bg-rose-700"

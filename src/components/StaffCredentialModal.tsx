@@ -16,7 +16,7 @@ export const StaffCredentialModal: React.FC<StaffCredentialModalProps> = ({
   onSave,
   editingStaff
 }) => {
-  const [role, setRole] = useState<'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER'>('GREEN_ROOM');
+  const [role, setRole] = useState<'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER' | 'ADMIN'>('GREEN_ROOM');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [specificName, setSpecificName] = useState(''); // Used for Stage/Panel Name or Team Name
@@ -95,6 +95,7 @@ export const StaffCredentialModal: React.FC<StaffCredentialModalProps> = ({
               <option value="GREEN_ROOM">Green Room Manager</option>
               <option value="JUDGE">Judge Panel</option>
               <option value="TEAM_LEADER">Team Leader</option>
+              <option value="ADMIN">Administrator</option>
             </select>
           </div>
 

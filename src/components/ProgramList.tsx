@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Program, ProgramStatus, ParticipantSummary } from '../types';
+import { Program, ProgramStatus, ParticipantSummary, CustomProgramScore } from '../types';
 import { ProgramAccordion } from './ProgramAccordion';
 
 interface ProgramListProps {
@@ -8,6 +8,7 @@ interface ProgramListProps {
     deleteProgram?: (id: string) => Promise<boolean>;
     updateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
     onEdit: (program: Program) => void;
+    customScores?: Record<string, CustomProgramScore>;
 }
 
 export const ProgramList: React.FC<ProgramListProps> = ({ 
@@ -15,7 +16,8 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     setPrograms, 
     deleteProgram, 
     updateProgram, 
-    onEdit 
+    onEdit,
+    customScores
 }) => {
     const [filter, setFilter] = useState<ProgramStatus | 'ALL'>('ALL');
     const [sortBy, setSortBy] = useState<'name' | 'time' | 'category'>('name');
@@ -259,6 +261,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
                                     }}
                                     onRequestCancel={setCancelProgramId}
                                     onUpdateProgram={updateProgram}
+                                    customScores={customScores}
                                 />
                             ))}
                             {filteredPrograms.length === 0 && (

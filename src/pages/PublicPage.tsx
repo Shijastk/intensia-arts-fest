@@ -1,327 +1,259 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { Program, ProgramStatus, GalleryImage } from '../types';
-import { Link } from 'react-router-dom';
-// import { getGallery } from '../services/gas.service';
-import { MasonryGridGallery } from '../components/MasonryGridGallery';
+import React, { useMemo, useState } from "react";
+import { Program, ProgramStatus, GalleryImage } from "../types";
+import { Link } from "react-router-dom";
+import { MasonryGridGallery } from "../components/MasonryGridGallery";
 
 interface PublicPageProps {
-    programs: Program[];
+  programs: Program[];
 }
+const formatFestName = (id?: string) => {
+  if (!id) return "Arts Fest";
+  return id
+    .split("-")
+    .filter((word) => isNaN(Number(word)))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
-export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({ programs, festId }) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [activeTab, setActiveTab] = useState<'HOME' | 'RESULTS'>('HOME');
-    const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({
+  programs,
+  festId,
+}) => {
+  const displayFestName = formatFestName(festId);
+  const firstNamePart = displayFestName.split(" ")[0] || "Arts";
+  const restNamePart = displayFestName.split(" ").slice(1).join(" ") || "Fest";
 
-    // Fetch gallery images from GAS (replaces Firestore subscription)
-    // useEffect(() => {
-    //     let mounted = true;
-    //     getGallery().then((res) => {
-    //         if (mounted && res.success && res.data) {
-    //             setGalleryImages((res.data as any[]).slice(0, 3));
-    //         }
-    //     });
-    //     return () => { mounted = false; };
-    // }, []);
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
-    const completedPrograms = useMemo(() => {
-        return programs
-            .filter(
-                p =>
-                    p.status === ProgramStatus.COMPLETED &&
-                    p.isResultPublished
-            )
-            // Latest programs first
-            .sort((a, b) =>
-                (b.startTime || '').localeCompare(a.startTime || '')
-            )
-            .slice(0, 3)
-            // 🔥 RANK SORTING LOGIC
-            .map(program => ({
-                ...program,
-                teams: [...program.teams]
-                    // 1️⃣ Sort teams by rank
-                    .sort((a, b) => a.rank - b.rank)
-                    .map(team => ({
-                        ...team,
-                        // 2️⃣ Sort participants by rank
-                        participants: [...(team.participants || [])].sort(
-                            (a, b) => a.rank - b.rank
-                        )
-                    }))
-            }));
-    }, [programs]);
+  return (
+    <div className="min-h-screen bg-[#FDFBF7] font-sans text-slate-900 overflow-x-hidden selection:bg-emerald-200 selection:text-emerald-900">
+      
+      {/* Dynamic Background */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-gradient-to-br from-emerald-100/50 to-teal-50/20 blur-[100px]"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-tl from-amber-100/40 to-orange-50/20 blur-[100px]"></div>
+      </div>
 
-
-    const upcomingPrograms = useMemo(() =>
-        programs.filter(p => p.status !== ProgramStatus.COMPLETED && p.status !== ProgramStatus.CANCELLED).sort((a, b) =>
-            (a.startTime || '').localeCompare(b.startTime || '')
-        ).slice(0, 3),
-        [programs]);
-
-    return (
-        <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-teal-100 selection:text-teal-900 overflow-x-hidden">
-            {/* Header/Navbar */}
-            <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-xl border-b border-slate-100 z-50">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-20">
-                        {/* Logo Area */}
-                        <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
-                                {/* Abstract Logo Shape */}
-                                <div className="absolute inset-0 bg-gradient-to-tr from-teal-600 to-emerald-400 rounded-full opacity-20 animate-pulse"></div>
-                                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-teal-600 to-teal-500 flex items-center justify-center text-white font-black text-xs sm:text-lg shadow-lg shadow-teal-200">
-                                    I
-                                </div>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 uppercase leading-none">Intensia</span>
-                                <span className="text-[8px] sm:text-[10px] font-bold text-teal-600 uppercase tracking-widest">Arts Fest</span>
-                            </div>
-                        </div>
-
-                        {/* Nav Links - Hidden Mobile */}
-                        <div className="hidden md:flex items-center gap-8">
-                            <a href="#home" className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">Home</a>
-                            <a href="#about" className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">About</a>
-                            <Link to={`/fests/${festId}/results`} className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">Results</Link>
-                            <a href="#gallery" className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-teal-600 transition-colors">Gallery</a>
-                        </div>
-
-                        {/* CTA */}
-                        <div className="flex-shrink-0">
-                            <Link
-                                to="/login"
-                                className="px-4 py-2 sm:px-6 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-slate-200"
-                            >
-                                Login
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            {/* Hero Section */}
-            <div id="home" className="pt-28 pb-12 sm:pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    {/* Hero Text */}
-                    <div className="order-2 lg:order-1 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 text-center lg:text-left flex flex-col items-center lg:items-start">
-                        <div className="space-y-4">
-                            <span className="inline-block px-4 py-1.5 rounded-full bg-orange-50 text-orange-600 text-[10px] font-black uppercase tracking-widest border border-orange-100">
-                                Dec 26 - 27, 2025 • Kalpetta
-                            </span>
-                            <h1 className="text-5xl sm:text-6xl md:text-8xl font-black text-slate-900 tracking-tighter leading-[0.9]">
-                                The Art<br />
-                                Form of <br />
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-400">Creativity</span>
-                            </h1>
-                            <p className="text-lg text-slate-500 font-medium max-w-lg mx-auto lg:mx-0 leading-relaxed">
-                                Experience the pinnacle of artistic expression at Intensia Arts Fest. Where talent meets tradition in a celebration of culture.
-                            </p>
-                        </div>
-
-                        {/* Stats Row */}
-                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-8 md:gap-12 pt-4 border-t border-slate-100 w-full">
-                            <div>
-                                <p className="text-3xl font-black text-slate-900">100+</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Participants</p>
-                            </div>
-                            <div>
-                                <p className="text-3xl font-black text-slate-900">5</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stages</p>
-                            </div>
-                            <div>
-                                <p className="text-3xl font-black text-slate-900">3</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Days</p>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-4 pt-4 w-full justify-center lg:justify-start">
-                            <a href="#results" className="px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white rounded-full text-sm font-bold uppercase tracking-widest transition-all shadow-xl shadow-teal-200 flex items-center justify-center gap-2">
-                                View Results
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                            </a>
-                            <a href="#about" className="px-8 py-4 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-full text-sm font-bold uppercase tracking-widest transition-all hover:bg-slate-50 text-center">
-                                Learn More
-                            </a>
-                        </div>
-                    </div>
-
-                    {/* Hero Images - Collage Style */}
-                    <div className="order-1 lg:order-2 relative h-[500px] hidden md:block animate-in fade-in zoom-in duration-1000">
-                        {/* Main Oval Image */}
-                        <div className="absolute top-0 right-0 w-4/5 h-full bg-slate-100 rounded-[100px] overflow-hidden shadow-2xl rotate-3 border-4 border-white">
-                            <img
-                                src="/hero-art.png"
-                                alt="Arts Composition"
-                                className="w-full h-full object-cover"
-                            />
-                            {/* Overlay Gradient */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-teal-900/40 to-transparent"></div>
-                        </div>
-
-                        {/* Floating Badge */}
-                        <div className="absolute bottom-20 left-10 bg-white p-6 rounded-3xl shadow-xl animate-bounce duration-[3000ms]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-2xl">🎨</div>
-                                <div>
-                                    <p className="text-sm font-black text-slate-900 uppercase">Islamic Arts</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Showcase</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+      {/* Header/Navbar - Floating Pill Style */}
+      <nav className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4">
+        <div className="bg-white/80 backdrop-blur-2xl shadow-2xl shadow-emerald-900/5 rounded-[2rem] px-6 sm:px-8 py-4 flex items-center justify-between w-full max-w-6xl">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-emerald-900/20 transform rotate-3">
+              I
             </div>
-
-            {/* Scrolling Ticker */}
-            <div className="bg-slate-900 py-4 overflow-hidden -skew-y-1 relative z-10">
-                <div className="flex gap-16 animate-marquee whitespace-nowrap text-slate-400 text-sm font-black uppercase tracking-[0.2em] opacity-80">
-                    <span>★ Live Results</span>
-                    <span>★ Intensia Arts Fest</span>
-                    <span>★ Intensia 2025</span>
-                    <span>★ The Art Form of Creativity</span>
-                    <span>★ Live Results</span>
-                    <span>★ Intensia Arts Fest</span>
-                    <span>★ Intensia 2025</span>
-                    <span>★ The Art Form of Creativity</span>
-                </div>
+            <div className="flex flex-col">
+              <span className="text-xl sm:text-2xl font-black tracking-tight text-emerald-950 uppercase leading-none">
+                {firstNamePart}
+              </span>
+              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-1">
+                {restNamePart}
+              </span>
             </div>
+          </div>
 
-            {/* Results & Events Section */}
-            
+          {/* Links */}
+          <div className="hidden md:flex items-center gap-8 bg-slate-50/50 px-8 py-3 rounded-full">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-sm font-bold uppercase tracking-wide text-slate-500 hover:text-emerald-700 transition-colors">Home</button>
+            <Link to={`/fests/${festId}/schedule`} className="text-sm font-bold uppercase tracking-wide text-slate-500 hover:text-emerald-700 transition-colors">Schedule</Link>
+            <Link to={`/fests/${festId}/results`} className="text-sm font-bold uppercase tracking-wide text-slate-500 hover:text-emerald-700 transition-colors">Results</Link>
+            <button onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })} className="text-sm font-bold uppercase tracking-wide text-slate-500 hover:text-emerald-700 transition-colors">About</button>
+          </div>
 
-            {/* About Section */}
-            <div id="about" className="py-12 md:py-24 bg-slate-50">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-col md:flex-row gap-16 items-center">
-                        <div className="md:w-1/2 relative">
-                            <div className="aspect-[4/5] bg-slate-200 rounded-[3rem] overflow-hidden shadow-2xl relative">
-                                <img src="/stage-abstract.png" alt="Festival Stage" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-gradient-to-tr from-slate-900/60 to-transparent"></div>
-                                <div className="absolute bottom-10 left-10 text-white">
-                                    <p className="text-xs font-bold uppercase tracking-widest mb-2 text-orange-400">About the Event</p>
-                                    <h3 className="text-4xl font-black uppercase tracking-tight">Soulful<br />Symphony</h3>
-                                </div>
-                            </div>
-                            {/* Decorative Elements */}
-                            <div className="absolute -top-10 -right-10 w-32 h-32 bg-teal-100 rounded-full blur-3xl opacity-50"></div>
-                            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-50"></div>
-                        </div>
-                        <div className="md:w-1/2 space-y-8">
-                            <div>
-                                <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight mb-4">Intensia<br />Arts Fest</h2>
-                                <div className="w-20 h-2 bg-gradient-to-r from-teal-500 to-emerald-400 rounded-full"></div>
-                            </div>
-                            <p className="text-slate-600 text-lg leading-relaxed font-medium">
-                                Experience no limits where melodies transcend boundaries. Immerse yourself in the rhythmic vibes of our annual arts festival. Join us at Intensia Arts Fest for two days of unlimited creativity and competition.
-                            </p>
-
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                                    <div className="text-teal-600 mb-3">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    </div>
-                                    <h4 className="text-sm font-black text-slate-900 uppercase mb-1">Dec 26-27</h4>
-                                    <p className="text-xs font-medium text-slate-400">9:00 AM - 9:00 PM</p>
-                                </div>
-                                <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                                    <div className="text-orange-500 mb-3">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                    </div>
-                                    <h4 className="text-sm font-black text-slate-900 uppercase mb-1">Kalpetta</h4>
-                                    <p className="text-xs font-medium text-slate-400">Main Campus Stage</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Highlights Section */}
-            <div className="py-12 md:py-24 bg-white relative overflow-hidden">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                    <div className="mb-12">
-                        <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-2">— Highlights</p>
-                        <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">Festival Extravaganza</h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Card 1 */}
-                        <div className="p-8 rounded-[2rem] bg-indigo-50 hover:bg-indigo-100 transition-all cursor-pointer group">
-                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 mb-6 shadow-sm group-hover:scale-110 transition-transform">
-                                <span className="text-2xl">🏆</span>
-                            </div>
-                            <h3 className="text-lg font-black text-slate-900 uppercase mb-3">Live Competition</h3>
-                            <p className="text-sm text-slate-500 font-medium">Experience high-stakes competition as students battle for the prestigious titles.</p>
-                        </div>
-                        {/* Card 2 */}
-                        <div className="p-8 rounded-[2rem] bg-teal-50 hover:bg-teal-100 transition-all cursor-pointer group">
-                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-teal-600 mb-6 shadow-sm group-hover:scale-110 transition-transform">
-                                <span className="text-2xl">🎤</span>
-                            </div>
-                            <h3 className="text-lg font-black text-slate-900 uppercase mb-3">Various Forms</h3>
-                            <p className="text-sm text-slate-500 font-medium">From classical recitation to modern artistic expressions, witness it all.</p>
-                        </div>
-                        {/* Card 3 */}
-                        <div className="p-8 rounded-[2rem] bg-orange-50 hover:bg-orange-100 transition-all cursor-pointer group">
-                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-orange-600 mb-6 shadow-sm group-hover:scale-110 transition-transform">
-                                <span className="text-2xl">📅</span>
-                            </div>
-                            <h3 className="text-lg font-black text-slate-900 uppercase mb-3">Real-time Schedule</h3>
-                            <p className="text-sm text-slate-500 font-medium">Stay updated with our live event tracking and result publishing system.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Gallery Section - Only visible if at least 1 image exists */}
-            {galleryImages.length > 0 && (
-                <div className="py-12 md:py-24 bg-white">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 md:mb-12 gap-6">
-                            <div>
-                                <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-2">— Event Gallery</p>
-                                <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tight">Festival Moments</h2>
-                                <p className="text-sm text-slate-500 mt-2">Capturing the vibrant moments from our event</p>
-                            </div>
-                            {/* View All button - Only visible if 3 or more images */}
-                            {galleryImages.length >= 3 && (
-                                <Link
-                                    to="/gallery"
-                                    className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-teal-200 flex items-center gap-2"
-                                >
-                                    View All Photos
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                                </Link>
-                            )}
-                        </div>
-
-                        {/* Gallery Grid - Latest 3 images */}
-                        <MasonryGridGallery
-                            images={galleryImages}
-                            limit={3}
-                        />
-
-                    </div>
-                </div>
-            )}
-
-            
-
-            {/* Footer */}
-            <footer className="bg-slate-900 text-white py-12 md:py-20 rounded-t-[2rem] md:rounded-t-[3rem] mt-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                    <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-8 text-2xl animate-pulse">
-                        ✨
-                    </div>
-                    <h2 className="text-3xl font-black uppercase tracking-tight mb-4">Intensia Arts Fest 2025</h2>
-                    <p className="text-slate-400 text-sm font-medium max-w-lg mx-auto mb-8">
-                        The ultimate celebration of creativity and talent at Intensia Arts Fest.
-                    </p>
-                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em]">&copy; 2025 INTENSIA. All rights reserved.</p>
-                </div>
-            </footer>
+          {/* CTA */}
+          <Link
+            to={`/fests/${festId}/login`}
+            className="px-6 py-3 bg-slate-900 hover:bg-emerald-900 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-slate-900/10 hover:-translate-y-1"
+          >
+            Login
+          </Link>
         </div>
-    );
+      </nav>
+
+      {/* Hero Section */}
+      <div id="home" className="relative pt-40 pb-20 md:pt-56 md:pb-32 z-10">
+        <div className="flex flex-col items-center justify-center max-w-5xl mx-auto px-4 text-center">
+          
+          <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-widest shadow-sm mb-8">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            A Celebration of Culture
+          </div>
+          
+          <h1 className="text-6xl sm:text-7xl md:text-8xl font-black text-slate-900 tracking-tighter leading-[0.9] mb-8">
+            {firstNamePart} <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-500">
+              {restNamePart}
+            </span>
+          </h1>
+          
+          <p className="text-xl text-slate-600 font-medium max-w-3xl mx-auto leading-relaxed mb-12">
+            Experience the pinnacle of artistic expression. A vibrant gathering where profound tradition meets extraordinary talent.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 w-full justify-center mb-20">
+            <Link to={`/fests/${festId}/results`} className="px-8 py-5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-2xl shadow-emerald-900/20 flex items-center justify-center gap-3 hover:-translate-y-1">
+              Live Results
+              <span className="text-xl">🏆</span>
+            </Link>
+            <Link to={`/fests/${festId}/schedule`} className="px-8 py-5 bg-white text-emerald-900 rounded-2xl text-sm font-black uppercase tracking-widest transition-all hover:bg-slate-50 shadow-xl shadow-slate-200/50 hover:-translate-y-1">
+              Event Schedule
+            </Link>
+          </div>
+
+          {/* Hero Feature Teaser */}
+          <div className="w-full max-w-5xl flex flex-col md:flex-row gap-6 relative z-10">
+            <div className="flex-1 bg-white p-8 rounded-[2rem] shadow-2xl shadow-emerald-900/5 hover:-translate-y-2 transition-transform duration-500 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400 rounded-full blur-[50px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
+              <span className="text-4xl block mb-4">🎭</span>
+              <h3 className="text-xl font-black text-slate-900 mb-2">Stage Arts</h3>
+              <p className="text-sm font-medium text-slate-500">Witness mesmerizing performances across classical and contemporary forms.</p>
+            </div>
+            
+            <div className="flex-1 bg-emerald-900 p-8 rounded-[2rem] shadow-2xl shadow-emerald-900/20 hover:-translate-y-2 transition-transform duration-500 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-teal-400 rounded-full blur-[50px] opacity-30 group-hover:opacity-50 transition-opacity"></div>
+              <span className="text-4xl block mb-4">✍️</span>
+              <h3 className="text-xl font-black text-white mb-2">Literary Events</h3>
+              <p className="text-sm font-medium text-emerald-100/70">Engage with profound thoughts through debates, poetry, and storytelling.</p>
+            </div>
+            
+            <div className="flex-1 bg-amber-50 p-8 rounded-[2rem] shadow-2xl shadow-amber-900/5 hover:-translate-y-2 transition-transform duration-500 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400 rounded-full blur-[50px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
+              <span className="text-4xl block mb-4">🎨</span>
+              <h3 className="text-xl font-black text-amber-950 mb-2">Creative Arts</h3>
+              <p className="text-sm font-medium text-amber-800/70">A showcase of visual brilliance spanning multiple mediums and expressions.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrolling Ticker - Fat & Bold */}
+      <div className="bg-emerald-900 py-6 relative z-10 transform -rotate-1 scale-105 shadow-2xl overflow-hidden">
+        <div className="flex gap-16 animate-marquee whitespace-nowrap text-emerald-100 text-lg font-black uppercase tracking-widest">
+          <span>✨ Live Results</span>
+          <span className="text-amber-400">✨ {displayFestName}</span>
+          <span>✨ Annual Edition</span>
+          <span className="text-amber-400">✨ The Art Form of Creativity</span>
+          <span>✨ Live Results</span>
+          <span className="text-amber-400">✨ {displayFestName}</span>
+          <span>✨ Annual Edition</span>
+          <span className="text-amber-400">✨ The Art Form of Creativity</span>
+        </div>
+      </div>
+
+      {/* About Section - Blocky & Vibrant */}
+      <div id="about" className="py-24 md:py-32 relative z-10 mt-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row gap-16 items-center">
+            
+            <div className="lg:w-1/2 relative w-full">
+              <div className="aspect-square sm:aspect-[4/3] rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-300 relative group">
+                <img src="/stage-abstract.png" alt="Festival" className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/60 to-transparent"></div>
+                <div className="absolute bottom-8 left-8 sm:bottom-12 sm:left-12">
+                  <div className="bg-amber-500 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl inline-block mb-4 shadow-lg">About The Event</div>
+                  <h3 className="text-4xl sm:text-5xl font-black text-white leading-none tracking-tight">Soulful<br/>Symphony</h3>
+                </div>
+              </div>
+              <div className="absolute -z-10 top-10 -right-10 w-full h-full bg-gradient-to-br from-amber-200 to-orange-200 rounded-[3rem] blur-2xl opacity-60"></div>
+            </div>
+            
+            <div className="lg:w-1/2 flex flex-col gap-8">
+              <h2 className="text-5xl sm:text-6xl font-black text-slate-900 tracking-tighter leading-[0.9]">
+                {firstNamePart}<br />
+                <span className="text-emerald-700">{restNamePart}</span>
+              </h2>
+              
+              <p className="text-xl text-slate-600 font-medium leading-relaxed">
+                Immerse yourself in the rhythmic vibes of our annual arts festival. Join us at {displayFestName} for days of unlimited creativity, passion, and artistic brilliance.
+              </p>
+
+              {/* Float Card */}
+              <div className="bg-white p-8 rounded-3xl shadow-2xl shadow-emerald-900/10 flex gap-6 items-start transform hover:-translate-y-2 transition-transform">
+                <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center text-3xl flex-shrink-0">🎭</div>
+                <div>
+                  <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2">A Gathering of Excellence</h4>
+                  <p className="text-slate-500 font-medium leading-relaxed">
+                    A vibrant assembly of talents spanning multiple stages, showcasing breathtaking performances and exquisite craftsmanship.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* Highlights Section - Bento Grid Style */}
+      <div className="py-24 bg-white relative z-10 rounded-t-[3rem] sm:rounded-t-[5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-16">
+            <h2 className="text-5xl sm:text-6xl font-black text-slate-900 tracking-tighter">Festival Extravaganza</h2>
+            <p className="text-lg font-bold text-amber-600 uppercase tracking-widest mt-4">Event Highlights</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-emerald-50 rounded-[2rem] p-10 hover:bg-emerald-100 transition-colors">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-8">🏆</div>
+              <h3 className="text-2xl font-black text-emerald-950 uppercase tracking-tight mb-4">Live Competition</h3>
+              <p className="text-emerald-800/80 font-medium leading-relaxed">Experience high-stakes competition as students battle for prestigious titles in an atmosphere of excellence.</p>
+            </div>
+            
+            <div className="bg-amber-50 rounded-[2rem] p-10 hover:bg-amber-100 transition-colors">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-8">🎤</div>
+              <h3 className="text-2xl font-black text-amber-950 uppercase tracking-tight mb-4">Various Forms</h3>
+              <p className="text-amber-800/80 font-medium leading-relaxed">From classical recitation to modern artistic expressions, witness a harmonious blend of traditions.</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-[2rem] p-10 hover:bg-slate-100 transition-colors">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-sm mb-8">📅</div>
+              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-4">Live Schedule</h3>
+              <p className="text-slate-600 font-medium leading-relaxed">Stay seamlessly updated with our live event tracking and instant result publishing system.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Gallery Section */}
+      {galleryImages.length > 0 && (
+        <div className="py-24 bg-slate-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-12 gap-6">
+              <div>
+                <h2 className="text-5xl font-black text-slate-900 tracking-tighter mb-4">Festival Moments</h2>
+                <p className="text-lg font-bold text-amber-600 uppercase tracking-widest">Event Gallery</p>
+              </div>
+              {galleryImages.length >= 3 && (
+                <Link
+                  to={`/fests/${festId}/gallery`}
+                  className="px-6 py-3 bg-slate-900 hover:bg-emerald-900 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-slate-900/10"
+                >
+                  View Collection
+                </Link>
+              )}
+            </div>
+            <MasonryGridGallery images={galleryImages} limit={3} />
+          </div>
+        </div>
+      )}
+
+      {/* Footer - Massive & Bold */}
+      <footer className="bg-slate-900 text-white pt-24 pb-12 mt-12 rounded-t-[3rem] sm:rounded-t-[5rem]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-700 rounded-3xl flex items-center justify-center text-3xl mb-12 transform -rotate-12 shadow-2xl shadow-emerald-500/20">✨</div>
+          <h2 className="text-6xl sm:text-7xl md:text-9xl font-black uppercase tracking-tighter mb-8 bg-clip-text text-transparent bg-gradient-to-b from-white to-slate-500">
+            {firstNamePart}
+          </h2>
+          <p className="text-slate-400 text-xl font-medium max-w-2xl mx-auto mb-16">
+            The ultimate celebration of profound creativity and cultural heritage.
+          </p>
+          <p className="text-xs font-black text-slate-600 uppercase tracking-widest">&copy; 2026 {displayFestName}. All rights reserved.</p>
+          <div className="mt-8 flex flex-col items-center gap-1 opacity-70 hover:opacity-100 transition-opacity">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Powered by</span>
+            <span className="text-sm font-black text-emerald-400 uppercase tracking-widest">Artflow</span>
+            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">by Festloom</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
 };

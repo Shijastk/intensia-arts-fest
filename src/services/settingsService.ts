@@ -1,13 +1,16 @@
 import { db } from '../config/firebase';
 import { ref, set, update, onValue, get } from 'firebase/database';
 import { Settings } from '../types';
-import { CATEGORIES } from '../constants/categories'; // Fallback categories
+import { CATEGORIES, ZONES } from '../constants/categories'; // Fallback values
 
 const DEFAULT_SETTINGS: Settings = {
   categories: CATEGORIES,
+  zones: ZONES,
   maxStudentsPerTeam: 50,
   maxNonGeneralPerStudent: 3,
+  customScores: {},
 };
+
 
 export const settingsService = {
   subscribeToSettings: (festId: string, callback: (settings: Settings) => void) => {
