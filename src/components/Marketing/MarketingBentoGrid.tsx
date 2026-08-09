@@ -21,8 +21,8 @@ export const MarketingBentoGrid: React.FC = () => {
             Smart Features
           </div>
           <h2 className="text-[56px] md:text-[80px] font-black tracking-tight text-black leading-[1.0] relative z-10">
-            Streamline your festival <br/>
-            with <span className="text-[#4f46e5]">powerful tools.</span>
+            Run your arts fest <br/>
+            like a <span className="text-[#4f46e5]">pro.</span>
           </h2>
         </div>
 
@@ -35,9 +35,9 @@ export const MarketingBentoGrid: React.FC = () => {
             {/* Card 1 */}
             <div data-aos="fade-up" className="bg-[#A388EE] rounded-[40px] border-[4px] border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col h-[420px] group hover:-translate-y-2 hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
               <div className="p-8 pb-0 text-white">
-                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Real-Time Analytics</h3>
+                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Live Zone Standings</h3>
                 <p className="text-[18px] text-white/90 font-bold leading-relaxed">
-                  Monitor your zone points live with clear, intuitive dashboards.
+                  Monitor your zone points live with clear, intuitive public dashboards.
                 </p>
               </div>
               <div className="flex-1 w-full flex items-end justify-center pt-8 relative overflow-hidden">
@@ -55,9 +55,9 @@ export const MarketingBentoGrid: React.FC = () => {
             {/* Card 2 */}
             <div data-aos="fade-up" data-aos-delay="100" className="bg-[#FFD166] rounded-[40px] border-[4px] border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col h-[420px] group hover:-translate-y-2 hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
               <div className="p-8 pb-0 text-black">
-                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Automated Reports</h3>
+                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Automated Results</h3>
                 <p className="text-[18px] text-black/80 font-bold leading-relaxed">
-                  Generate final score summaries instantly—no manual work needed.
+                  Generate final score summaries and winner lists instantly—no manual tallying needed.
                 </p>
               </div>
               <div className="flex-1 w-full flex items-end justify-center px-8 pb-8 relative">
@@ -73,9 +73,9 @@ export const MarketingBentoGrid: React.FC = () => {
             {/* Card 3 */}
             <div data-aos="fade-up" data-aos-delay="200" className="bg-[#06D6A0] rounded-[40px] border-[4px] border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col h-[420px] group hover:-translate-y-2 hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
               <div className="p-8 pb-0 text-black">
-                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Smart Judging</h3>
+                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Smart Grading</h3>
                 <p className="text-[18px] text-black/80 font-bold leading-relaxed">
-                  Automated grade calculation (A/B/C) based on custom rulesets.
+                  Automated grade calculation (A, B, C) based on your college's specific rulesets.
                 </p>
               </div>
               <div className="flex-1 w-full flex items-center justify-center relative mt-4">
@@ -99,9 +99,9 @@ export const MarketingBentoGrid: React.FC = () => {
             {/* Card 4 */}
             <div data-aos="fade-up" className="bg-[#EF476F] rounded-[40px] border-[4px] border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col md:flex-row items-center p-10 group h-auto md:h-[260px] hover:-translate-y-2 hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
               <div className="w-full md:w-3/5 mb-8 md:mb-0 text-white">
-                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Secure Syncing</h3>
+                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Secure Multi-Stage Syncing</h3>
                 <p className="text-[18px] text-white/90 font-bold leading-relaxed max-w-[90%]">
-                  Link multiple stages safely with real-time offline-first data syncing. No dropouts.
+                  Link multiple stages safely with real-time offline-first data syncing. No dropouts even during bad network.
                 </p>
               </div>
               <div className="w-full md:w-2/5 flex items-center justify-center relative">
@@ -114,9 +114,9 @@ export const MarketingBentoGrid: React.FC = () => {
             {/* Card 5 */}
             <div data-aos="fade-up" data-aos-delay="100" className="bg-[#118AB2] rounded-[40px] border-[4px] border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] overflow-hidden flex flex-col md:flex-row items-center p-10 group h-auto md:h-[260px] hover:-translate-y-2 hover:shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
               <div className="w-full md:w-3/5 mb-8 md:mb-0 text-white">
-                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Performance Score</h3>
+                <h3 className="text-[28px] font-black tracking-tight mb-4 leading-tight">Participant Tracking</h3>
                 <p className="text-[18px] text-white/90 font-bold leading-relaxed max-w-[90%]">
-                  View key metrics and participant trends at a glance.
+                  View individual performance scores and overall trends at a single glance.
                 </p>
               </div>
               <div className="w-full md:w-2/5 flex items-center justify-center relative">

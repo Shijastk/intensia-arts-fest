@@ -8,9 +8,9 @@ export const AdminFeatureShowcase: React.FC = () => {
       label: 'Role-Based Access',
       title: 'Uncompromising Security.',
       sub1Title: 'GRANULAR PERMISSIONS',
-      sub1Text: 'Assign strict, scoped access to Greenroom officers, Convenors, and Judges. No one sees more than they need to.',
+      sub1Text: 'Assign strict, scoped access to Green Room Officers, Convenors, and Judges. No one sees more than they need to.',
       sub2Title: 'AUDIT TRAILS',
-      sub2Text: 'Every score entry and greenroom check-in is logged with timestamps and user IDs for total accountability.',
+      sub2Text: 'Every score entry and Green Room check-in is logged with timestamps and user IDs for total accountability.',
       image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
       bgColor: 'bg-[#FF90E8]',
       textColor: 'text-black',
@@ -19,12 +19,12 @@ export const AdminFeatureShowcase: React.FC = () => {
     },
     {
       id: 'portals',
-      label: 'Team Portals',
-      title: 'Zone Management.',
+      label: 'Zone/House Management',
+      title: 'Team Management.',
       sub1Title: 'DEDICATED LOGINS',
-      sub1Text: 'Give zone leaders their own secure portal to manage their team\'s registrations and view real-time performance.',
+      sub1Text: 'Give zone leaders their own secure portals to manage their team\'s registrations and view real-time performance.',
       sub2Title: 'PAPERLESS REGISTRATION',
-      sub2Text: 'Drop the Excel sheets. Participants are imported, verified, and assigned chest numbers natively in the cloud.',
+      sub2Text: 'Drop the messy Excel sheets. Participants are imported, verified, and assigned chest numbers natively in the system.',
       image: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=800&q=80',
       bgColor: 'bg-[#23B5D3]',
       textColor: 'text-black',
@@ -36,9 +36,9 @@ export const AdminFeatureShowcase: React.FC = () => {
       label: 'Cloud-Synced Speed',
       title: 'Real-Time Sync.',
       sub1Title: 'INSTANT UPDATES',
-      sub1Text: 'The moment a judge submits a score on their iPad, it reflects on the convenor dashboard and public tracker instantly.',
+      sub1Text: 'The moment a judge submits a score on their tablet, it reflects on the convenor dashboard and public tracker instantly.',
       sub2Title: 'OFFLINE RESILIENCY',
-      sub2Text: 'If the network drops, scores are cached locally on the iPad and automatically synced the millisecond connection is restored.',
+      sub2Text: 'If the network drops, scores are cached locally on the device and automatically synced the millisecond connection is restored.',
       image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80',
       bgColor: 'bg-[#FFD166]',
       textColor: 'text-black',
@@ -54,11 +54,11 @@ export const AdminFeatureShowcase: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-16" data-aos="fade-up">
           <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-[#06D6A0] text-black text-[13px] font-black tracking-widest uppercase border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <Zap size={16} strokeWidth={3} /> Admin Control
+            <Zap size={16} strokeWidth={3} /> Built For Admins
           </div>
           <h2 className="text-[48px] md:text-[64px] font-black tracking-tight text-black leading-[1.05]">
-            Total operations are <br/>
-            <span className="text-[#4f46e5]">faster than they should be.</span>
+            Fest operations made <br/>
+            <span className="text-[#4f46e5]">incredibly smooth.</span>
           </h2>
         </div>
 

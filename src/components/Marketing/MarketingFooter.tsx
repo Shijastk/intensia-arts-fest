@@ -14,10 +14,10 @@ export const MarketingFooter: React.FC = () => {
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-8">
         <div className="flex flex-col items-center md:items-start">
           <div className="text-[32px] font-black tracking-tight text-black mb-2 uppercase">
-            Intensia.
+            Artflow.
           </div>
           <div className="text-[14px] text-black/60 font-bold uppercase tracking-widest">
-            Copyright © {new Date().getFullYear()} Intensia. All rights reserved.
+            Copyright © {new Date().getFullYear()} Festloom. All rights reserved.
           </div>
         </div>
         

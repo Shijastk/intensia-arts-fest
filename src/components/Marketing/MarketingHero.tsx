@@ -31,21 +31,21 @@ export const MarketingHero: React.FC = () => {
         {/* Pill Badge */}
         <div data-aos="fade-down" className="inline-flex items-center gap-3 mb-8 px-6 py-2.5 rounded-full border-[3px] border-black bg-[#FFD166] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <span className="w-3 h-3 rounded-full bg-black animate-pulse"></span>
-          <span className="text-[14px] font-black tracking-widest uppercase text-black">Introducing Intensia 2.0</span>
+          <span className="text-[14px] font-black tracking-widest uppercase text-black">Introducing Artflow 2.0</span>
         </div>
 
         {/* Tightly Kerned Headline */}
-        <h1 data-aos="fade-up" className="text-[64px] md:text-[88px] lg:text-[110px] font-black tracking-tight leading-[1.05] text-black mb-8 relative">
-          Manage your fest. <br />
+        <h1 data-aos="fade-up" className="text-[56px] md:text-[76px] lg:text-[96px] font-black tracking-tight leading-[1.05] text-black mb-8 relative">
+          The Ultimate <br />
           <span className="relative inline-block mt-2">
-            <span className="relative z-10 text-black">Without the chaos.</span>
+            <span className="relative z-10 text-black">College Arts Fest App.</span>
             <span className="absolute bottom-2 left-0 w-full h-8 bg-[#23B5D3] -rotate-2 -z-0 rounded-lg border-[3px] border-black"></span>
           </span>
         </h1>
         
         {/* Description */}
-        <p data-aos="fade-up" data-aos-delay="100" className="text-[20px] md:text-[24px] text-black mb-12 max-w-[750px] mx-auto font-bold tracking-tight leading-relaxed bg-white/40 p-4 rounded-xl border-2 border-black/5 backdrop-blur-sm">
-          The all-in-one platform to automate registrations, anonymous scoring, and live leaderboards. Drop the spreadsheets forever.
+        <p data-aos="fade-up" data-aos-delay="100" className="text-[20px] md:text-[24px] text-black mb-12 max-w-[850px] mx-auto font-bold tracking-tight leading-relaxed bg-white/40 p-4 rounded-xl border-2 border-black/5 backdrop-blur-sm">
+          A complete digital ecosystem built for Indian campuses. Manage off-stage and on-stage programmes, automate zone registrations, enforce unbiased judging via Green Room codes, and publish live leaderboards. No more messy spreadsheets.
         </p>
 
         {/* CTAs */}
@@ -98,7 +98,7 @@ export const MarketingHero: React.FC = () => {
                 <div className="w-4 h-4 rounded-full bg-[#FFD166] border-2 border-black hover:bg-[#FFD166]/80 cursor-pointer"></div>
                 <div className="w-4 h-4 rounded-full bg-[#06D6A0] border-2 border-black hover:bg-[#06D6A0]/80 cursor-pointer"></div>
               </div>
-              <div className="mx-auto text-sm font-black text-black uppercase tracking-widest hidden sm:block">Intensia Dashboard</div>
+              <div className="mx-auto text-sm font-black text-black uppercase tracking-widest hidden sm:block">Artflow Dashboard</div>
               <div className="w-16 hidden sm:block"></div>
             </div>
             {/* Dashboard Image */}

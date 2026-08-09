@@ -22,7 +22,7 @@ export const MarketingNav: React.FC = () => {
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={(e) => smoothScroll(e as any, 'hero')}>
             <span className="text-[24px] font-black tracking-tight text-black">
-              Intensia.
+              Artflow.
             </span>
           </div>
 
