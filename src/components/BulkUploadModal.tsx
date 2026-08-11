@@ -175,6 +175,36 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
 
         {/* Body */}
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
+          
+          {/* AI Helper Banner */}
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100/50 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div className="absolute -top-4 -right-4 p-4 opacity-10 pointer-events-none transform rotate-12">
+              <UploadCloud className="w-24 h-24 text-indigo-600" />
+            </div>
+            <div className="flex gap-3 relative z-10">
+              <div className="shrink-0 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center border border-indigo-100">
+                <span className="text-indigo-600 font-black text-sm">✨</span>
+              </div>
+              <div>
+                <h4 className="text-[13px] font-black text-slate-800 uppercase tracking-tight mb-1">No CSV? Use AI!</h4>
+                <p className="text-[11px] text-slate-600 font-medium leading-relaxed max-w-md">
+                  Take a photo of your hand-written or printed list, copy our prompt, and paste both into Gemini or ChatGPT to get a ready-to-upload CSV file.
+                </p>
+                <button
+                  onClick={() => {
+                    const prompt = "Please convert the attached photo of the programs list into a CSV format with the following exact columns: name, category, zone, duration, isGroup, participantsCount, groupCount, membersPerGroup, description. Follow these rules: duration should be a number in minutes. isGroup should be true or false. Return ONLY the raw CSV text, no markdown formatting.";
+                    navigator.clipboard.writeText(prompt);
+                    alert("AI Prompt copied to clipboard! Paste it into Gemini or ChatGPT.");
+                  }}
+                  className="mt-3 px-3 py-1.5 bg-white text-indigo-600 border border-indigo-200 hover:border-indigo-400 hover:text-indigo-700 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm transition-all flex items-center gap-1.5 w-fit"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                  Copy Prompt
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 rounded-lg border-2 border-dashed transition-colors
             ${isDragging ? 'border-indigo-400 bg-indigo-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}
           >
