@@ -33,6 +33,7 @@ export const MarketingNav: React.FC = () => {
             <a href="#hero" onClick={(e) => smoothScroll(e, 'hero')} className="text-[16px] text-black font-black hover:text-[#FF3366] transition-colors tracking-wide uppercase">Overview</a>
             <a href="#features" onClick={(e) => smoothScroll(e, 'features')} className="text-[16px] text-black font-black hover:text-[#FF3366] transition-colors tracking-wide uppercase">Features</a>
             <a href="#admin" onClick={(e) => smoothScroll(e, 'admin')} className="text-[16px] text-black font-black hover:text-[#FF3366] transition-colors tracking-wide uppercase">Admin</a>
+            <a href="#ai-prompt" onClick={(e) => smoothScroll(e, 'ai-prompt')} className="text-[16px] text-black font-black hover:text-[#FF3366] transition-colors tracking-wide uppercase">Prompt</a>
             
             <button 
               onClick={() => navigate('/login')}
@@ -58,6 +59,7 @@ export const MarketingNav: React.FC = () => {
             <a href="#hero" onClick={(e) => smoothScroll(e, 'hero')} className="block text-black font-black text-4xl border-b-[3px] border-black pb-4 uppercase tracking-wider">Overview</a>
             <a href="#features" onClick={(e) => smoothScroll(e, 'features')} className="block text-black font-black text-4xl border-b-[3px] border-black pb-4 uppercase tracking-wider">Features</a>
             <a href="#admin" onClick={(e) => smoothScroll(e, 'admin')} className="block text-black font-black text-4xl border-b-[3px] border-black pb-4 uppercase tracking-wider">Admin</a>
+            <a href="#ai-prompt" onClick={(e) => smoothScroll(e, 'ai-prompt')} className="block text-black font-black text-4xl border-b-[3px] border-black pb-4 uppercase tracking-wider">Prompt</a>
             <button 
               onClick={() => navigate('/login')}
               className="mt-8 w-full text-center bg-[#06D6A0] text-black px-6 py-5 rounded-2xl font-black text-2xl border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] uppercase tracking-widest"

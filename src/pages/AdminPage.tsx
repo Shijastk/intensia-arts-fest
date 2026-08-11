@@ -126,7 +126,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     }
     
     if (success) {
-      setShowProgramModal(false);
+      (e.target as HTMLFormElement).reset();
       setEditingProgram(null);
       setIsGroup(false);
     } else {
@@ -140,6 +140,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     } else {
       await addStaff(staffData);
     }
+    setEditingStaff(null);
   };
 
   const confirmDeleteStaff = (id: string, username: string) => {

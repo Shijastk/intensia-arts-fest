@@ -192,7 +192,6 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
 
     await Promise.all(updatePromises);
 
-    setShowAddModal(false);
     setParticipantName('');
     setChestNo('');
     setSelectedProgramIds([]);
@@ -373,8 +372,8 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
 
       {/* MULTI-SELECT ADD MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowAddModal(false)}>
+          <div className="bg-white rounded-xl w-full max-w-md p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4 shrink-0">
               <h3 className="text-sm font-black uppercase text-slate-900">Add Candidate</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>

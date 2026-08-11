@@ -60,7 +60,11 @@ export const StaffCredentialModal: React.FC<StaffCredentialModalProps> = ({
 
     await onSave(staffData, editingStaff?.id);
     setIsSubmitting(false);
-    onClose();
+    if (!editingStaff) {
+      setUsername('');
+      setPassword('');
+      setSpecificName('');
+    }
   };
 
   const generateCredentials = () => {
@@ -72,8 +76,8 @@ export const StaffCredentialModal: React.FC<StaffCredentialModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">
             {editingStaff ? 'Edit Staff Account' : 'Create Staff Account'}

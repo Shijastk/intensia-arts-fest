@@ -8,6 +8,7 @@ import { MarketingHero } from '../components/Marketing/MarketingHero';
 import { MarketingSplitFeatures } from '../components/Marketing/MarketingSplitFeatures';
 import { MarketingBentoGrid } from '../components/Marketing/MarketingBentoGrid';
 import { AdminFeatureShowcase } from '../components/Marketing/AdminFeatureShowcase';
+import { AIUploadPrompt } from '../components/Marketing/AIUploadPrompt';
 import { MarketingFooter } from '../components/Marketing/MarketingFooter';
 
 export const MarketingPage: React.FC = () => {
@@ -50,6 +51,7 @@ export const MarketingPage: React.FC = () => {
       <MarketingSplitFeatures />
       <MarketingBentoGrid />
       <AdminFeatureShowcase />
+      <AIUploadPrompt />
       <MarketingFooter />
     </div>
   );

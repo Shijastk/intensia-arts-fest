@@ -83,8 +83,8 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) =>
 
       {/* Standard Modal instead of old Purple Card Design */}
       {selectedParticipant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedParticipant(null)}>
+          <div className="bg-white rounded-xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">Performer Info</h3>
