@@ -277,7 +277,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     { role: 'ADMIN', username: 'admin', password: 'admin123' },
                     { role: 'GREEN_ROOM', username: 'greenroom', password: 'greenroom123' },
                     { role: 'JUDGE', username: 'judge1', password: 'judge123', judgePanel: 'Stage 1' },
-                    { role: 'JUDGE', username: 'judge2', password: 'judge123', judgePanel: 'Stage 2' }
+                    { role: 'JUDGE', username: 'judge2', password: 'judge123', judgePanel: 'Stage 2' },
+                    { role: 'TEAM_LEADER', username: 'teamA', password: 'team123', teamName: 'Team A' },
+                    { role: 'TEAM_LEADER', username: 'teamB', password: 'team123', teamName: 'Team B' }
                   ];
                   for (const d of defaults) {
                     await addStaff(d);
