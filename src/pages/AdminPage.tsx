@@ -281,10 +281,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     { role: 'TEAM_LEADER', username: 'teamA', password: 'team123', teamName: 'Team A' },
                     { role: 'TEAM_LEADER', username: 'teamB', password: 'team123', teamName: 'Team B' }
                   ];
+                  let addedCount = 0;
                   for (const d of defaults) {
-                    await addStaff(d);
+                    if (!staffs?.find(s => s.username === d.username)) {
+                      await addStaff(d);
+                      addedCount++;
+                    }
                   }
-                  alert("Default credentials seeded!");
+                  if (addedCount > 0) {
+                    alert(`Successfully seeded ${addedCount} new default credentials!`);
+                  } else {
+                    alert("All default credentials already exist.");
+                  }
                 }} className="px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg text-xs font-bold shadow-sm transition-all">Seed Defaults</button>
                 <button onClick={() => { setEditingStaff(null); setShowStaffModal(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold shadow-sm transition-all">+ Add Staff</button>
               </div>
