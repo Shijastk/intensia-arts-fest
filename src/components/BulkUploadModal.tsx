@@ -161,7 +161,7 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
 
       const collegeParticipantCounter = new Map<string, number>();
 
-      for (const [pNameLower, students] of Object.entries(groupedByProgram)) {
+      for (const [pNameLower, students] of Object.entries(groupedByProgram) as [string, any[]][]) {
         const matchingProgram = programs.find(p => p.name.toLowerCase().trim() === pNameLower);
         if (!matchingProgram) {
           console.warn(`Program not found for name: ${students[0].programName}`);
@@ -170,7 +170,7 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
 
         const updatedTeams = JSON.parse(JSON.stringify(matchingProgram.teams || []));
 
-        students.forEach(student => {
+        students.forEach((student: any) => {
           const cNameLower = student.collegeName.toLowerCase().trim();
           let team = updatedTeams.find((t: any) => t.teamName.toLowerCase().trim() === cNameLower);
           if (!team) {
