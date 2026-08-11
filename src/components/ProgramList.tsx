@@ -235,8 +235,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
                 <div className="hidden lg:flex items-center justify-between px-6 py-4 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 gap-4">
                     <div className="flex-1 pl-12">Event</div>
                     <div className="w-[100px] text-center">Category</div>
-                    <div className="w-[100px] text-center">Status</div>
-                    <div className="w-[340px] text-right pr-2">Actions</div>
+                    <div className="w-[450px] text-right pr-2">Actions</div>
                 </div>
 
                 <div className="space-y-3">

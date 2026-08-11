@@ -28,6 +28,8 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
 }) => {
 
   const [isOpen, setIsOpen] = useState(false);
+  const hasPerformers = (program.teams?.reduce((acc, team) => acc + (team.participants?.length || 0), 0) || 0) > 0;
+  const isUpcoming = program.startTime ? new Date(program.startTime).getTime() > Date.now() - 4 * 60 * 60 * 1000 : false;
 
   // Custom alert / confirmation modal state
   const [modalConfig, setModalConfig] = useState<{
@@ -247,6 +249,12 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                     {program.judgePanel}
                   </span>
                 )}
+                {program.venue && (
+                  <span className={`text-[10px] font-bold truncate flex items-center gap-1 ${isUpcoming ? 'text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100' : 'text-slate-500'}`}>
+                    <span>📍 {program.venue}</span>
+                    {program.startTime && <span>• 🕒 {new Date(program.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -262,7 +270,16 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           </span>
                         )}
                     </div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">#{program.id.substring(0,8)}</span>
+                    <span className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${program.venue && isUpcoming ? 'text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 w-fit flex items-center gap-1' : 'text-slate-400'}`}>
+                      {program.venue ? (
+                        <>
+                          <span>📍 {program.venue}</span>
+                          {program.startTime && <span>• 🕒 {new Date(program.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
+                        </>
+                      ) : (
+                        `#${program.id.substring(0,8)}`
+                      )}
+                    </span>
                  </div>
                  
                  <div className="w-[100px] flex justify-center flex-shrink-0">
@@ -271,41 +288,39 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                     </span>
                  </div>
                  
-                 <div className="w-[100px] flex justify-center flex-shrink-0">
-                    <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest ${getStatusColor(program.status)}`}>
-                        {program.status}
-                    </span>
-                 </div>
+
             </div>
           </button>
           
           <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 flex-shrink-0 whitespace-nowrap">
             {/* Blue Button: Send to GR / Recall (GR) with Custom Confirm */}
-            <button
-              onClick={() => {
-                if (program.isPublished) {
-                  showConfirm(
-                    'Recall from GR',
-                    `Are you sure you want to recall "${program.name}" from the Judges Panel / GR?`,
-                    () => onPublish(program.id),
-                    'warning',
-                    'Recall'
-                  );
-                } else {
-                  onPublish(program.id);
-                }
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                program.isPublished
-                  ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
-                  : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-              {program.isPublished ? 'Recall (GR)' : 'Send to GR'}
-            </button>
+            {hasPerformers && (
+              <button
+                onClick={() => {
+                  if (program.isPublished) {
+                    showConfirm(
+                      'Recall from GR',
+                      `Are you sure you want to recall "${program.name}" from the Judges Panel / GR?`,
+                      () => onPublish(program.id),
+                      'warning',
+                      'Recall'
+                    );
+                  } else {
+                    onPublish(program.id);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
+                  program.isPublished
+                    ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
+                    : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                {program.isPublished ? 'Recall (GR)' : 'Send to GR'}
+              </button>
+            )}
             
             {program.status === ProgramStatus.COMPLETED && (
               <>
@@ -362,9 +377,9 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
               <button 
                 onClick={() => onEdit(program)} 
                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors" 
-                title="Schedule / Edit"
+                title="Edit Program"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               </button>
               
               {/* Red Action: Delete Program */}

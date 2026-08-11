@@ -197,7 +197,31 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
           totalUploaded++;
         });
 
-        await updateProgram(matchingProgram.id, { teams: updatedTeams });
+        // Auto-expand limits if bulk uploaded data exceeds them
+        let newParticipantsCount = matchingProgram.participantsCount || 0;
+        let newGroupCount = matchingProgram.groupCount || 0;
+        let newMembersPerGroup = matchingProgram.membersPerGroup || 0;
+
+        if (!matchingProgram.isGroup && newParticipantsCount < updatedTeams.length) {
+            newParticipantsCount = updatedTeams.length;
+        }
+        if (matchingProgram.isGroup) {
+            if (newGroupCount < updatedTeams.length) {
+                newGroupCount = updatedTeams.length;
+            }
+            const maxMembers = Math.max(...updatedTeams.map((t: any) => t.participants.length));
+            if (newMembersPerGroup < maxMembers) {
+                newMembersPerGroup = maxMembers;
+                newParticipantsCount = maxMembers;
+            }
+        }
+
+        await updateProgram(matchingProgram.id, { 
+          teams: updatedTeams,
+          participantsCount: newParticipantsCount,
+          groupCount: newGroupCount,
+          membersPerGroup: newMembersPerGroup
+        });
       }
 
       setSuccessCount(totalUploaded);
@@ -285,9 +309,9 @@ CSV Schema (Columns):
 3. zone (Optional: string) - Zone if mentioned; leave blank if not.
 4. duration (Optional: number) - Duration in minutes. Default to 30.
 5. isGroup (Required: boolean) - Must be 'true' or 'false'.
-6. participantsCount (Optional: number) - Total count if mentioned.
-7. groupCount (Optional: number) - Required if isGroup is true; leave blank otherwise.
-8. membersPerGroup (Optional: number) - Required if isGroup is true; leave blank otherwise.
+6. participantsCount (Required: number) - Maximum participants allowed. If not mentioned, default to 1 for individuals, 15 for groups.
+7. groupCount (Optional: number) - Required if isGroup is true. Default to 10 if not mentioned.
+8. membersPerGroup (Optional: number) - Required if isGroup is true (same as participantsCount). Default to 15 if not mentioned.
 9. description (Optional: string) - Short description ("[Category] - [Name]").
 
 Rules:

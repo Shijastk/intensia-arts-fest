@@ -664,6 +664,16 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
                       />
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-700 uppercase mb-1">Duration (minutes)</label>
+                      <input 
+                        type="number" 
+                        id="timeEditDuration"
+                        defaultValue={timeEditProgram.duration || 30}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                        min="1"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
@@ -677,11 +687,19 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                     onClick={async () => {
                       const startInput = (document.getElementById('timeEditStart') as HTMLInputElement).value;
                       const endInput = (document.getElementById('timeEditEnd') as HTMLInputElement).value;
+                      const durationInput = (document.getElementById('timeEditDuration') as HTMLInputElement).value;
                       
+                      const updates: Partial<Program> = {};
                       if (startInput && endInput) {
-                        const newStart = new Date(startInput).toISOString();
-                        const newEnd = new Date(endInput).toISOString();
-                        await updateProgram(timeEditProgram.id, { startTime: newStart, endTime: newEnd });
+                        updates.startTime = new Date(startInput).toISOString();
+                        updates.endTime = new Date(endInput).toISOString();
+                      }
+                      if (durationInput) {
+                        updates.duration = parseInt(durationInput, 10);
+                      }
+                      
+                      if (Object.keys(updates).length > 0) {
+                        await updateProgram(timeEditProgram.id, updates);
                       }
                       setTimeEditProgram(null);
                     }}

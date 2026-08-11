@@ -24,7 +24,10 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) =>
           }
           map.get(pt.chestNumber).programs.push({
             name: p.name,
-            points: pt.points || 0
+            points: pt.points || 0,
+            venue: p.venue,
+            startTime: p.startTime,
+            status: p.status
           });
         });
       });
@@ -107,11 +110,20 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) =>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Participating Events ({selectedParticipant.programs.length})</p>
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {selectedParticipant.programs.map((prog: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                    <span className="text-xs font-bold text-slate-700 uppercase truncate">{prog.name}</span>
-                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                      {prog.points > 0 ? `${prog.points} Pts` : 'Pending'}
-                    </span>
+                  <div key={i} className="flex flex-col p-3 bg-slate-50 border border-slate-100 rounded-lg gap-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-xs font-bold text-slate-700 uppercase truncate">{prog.name}</span>
+                      <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 shrink-0 ml-2">
+                        {prog.points > 0 ? `${prog.points} Pts` : prog.status}
+                      </span>
+                    </div>
+                    {(prog.venue || prog.startTime) && (
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+                        {prog.venue && <span>📍 {prog.venue}</span>}
+                        {prog.venue && prog.startTime && <span>•</span>}
+                        {prog.startTime && <span>🕒 {new Date(prog.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

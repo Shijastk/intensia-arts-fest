@@ -15,9 +15,9 @@ CSV Schema (Columns):
 3. zone (Optional: string) - Zone if mentioned; leave blank if not.
 4. duration (Optional: number) - Duration in minutes. Default to 30.
 5. isGroup (Required: boolean) - Must be 'true' or 'false'.
-6. participantsCount (Optional: number) - Total count if mentioned.
-7. groupCount (Optional: number) - Required if isGroup is true; leave blank otherwise.
-8. membersPerGroup (Optional: number) - Required if isGroup is true; leave blank otherwise.
+6. participantsCount (Required: number) - Maximum participants allowed. If not mentioned, default to 1 for individuals, 15 for groups.
+7. groupCount (Optional: number) - Required if isGroup is true. Default to 10 if not mentioned.
+8. membersPerGroup (Optional: number) - Required if isGroup is true (same as participantsCount). Default to 15 if not mentioned.
 9. description (Optional: string) - Short description ("[Category] - [Name]").
 
 Rules:
