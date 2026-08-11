@@ -47,12 +47,12 @@ const normalizeTeamName = (teamName: string) => teamName.trim().toUpperCase();
 
 const roundScore = (score: number) => Number(score.toFixed(1));
 
-const getCategoryZone = (category: string): string | null => {
+const getCategoryZone = (category: string): string => {
   const match = (category || '').match(/^([A-Z])\s+zone/i);
-  return match?.[1]?.toUpperCase() ?? null;
+  return match?.[1]?.toUpperCase() ?? 'General';
 };
 
-const getProgramZone = (program: Program): string | null => getCategoryZone(program.category);
+const getProgramZone = (program: Program): string => getCategoryZone(program.category);
 
 const getAllZones = (programs: Program[]): string[] => {
   const zones = new Set<string>();
@@ -117,9 +117,11 @@ const calculateZoneScores = (programs: Program[], targetZone: string, teamNames:
   );
 };
 
-const isOffStageCategory = (category: string) => {
-  const lowerCategory = category.toLowerCase();
-  return lowerCategory.includes('no stage') || lowerCategory.includes('non stage') || lowerCategory.includes('off stage');
+const isOffStageCategory = (program: Program) => {
+  if (program.isOffStage !== undefined) return program.isOffStage;
+  // Fallback for older programs
+  const lowerCategory = (program.category || '').toLowerCase();
+  return lowerCategory.includes('no stage') || lowerCategory.includes('non stage') || lowerCategory.includes('off stage') || lowerCategory.includes('off-stage');
 };
 
 const aggregateIndividualScores = (
@@ -135,11 +137,10 @@ const aggregateIndividualScores = (
       program.isResultPublished &&
       !program.isGroup &&
       categoryFilter(program.category) &&
-      (!nonStageOnly || isOffStageCategory(program.category))
+      (!nonStageOnly || isOffStageCategory(program))
     )
     .forEach(program => {
       (program.teams || []).forEach(team => {
-        const teamName = normalizeTeamName(team.teamName || '');
         (team.participants || []).forEach(participant => {
           const points = participant.points || 0;
           if (points <= 0 || !participant.chestNumber) return;

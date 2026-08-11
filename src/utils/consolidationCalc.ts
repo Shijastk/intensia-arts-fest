@@ -59,19 +59,18 @@ export const calculateConsolidatedResults = (programs: Program[]) => {
         const pts = p.points || 0;
         const rank = p.rank || team.rank || 0;
 
-        cand.totalPoints += pts;
-
         // Add Individual points to Team Overall Score & Prathibha calculations
         if (!isGrp) {
+          cand.totalPoints += pts;
           teamScores[tName] += pts;
           cand.individualPoints += pts;
           if (isOff) cand.offStagePoints += pts;
-        }
 
-        // Count achievements
-        if (rank === 1) cand.firsts += 1;
-        else if (rank === 2) cand.seconds += 1;
-        else if (rank === 3) cand.thirds += 1;
+          // Count achievements
+          if (rank === 1) cand.firsts += 1;
+          else if (rank === 2) cand.seconds += 1;
+          else if (rank === 3) cand.thirds += 1;
+        }
       });
     });
   });

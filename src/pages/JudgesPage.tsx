@@ -117,61 +117,133 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
         const confirm = window.confirm('Are you sure you want to submit these scores? This will mark the program as completed.');
         if (!confirm) return;
 
-        const allParticipantsRaw = selectedProgram.teams.reduce((acc: any[], team) => acc.concat(
-            team.participants.map(p => {
-                const scoreData = scores[p.chestNumber];
-                const score = parseFloat(scoreData?.score || '0');
-                const grade = scoreData?.grade || '';
-                return {
-                    chestNumber: p.chestNumber,
-                    teamId: team.id,
-                    score,
-                    grade,
-                    points: 0,
-                    rank: 0
-                };
-            })
-        ), []);
+        let entitiesToRank: any[] = [];
 
-        allParticipantsRaw.sort((a, b) => b.score - a.score);
+        if (selectedProgram.isGroup) {
+            // Rank teams/sub-teams based on their representative's score
+            selectedProgram.teams.forEach(team => {
+                const limit = (selectedProgram.membersPerGroup && selectedProgram.membersPerGroup > 0) ? selectedProgram.membersPerGroup : 999;
+                const pList = team.participants;
+                for (let i = 0; i < pList.length; i += limit) {
+                    const chunk = pList.slice(i, i + limit);
+                    if (chunk.length === 0) continue;
+                    const rep = chunk[0];
+                    const scoreData = scores[rep.chestNumber];
+                    const score = parseFloat(scoreData?.score || '0');
+                    const grade = scoreData?.grade || '';
+                    entitiesToRank.push({
+                        isGroup: true,
+                        teamId: team.id,
+                        chunkParticipants: chunk,
+                        score,
+                        grade,
+                        points: 0,
+                        rank: 0
+                    });
+                }
+            });
+        } else {
+            // Rank individuals
+            selectedProgram.teams.forEach(team => {
+                team.participants.forEach(p => {
+                    const scoreData = scores[p.chestNumber];
+                    const score = parseFloat(scoreData?.score || '0');
+                    const grade = scoreData?.grade || '';
+                    entitiesToRank.push({
+                        isGroup: false,
+                        teamId: team.id,
+                        participant: p,
+                        score,
+                        grade,
+                        points: 0,
+                        rank: 0
+                    });
+                });
+            });
+        }
 
+        // Sort by score descending
+        entitiesToRank.sort((a, b) => b.score - a.score);
+
+        // Assign ranks and calculate points
         let currentRank = 1;
-        for (let i = 0; i < allParticipantsRaw.length; i++) {
-            if (i > 0 && allParticipantsRaw[i].score < allParticipantsRaw[i - 1].score) {
+        for (let i = 0; i < entitiesToRank.length; i++) {
+            if (i > 0 && entitiesToRank[i].score < entitiesToRank[i - 1].score) {
                 currentRank = i + 1;
             }
-            allParticipantsRaw[i].rank = currentRank;
+            entitiesToRank[i].rank = currentRank;
             const customConfig = settings?.customScores?.[selectedProgram.id];
-            allParticipantsRaw[i].points = calculatePoints(
-                allParticipantsRaw[i].score, 
-                allParticipantsRaw[i].grade, 
+            entitiesToRank[i].points = calculatePoints(
+                entitiesToRank[i].score, 
+                entitiesToRank[i].grade, 
                 selectedProgram.isGroup, 
                 currentRank,
                 customConfig
             );
         }
 
+        // Map back to teams structure
         const updatedTeams = selectedProgram.teams.map(team => {
-            const updatedParticipants = team.participants.map(participant => {
-                const calculatedData = allParticipantsRaw.find(p => p.chestNumber === participant.chestNumber);
-                return {
-                    ...participant,
-                    score: calculatedData?.score || 0,
-                    grade: calculatedData?.grade || '',
-                    points: calculatedData?.points || 0,
-                    rank: calculatedData?.rank || 0
-                };
+            let teamPoints = 0;
+            let teamScore = 0;
+            let teamGrade = '';
+            let teamRank = 999;
+
+            const updatedParticipants = team.participants.map(p => {
+                if (selectedProgram.isGroup) {
+                    const entity = entitiesToRank.find(e => e.teamId === team.id && e.chunkParticipants.some((cp: any) => cp.chestNumber === p.chestNumber));
+                    if (entity) {
+                        return {
+                            ...p,
+                            score: entity.score,
+                            grade: entity.grade,
+                            points: entity.points,
+                            rank: entity.rank
+                        };
+                    }
+                } else {
+                    const entity = entitiesToRank.find(e => e.teamId === team.id && e.participant.chestNumber === p.chestNumber);
+                    if (entity) {
+                        return {
+                            ...p,
+                            score: entity.score,
+                            grade: entity.grade,
+                            points: entity.points,
+                            rank: entity.rank
+                        };
+                    }
+                }
+                return p;
             });
 
-            const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0]);
+            // Calculate team-level summary
+            if (selectedProgram.isGroup) {
+                 // For group, team score/grade/rank comes from the best performing sub-team
+                 const subTeamsForThisTeam = entitiesToRank.filter(e => e.teamId === team.id);
+                 if (subTeamsForThisTeam.length > 0) {
+                     const bestSubTeam = subTeamsForThisTeam[0]; // already sorted by score
+                     teamScore = bestSubTeam.score;
+                     teamGrade = bestSubTeam.grade;
+                     teamRank = bestSubTeam.rank;
+                     teamPoints = bestSubTeam.points;
+                 }
+            } else {
+                 const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0]);
+                 if (bestParticipant) {
+                     teamScore = bestParticipant.score || 0;
+                     teamGrade = bestParticipant.grade || '';
+                     teamRank = bestParticipant.rank || 999;
+                 }
+                 teamPoints = updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0);
+            }
 
             return {
                 ...team,
                 participants: updatedParticipants,
-                score: bestParticipant.score,
-                grade: bestParticipant.grade,
-                rank: bestParticipant.rank,
-                points: selectedProgram.isGroup ? (updatedParticipants[0]?.points || 0) : updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0)
+                score: teamScore,
+                grade: teamGrade,
+                rank: teamRank,
+                points: teamPoints
             };
         });
 

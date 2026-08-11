@@ -53,29 +53,47 @@ export const ProgramFormModal: React.FC<ProgramFormModalProps> = ({
               <input type="text" name="name" defaultValue={editingProgram?.name} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="e.g. Oppana, Duffmuttu" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Category</label>
-                <select name="category" defaultValue={editingProgram?.category || ''} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
-                  <option value="" disabled>Select Category</option>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Zone <span className="text-slate-400 normal-case font-medium">(optional)</span></label>
-                <select name="zone" defaultValue={editingProgram?.zone || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
-                  <option value="">— No Zone —</option>
-                  {zones.map(z => <option key={z} value={z}>{z}</option>)}
-                </select>
-              </div>
+            {zones.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Category</label>
+                    <select name="category" defaultValue={editingProgram?.category || ''} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
+                      <option value="" disabled>Select Category</option>
+                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Zone <span className="text-slate-400 normal-case font-medium">(optional)</span></label>
+                    <select name="zone" defaultValue={editingProgram?.zone || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
+                      <option value="">— No Zone —</option>
+                      {zones.map(z => <option key={z} value={z}>{z}</option>)}
+                    </select>
+                  </div>
+                </div>
 
-            </div>
-
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
-              <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Duration (in minutes)</label>
-              <input type="number" name="duration" min="5" defaultValue={editingProgram?.duration || 30} required className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="e.g. 30" />
-              <p className="text-[10px] text-slate-500 mt-1 font-medium">Time and venue will be assigned later in the Schedule Manager.</p>
-            </div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Duration (in minutes)</label>
+                  <input type="number" name="duration" min="5" defaultValue={editingProgram?.duration || 30} required className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="e.g. 30" />
+                  <p className="text-[10px] text-slate-500 mt-1 font-medium">Time and venue will be assigned later in the Schedule Manager.</p>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Category</label>
+                  <select name="category" defaultValue={editingProgram?.category || ''} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
+                    <option value="" disabled>Select Category</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Duration (in minutes)</label>
+                  <input type="number" name="duration" min="5" defaultValue={editingProgram?.duration || 30} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="e.g. 30" />
+                  <p className="text-[9px] text-slate-500 mt-1 font-medium leading-tight">Time and venue will be assigned later in the Schedule Manager.</p>
+                </div>
+              </div>
+            )}
 
             <div className="border-t border-slate-100 pt-4 mt-2">
               <label className="flex items-center gap-2 cursor-pointer mb-4">

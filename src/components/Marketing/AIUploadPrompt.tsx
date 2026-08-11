@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Copy, CheckCircle2, Sparkles, FileText, ArrowRight } from 'lucide-react';
+import { Toast } from '../ui/Toast';
 
 export const AIUploadPrompt: React.FC = () => {
   const [copied, setCopied] = useState(false);
@@ -92,21 +93,13 @@ Rules:
       </div>
 
       {/* Snackbar Notification */}
-      <div 
-        className={`fixed bottom-8 right-8 z-[100] transition-all duration-500 transform ${
-          copied ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0 pointer-events-none'
-        }`}
-      >
-        <div className="bg-slate-900 border border-slate-700 shadow-2xl text-white px-6 py-4 rounded-xl flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-          </div>
-          <div>
-            <h4 className="font-bold text-sm">Prompt Copied!</h4>
-            <p className="text-xs text-slate-400 mt-0.5">Paste it into ChatGPT or Gemini to convert your files.</p>
-          </div>
-        </div>
-      </div>
+      {copied && (
+        <Toast 
+          message="Prompt Copied! Paste it into ChatGPT or Gemini to convert your files."
+          type="success"
+          onClose={() => setCopied(false)}
+        />
+      )}
     </section>
   );
 };

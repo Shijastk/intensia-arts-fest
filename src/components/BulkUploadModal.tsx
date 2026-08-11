@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Program, ProgramStatus } from '../types';
 import Papa from 'papaparse';
 import { UploadCloud, CheckCircle2, Users, Calendar } from 'lucide-react';
+import { Toast } from './ui/Toast';
 
 interface BulkUploadModalProps {
   show: boolean;
@@ -20,6 +21,7 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [successCount, setSuccessCount] = useState(0);
+  const [toastMsg, setToastMsg] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processProgramsFile = (results: Papa.ParseResult<any>) => {
@@ -380,7 +382,7 @@ Rules:
                   onClick={() => {
                     const promptToCopy = activeTab === 'programs' ? programsPrompt : studentsPrompt;
                     navigator.clipboard.writeText(promptToCopy);
-                    alert("AI Prompt copied to clipboard! Paste it into Gemini or ChatGPT.");
+                    setToastMsg({message: "AI Prompt copied to clipboard! Paste it into Gemini or ChatGPT.", type: "success"});
                   }}
                   className={`mt-3 px-3 py-1.5 bg-white border rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm transition-all flex items-center gap-1.5 w-fit
                     ${activeTab === 'programs' ? 'text-indigo-600 border-indigo-200 hover:border-indigo-400 hover:text-indigo-700' : 'text-emerald-600 border-emerald-200 hover:border-emerald-400 hover:text-emerald-700'}`}
@@ -513,6 +515,14 @@ Rules:
         </div>
 
       </div>
+      
+      {toastMsg && (
+        <Toast
+          message={toastMsg.message}
+          type={toastMsg.type}
+          onClose={() => setToastMsg(null)}
+        />
+      )}
     </div>
   );
 };

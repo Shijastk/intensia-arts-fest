@@ -5,13 +5,8 @@ export const CATEGORIES = [
   "Junior (Off-Stage)",
   "Senior (Stage)", 
   "Senior (Off-Stage)",
-  "General (Stage)", 
+  "General (Stage)",
   "General (Off-Stage)"
 ];
 
-export const ZONES = [
-  "Zone A", 
-  "Zone B", 
-  "Zone C", 
-  "General"
-];
+export const ZONES: string[] = [];

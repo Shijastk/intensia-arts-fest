@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Settings, Program, CustomProgramScore } from '../types';
+import { Toast } from '../components/ui/Toast';
 import {
   getDefaultCustomScore,
   AVAILABLE_GRADES,
@@ -40,13 +41,7 @@ const emptyCustomForm = (isGroup: boolean) => {
   };
 };
 
-// ── Small reusable tag chip ──────────────────────────────────────────────────
-const Chip: React.FC<{ label: string; onRemove: () => void }> = ({ label, onRemove }) => (
-  <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg">
-    <span className="text-xs font-bold text-slate-700">{label}</span>
-    <button onClick={onRemove} className="text-slate-400 hover:text-rose-500 transition-colors leading-none">✕</button>
-  </div>
-);
+// Replaced Chip with full div for categories to support reordering
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSettings, programs = [] }) => {
   // ── General settings ──────────────────────────────────────────────────────
@@ -61,6 +56,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
   const [showOverallPoints, setShowOverallPoints] = useState<boolean>(settings?.showOverallLeaderboardInPublic ?? true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [alertModal, setAlertModal] = useState<{isOpen: boolean; message: string}>({isOpen: false, message: ''});
 
   // ── Custom score state ────────────────────────────────────────────────────
   const [selectedProgramId, setSelectedProgramId] = useState('');
@@ -127,33 +123,64 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
     setEditingZoneIdx(null);
   };
 
-  // ── Category helpers ──────────────────────────────────────────────────────
+  const [newCategoryType, setNewCategoryType] = useState<'Stage' | 'Off-Stage' | 'None'>('Stage');
+  const [draggedCatIdx, setDraggedCatIdx] = useState<number | null>(null);
+
   const handleAddCategory = () => {
-    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      setCategories([...categories, newCategory.trim()]);
-      setNewCategory('');
+    let catName = newCategory.trim();
+    if (catName) {
+      // Remove any manually typed stage type to prevent duplication like "Kids (Stage) (Stage)"
+      catName = catName.replace(/\s*\((Stage|Off-Stage)\)$/i, '').trim();
+      
+      if (newCategoryType !== 'None') {
+        catName = `${catName} (${newCategoryType})`;
+      }
+
+      if (!categories.includes(catName)) {
+        setCategories([...categories, catName]);
+        setNewCategory('');
+      }
     }
   };
 
-  // ── Save general settings ─────────────────────────────────────────────────
-  const handleSave = async () => {
-    setIsSaving(true);
-    setSaveMessage('');
-    const success = await updateSettings({
-      categories,
-      zones,
-      maxStudentsPerTeam: maxStudents,
-      maxNonGeneralPerStudent: maxNonGeneral,
-      showOverallLeaderboardInPublic: showOverallPoints,
-    });
-    setIsSaving(false);
-    if (success) {
-      setSaveMessage('Settings updated successfully!');
-      setTimeout(() => setSaveMessage(''), 3000);
-    } else {
-      setSaveMessage('Failed to update settings.');
+  const handleRemoveCategory = (cat: string) => {
+    if (cat.toLowerCase().includes('general')) {
+      setAlertModal({isOpen: true, message: 'The "General" category cannot be deleted as it is required for core calculations.'});
+      return;
     }
+    setCategories(categories.filter(c => c !== cat));
   };
+
+  // ── Auto-save settings ───────────────────────────────────────────────────
+  const initialMount = useRef(true);
+
+  useEffect(() => {
+    if (initialMount.current) {
+      initialMount.current = false;
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSaving(true);
+      setSaveMessage('Saving...');
+      const success = await updateSettings({
+        categories,
+        zones,
+        maxStudentsPerTeam: maxStudents,
+        maxNonGeneralPerStudent: maxNonGeneral,
+        showOverallLeaderboardInPublic: showOverallPoints,
+      });
+      setIsSaving(false);
+      if (success) {
+        setSaveMessage('Saved');
+        setTimeout(() => setSaveMessage(''), 2000);
+      } else {
+        setSaveMessage('Save failed');
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [categories, zones, maxStudents, maxNonGeneral, showOverallPoints, updateSettings]);
 
   // ── Custom score helpers ──────────────────────────────────────────────────
   const handleCustomFormChange = (section: 'gradePoints' | 'rankPoints', key: string, value: string) => {
@@ -205,18 +232,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
             <p className="text-xs text-slate-400 mt-0.5">Zones · Categories · Score rules · Limits</p>
           </div>
           <div className="flex items-center gap-3">
-            {saveMessage && (
-              <span className={`text-xs font-bold ${saveMessage.includes('Failed') ? 'text-red-500' : 'text-green-600'}`}>
-                {saveMessage}
-              </span>
-            )}
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-5 py-2.5 bg-[#3B3BFA] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md shadow-blue-500/20 transition-all disabled:opacity-50 shrink-0"
-            >
-              {isSaving ? 'Saving…' : 'Save Settings'}
-            </button>
           </div>
         </div>
       </div>
@@ -355,19 +370,57 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
               type="text" value={newCategory}
               onChange={e => setNewCategory(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
-              placeholder="E.g. Super Senior (Stage)"
+              placeholder="E.g. Super Senior"
               className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm focus:border-[#3B3BFA] outline-none"
             />
+            <select
+              value={newCategoryType}
+              onChange={e => setNewCategoryType(e.target.value as any)}
+              className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:border-[#3B3BFA] outline-none bg-white font-bold text-slate-700 shrink-0"
+            >
+              <option value="Stage">Stage</option>
+              <option value="Off-Stage">Off-Stage</option>
+              <option value="None">None</option>
+            </select>
             <button onClick={handleAddCategory} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors">+ Add</button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mt-4">
             {categories.map((cat, idx) => (
-              <Chip key={idx} label={cat} onRemove={() => setCategories(categories.filter(c => c !== cat))} />
+              <div 
+                key={idx} 
+                draggable
+                onDragStart={() => setDraggedCatIdx(idx)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggedCatIdx !== null && draggedCatIdx !== idx) {
+                    const newCats = [...categories];
+                    const [moved] = newCats.splice(draggedCatIdx, 1);
+                    newCats.splice(idx, 0, moved);
+                    setCategories(newCats);
+                  }
+                  setDraggedCatIdx(null);
+                }}
+                className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-sm px-2.5 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all group select-none"
+              >
+                <div className="flex items-center justify-center bg-white border border-slate-200 w-5 h-5 rounded text-[9px] font-black text-slate-500 shadow-sm">
+                  {idx + 1}
+                </div>
+                <span className="text-xs font-bold text-slate-700 pr-1">{cat}</span>
+                <button
+                  onClick={() => handleRemoveCategory(cat)}
+                  className="flex items-center justify-center w-5 h-5 rounded-md text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition-colors leading-none"
+                  title="Remove"
+                >
+                  ✕
+                </button>
+              </div>
             ))}
             {categories.length === 0 && <p className="text-xs text-slate-400 italic">No categories added yet.</p>}
           </div>
-          <p className="text-[11px] text-slate-400 italic">
-            Categories containing "General" bypass the non-general programs limit.
+          <p className="text-[11px] text-slate-400 italic flex items-center gap-2">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Categories containing "General" bypass the non-general limit. Drag items to reorder.
           </p>
         </div>
       </section>
@@ -677,6 +730,42 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
           </p>
         </div>
       </section>
+
+      {/* Custom Alert Modal */}
+      {alertModal.isOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 transform transition-all">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-amber-100 text-amber-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">Restricted Action</h4>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 mb-5 leading-relaxed pl-1">{alertModal.message}</p>
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setAlertModal({isOpen: false, message: ''})}
+                className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-sm"
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {saveMessage && (
+        <Toast
+          message={saveMessage}
+          type={saveMessage === 'Saving...' ? 'info' : saveMessage.includes('fail') ? 'error' : 'success'}
+          onClose={() => setSaveMessage('')}
+        />
+      )}
 
       </div>
     </div>
