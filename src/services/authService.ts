@@ -58,6 +58,9 @@ export const authService = {
           for (const staffKey of Object.keys(staffList)) {
             const staffMember = staffList[staffKey];
             if (staffMember.username === username && staffMember.password === pass) {
+              if (staffMember.isDisabled) {
+                return { success: false, error: 'This account has been disabled by the administrator.' };
+              }
               foundUser = staffMember;
               targetFestId = festId;
               break;

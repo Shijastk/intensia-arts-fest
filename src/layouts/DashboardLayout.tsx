@@ -109,6 +109,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }
   }, [currentUser, view]);
 
+  // Real-time check to log out disabled users
+  useEffect(() => {
+    if (currentUser && staffs && staffs.length > 0) {
+      // Don't auto-logout the primary admin if it's mock
+      if (currentUser.username === 'admin' && currentUser.uid === 'admin-1') return;
+      
+      const matchedStaff = staffs.find(s => s.username === currentUser.username);
+      if (matchedStaff && matchedStaff.isDisabled) {
+        setToast({ message: 'Your account has been disabled.', type: 'error' });
+        setTimeout(() => {
+          handleLogout();
+        }, 2000);
+      }
+    }
+  }, [currentUser, staffs, handleLogout]);
+
   // FIX: Converted role to lowercase and removed underscores for proper permission matching
   const canAccessView = (viewType: ViewType): boolean => {
     if (!currentUser) return false;

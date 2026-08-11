@@ -106,6 +106,7 @@ export interface Staff {
   stage?: string;     // For Green Room or Judges
   judgePanel?: string; // Additional property to fix TS error
   teamName?: string; // Additional property to fix TS error
+  isDisabled?: boolean; // Flag to disable the account
 }
 
 export interface CustomProgramScore {

@@ -298,7 +298,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         <span className="text-[9px] uppercase">{staff.role === 'ADMIN' ? 'ADM' : staff.role === 'GREEN_ROOM' ? 'GR' : staff.role === 'JUDGE' ? 'JDG' : 'LDR'}</span>
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-slate-900 uppercase">{staff.username}</h4>
+                        <h4 className="text-sm font-black text-slate-900 uppercase flex items-center gap-2">
+                          {staff.username}
+                          {staff.isDisabled && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px]">DISABLED</span>}
+                        </h4>
                         <div className="flex gap-2 items-center mt-1">
                           <span className="text-[10px] font-bold text-slate-500 uppercase">Pass: <span className="font-mono bg-slate-100 px-1 rounded">{staff.password}</span></span>
                           {(staff.stage || staff.panelName) && (
@@ -311,6 +314,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       </div>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
+                      <button 
+                        onClick={() => updateStaff(staff.id, { isDisabled: !staff.isDisabled })} 
+                        className={`flex-1 sm:flex-none px-4 py-2 border rounded-lg text-xs font-bold transition-all
+                          ${staff.isDisabled ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        {staff.isDisabled ? 'Enable' : 'Disable'}
+                      </button>
                       <button onClick={() => { setEditingStaff(staff); setShowStaffModal(true); }} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:border-indigo-400 rounded-lg text-xs font-bold transition-all">Edit</button>
                       <button onClick={() => confirmDeleteStaff(staff.id, staff.username)} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-all">Delete</button>
                     </div>
