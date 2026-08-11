@@ -271,7 +271,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">Registered Staff ({staffs?.length || 0})</h3>
                 <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Manage access for Green Room, Judges & Leaders</p>
               </div>
-              <button onClick={() => { setEditingStaff(null); setShowStaffModal(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold shadow-sm transition-all">+ Add Staff</button>
+              <div className="flex gap-2">
+                <button onClick={async () => {
+                  const defaults: any[] = [
+                    { role: 'ADMIN', username: 'admin', password: 'admin123' },
+                    { role: 'GREEN_ROOM', username: 'greenroom', password: 'greenroom123' },
+                    { role: 'JUDGE', username: 'judge1', password: 'judge123', judgePanel: 'Stage 1' },
+                    { role: 'JUDGE', username: 'judge2', password: 'judge123', judgePanel: 'Stage 2' }
+                  ];
+                  for (const d of defaults) {
+                    await addStaff(d);
+                  }
+                  alert("Default credentials seeded!");
+                }} className="px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg text-xs font-bold shadow-sm transition-all">Seed Defaults</button>
+                <button onClick={() => { setEditingStaff(null); setShowStaffModal(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold shadow-sm transition-all">+ Add Staff</button>
+              </div>
             </div>
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
               {(!staffs || staffs.length === 0) ? (
