@@ -115,7 +115,6 @@ export interface CustomProgramScore {
     'B': number;
     'C': number;
     'No Grade': number;
-    '': number;
   };
   rankPoints: {
     1: number;

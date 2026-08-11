@@ -1,3 +1,7 @@
+import usthadImg from '../images/usthad.png';
+import starImg from '../images/star.svg';
+import lineoneImg from '../images/lineone.svg';
+
 const Banner = () => {
   return (
     <section className="bg-header max-h-screen pt-5 pb-10 overflow-hidden">
@@ -8,13 +12,13 @@ const Banner = () => {
           <div className="col-span-7 flex flex-col justify-center gap-6 relative">
 
             <img
-              src="/images/hero/star.svg"
+              src={starImg}
               alt="star"
               className="absolute top-[-74px] right-[51px] hidden lg:block w-[95px] h-[97px]"
             />
 
             <img
-              src="/images/hero/lineone.svg"
+              src={lineoneImg}
               alt="line"
               className="absolute top-[-74px] right-[51px] hidden lg:block w-[190px] h-[148px]"
             />
@@ -44,7 +48,7 @@ const Banner = () => {
             <div className="relative w-full max-w-md lg:max-w-full flex justify-center">
 
               <img
-                src="/images/hero/usthad.png"
+                src={usthadImg}
                 alt="Hero"
                 className="w-full h-auto object-contain"
               />

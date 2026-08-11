@@ -12,8 +12,7 @@ export const INDIVIDUAL_GRADE_POINTS: Record<string, number> = {
     'A': 5,
     'B': 3,
     'C': 1,
-    'No Grade': 0,
-    '': 0
+    'No Grade': 0
 };
 
 export const INDIVIDUAL_RANK_POINTS: Record<number, number> = {
@@ -28,8 +27,7 @@ export const GROUP_GRADE_POINTS: Record<string, number> = {
     'A': 10,
     'B': 6,
     'C': 2,
-    'No Grade': 0,
-    '': 0
+    'No Grade': 0
 };
 
 export const GROUP_RANK_POINTS: Record<number, number> = {
@@ -110,8 +108,8 @@ export const getGradeBreakdown = (isGroup: boolean, customConfig?: CustomProgram
  */
 export const getDefaultCustomScore = (isGroup: boolean): CustomProgramScore => ({
     gradePoints: isGroup
-        ? { 'A+': 10, 'A': 10, 'B': 6, 'C': 2, 'No Grade': 0, '': 0 }
-        : { 'A+': 5, 'A': 5, 'B': 3, 'C': 1, 'No Grade': 0, '': 0 },
+        ? { 'A+': 10, 'A': 10, 'B': 6, 'C': 2, 'No Grade': 0 }
+        : { 'A+': 5, 'A': 5, 'B': 3, 'C': 1, 'No Grade': 0 },
     rankPoints: isGroup
         ? { 1: 10, 2: 6, 3: 2 }
         : { 1: 5, 2: 3, 3: 1 },

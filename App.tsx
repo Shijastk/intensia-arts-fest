@@ -18,6 +18,7 @@ import { useSettings } from './src/hooks/useSettings';
 
 // ---> NEW IMPORT: Marketing Page <---
 import { MarketingPage } from './src/pages/MarketingPage';
+import { SuperAdminPage } from './src/pages/SuperAdminPage';
 
 // Wrapper for Public Fest Pages
 const PublicFestRoute = ({ component: Component }: { component: any }) => {
@@ -129,6 +130,9 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route path="/maintenance" element={<MaintenancePage />} />
+        
+        {/* Supreme Admin Route */}
+        <Route path="/supreme-admin" element={<SuperAdminPage />} />
         
         {/* Base URL: Now mapped to our new Marketing Page */}
         <Route path="/" element={<MarketingPage />} />

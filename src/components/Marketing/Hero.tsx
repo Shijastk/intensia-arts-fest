@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
-
-const withBasePath = (url: string) => url;
+import usthadImg from '../../images/usthad.png';
+import starImg from '../../images/star.svg';
 
 const Hero: React.FC = () => {
   return (
@@ -12,7 +12,7 @@ const Hero: React.FC = () => {
       <div className="absolute top-16 left-1/3 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none -z-10" />
 
       <img
-        src={withBasePath('/images/hero/star.svg')}
+        src={starImg}
         alt=''
         className='absolute bottom-8 left-8 w-24 h-24 opacity-15 pointer-events-none -z-10'
       />
@@ -61,7 +61,7 @@ const Hero: React.FC = () => {
           <div className='col-span-5 flex justify-center items-end h-full pt-4 lg:pt-0'>
             <div className='relative w-full max-w-md lg:max-w-full flex justify-center items-end h-full'>
               <img
-                src={withBasePath('/images/hero/usthad.png')}
+                src={usthadImg}
                 alt='Hero Image of Usthad'
                 width={800} 
                 height={900} 

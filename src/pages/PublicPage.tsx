@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Program, ProgramStatus, GalleryImage } from "../types";
 import { Link } from "react-router-dom";
 import { MasonryGridGallery } from "../components/MasonryGridGallery";
+import stageAbstractImg from "../images/stage-abstract.png";
 
 interface PublicPageProps {
   programs: Program[];
@@ -147,7 +148,7 @@ export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({
             
             <div className="lg:w-1/2 relative w-full">
               <div className="aspect-square sm:aspect-[4/3] rounded-[3rem] overflow-hidden shadow-2xl shadow-slate-300 relative group">
-                <img src="/stage-abstract.png" alt="Festival" className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" />
+                <img src={stageAbstractImg} alt="Festival" className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700" />
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/60 to-transparent"></div>
                 <div className="absolute bottom-8 left-8 sm:bottom-12 sm:left-12">
                   <div className="bg-amber-500 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl inline-block mb-4 shadow-lg">About The Event</div>

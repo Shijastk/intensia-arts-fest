@@ -31,7 +31,6 @@ const emptyCustomForm = (isGroup: boolean) => {
       'B': String(def.gradePoints['B']),
       'C': String(def.gradePoints['C']),
       'No Grade': '0',
-      '': '0',
     },
     rankPoints: {
       1: String(def.rankPoints[1]),
@@ -100,7 +99,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
           'B': String(existing.gradePoints['B']),
           'C': String(existing.gradePoints['C']),
           'No Grade': '0',
-          '': '0',
         },
         rankPoints: {
           1: String(existing.rankPoints[1]),
@@ -173,7 +171,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
         'B': Number(customForm.gradePoints['B']) || 0,
         'C': Number(customForm.gradePoints['C']) || 0,
         'No Grade': 0,
-        '': 0,
       },
       rankPoints: {
         1: Number(customForm.rankPoints[1]) || 0,

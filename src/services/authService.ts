@@ -16,6 +16,9 @@ export const authService = {
 
       if (snapshot.exists()) {
         const userData = snapshot.val();
+        if (userData.isActive === false) {
+          return { success: false, error: 'Your account has been deactivated by the system administrator.' };
+        }
         return { success: true, festId: userData.festId, isNewUser: false };
       } else {
         await set(userRef, {
