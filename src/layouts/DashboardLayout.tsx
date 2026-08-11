@@ -109,21 +109,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }
   }, [currentUser, view]);
 
+  const isUserDisabled = useMemo(() => {
+    if (!currentUser || !staffs) return false;
+    if (currentUser.username === 'admin' && currentUser.uid === 'admin-1') return false;
+    const matchedStaff = staffs.find(s => s.username === currentUser.username);
+    return matchedStaff?.isDisabled === true;
+  }, [currentUser, staffs]);
+
   // Real-time check to log out disabled users
   useEffect(() => {
-    if (currentUser && staffs && staffs.length > 0) {
-      // Don't auto-logout the primary admin if it's mock
-      if (currentUser.username === 'admin' && currentUser.uid === 'admin-1') return;
-      
-      const matchedStaff = staffs.find(s => s.username === currentUser.username);
-      if (matchedStaff && matchedStaff.isDisabled) {
-        setToast({ message: 'Your account has been disabled.', type: 'error' });
-        setTimeout(() => {
-          handleLogout();
-        }, 2000);
-      }
+    if (isUserDisabled) {
+      setToast({ message: 'Your account has been disabled.', type: 'error' });
+      const timer = setTimeout(() => {
+        handleLogout();
+      }, 2000);
+      return () => clearTimeout(timer);
     }
-  }, [currentUser, staffs, handleLogout]);
+  }, [isUserDisabled, handleLogout]);
 
   // FIX: Converted role to lowercase and removed underscores for proper permission matching
   const canAccessView = (viewType: ViewType): boolean => {
@@ -146,6 +148,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   };
 
   const renderContent = () => {
+    if (isUserDisabled) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4 mx-auto">
+             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          </div>
+          <h2 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight">Account Disabled</h2>
+          <p className="text-sm font-medium text-slate-600 max-w-md mx-auto">This account has been disabled by the administrator. You are being logged out...</p>
+        </div>
+      );
+    }
     if (!canAccessView(view)) return null;
     if (loading) {
       return (
