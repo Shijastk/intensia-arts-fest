@@ -185,7 +185,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               className="px-6 py-3 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm transition-all flex items-center gap-2 shrink-0"
             >
               <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-              Bulk Upload
+              Bulk Upload 
             </button>
             <button 
               onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
@@ -310,7 +310,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
              
       <ProgramFormModal show={showProgramModal} onClose={() => { setShowProgramModal(false); setEditingProgram(null); setIsGroup(false); }} onSave={handleSaveProgram} editingProgram={editingProgram} isGroup={isGroup} setIsGroup={setIsGroup} categories={settings?.categories || CATEGORIES} zones={settings?.zones || ZONES} />
       
-      <BulkUploadModal show={showBulkUploadModal} onClose={() => setShowBulkUploadModal(false)} addProgram={addProgram} />
+      <BulkUploadModal show={showBulkUploadModal} onClose={() => setShowBulkUploadModal(false)} addProgram={addProgram} programs={programs} updateProgram={updateProgram} />
 
       <StaffCredentialModal 
          festId={programs[0]?.festId || 'default-fest'}
