@@ -173,6 +173,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
   const [clashWarning, setClashWarning] = useState<{ targetId: string, clashes: ClashDetail[], pendingUpdate: Partial<Program>, updatesToSave: {id: string, updates: Partial<Program>}[] } | null>(null);
   const [activeDragProgram, setActiveDragProgram] = useState<Program | null>(null);
   const [manualAssignProgram, setManualAssignProgram] = useState<Program | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   
   // Custom Stages Feature
   const [customStages, setCustomStages] = useState<string[]>([]);
@@ -197,7 +198,14 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
   );
 
-  const unscheduledPrograms = useMemo(() => programs.filter(p => !p.startTime), [programs]);
+  const unscheduledPrograms = useMemo(() => {
+    let list = programs.filter(p => !p.startTime);
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(term) || (p.category && p.category.toLowerCase().includes(term)));
+    }
+    return list;
+  }, [programs, searchTerm]);
   const scheduledPrograms = useMemo(() => programs.filter(p => !!p.startTime).sort((a,b) => {
     const da = parseToValidDate(a.startTime);
     const db = parseToValidDate(b.startTime);
@@ -476,9 +484,19 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
           {/* Sidebar: Unscheduled List */}
           <div className="w-full lg:w-[320px] shrink-0">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col max-h-[85vh]">
-              <div className="flex justify-between items-center mb-4 shrink-0">
+              <div className="flex justify-between items-center mb-3 shrink-0">
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Unscheduled</h3>
                 <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-black border border-slate-200">{unscheduledPrograms.length}</span>
+              </div>
+              
+              <div className="mb-3 shrink-0 relative">
+                <input 
+                  type="text" 
+                  placeholder="Search programs..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-600 transition-colors"
+                />
               </div>
               
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-3 shrink-0">Drag & Drop onto a stage to schedule</p>

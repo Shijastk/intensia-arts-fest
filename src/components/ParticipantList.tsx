@@ -117,11 +117,14 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) =>
                         {prog.points > 0 ? `${prog.points} Pts` : prog.status}
                       </span>
                     </div>
-                    {(prog.venue || prog.startTime) && (
-                      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+                    {(prog.venue || (prog.startTime && prog.status !== 'COMPLETED')) && (
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
                         {prog.venue && <span>📍 {prog.venue}</span>}
-                        {prog.venue && prog.startTime && <span>•</span>}
-                        {prog.startTime && <span>🕒 {new Date(prog.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
+                        {prog.startTime && prog.status !== 'COMPLETED' && (
+                          <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            🕒 {new Date(prog.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(prog.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

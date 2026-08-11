@@ -148,7 +148,7 @@ const aggregateIndividualScores = (
           const currentScore = scores.get(participant.chestNumber) || {
             name: participant.name,
             chestNumber: participant.chestNumber,
-            teamName,
+            teamName: team.teamName || 'Unknown',
             totalPoints: 0,
           };
 

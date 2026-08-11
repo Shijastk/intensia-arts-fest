@@ -21,11 +21,12 @@ interface AdminPageProps {
   deleteStaff: (id: string) => Promise<boolean>;
   settings?: any;
   updateSettings?: (updates: any) => Promise<boolean>;
+  adminSubView?: 'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results';
 }
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   programs, setPrograms, addProgram, updateProgram, deleteProgram,
-  staffs, addStaff, updateStaff, deleteStaff, settings, updateSettings
+  staffs, addStaff, updateStaff, deleteStaff, settings, updateSettings, adminSubView
 }) => {
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
   const showOverallPoints = settings?.showOverallLeaderboardInPublic === true;
@@ -37,8 +38,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     setIsUpdatingSettings(false);
   };
 
-  // Added 'results' and 'scheduler' to the state
-  const [subTab, setSubTab] = useState<'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results'>('tracker');
+  // Removed local subTab state, using adminSubView prop
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
@@ -126,7 +126,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     }
     
     if (success) {
-      (e.target as HTMLFormElement).reset();
+      if (!editingProgram) {
+        (e.target as HTMLFormElement).reset();
+      } else {
+        setShowProgramModal(false);
+      }
       setEditingProgram(null);
       setIsGroup(false);
     } else {
@@ -154,6 +158,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       }
     });
   };
+
+  const activeTab = adminSubView || 'tracker';
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 font-sans">
@@ -198,49 +204,73 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         </div>
       </div>
       
-      {/* TABS NAVIGATION - Image 1 Style */}
-      <div className="flex justify-between items-center bg-white rounded-2xl px-2 shadow-sm border border-slate-100 overflow-x-auto custom-scrollbar">
-        {[
-          { id: 'tracker', label: 'Tracker', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg> },
-          { id: 'scheduler', label: 'Scheduler', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
-          { id: 'results', label: 'Live Results', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg> },
-          { id: 'performers', label: 'Performers', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
-          { id: 'requests', label: 'Requests', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> },
-          { id: 'staff', label: 'Staff Access', icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> }
-        ].map(tab => (
-          <button 
-            key={tab.id}
-            onClick={() => setSubTab(tab.id as any)} 
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-5 text-xs font-black uppercase tracking-widest whitespace-nowrap border-b-[3px] transition-all
-              ${subTab === tab.id ? 'border-[#3B3BFA] text-[#3B3BFA]' : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-200'}`}
-          >
-            {tab.icon}
-            {tab.label}
-            {tab.id === 'requests' && pendingRequests.length > 0 && (
-              <span className="bg-[#3B3BFA] text-white px-2 py-0.5 rounded-full text-[10px] ml-1">{pendingRequests.length}</span>
-            )}
-          </button>
-        ))}
+      {/* METRIC CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-2">
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 shrink-0">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              </div>
+              <div className="min-w-0">
+                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Events</p>
+                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">{programs.length}</p>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Across all categories</p>
+              </div>
+          </div>
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+              </div>
+              <div className="min-w-0">
+                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Performers</p>
+                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
+                      {programs.reduce((acc, p) => acc + (p.teams?.reduce((a, t) => a + (t.participants?.length || 0), 0) || 0), 0)}
+                  </p>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Registered</p>
+              </div>
+          </div>
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 shrink-0">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              </div>
+              <div className="min-w-0">
+                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Teams</p>
+                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
+                      {programs.reduce((acc, p) => acc + (p.teams?.length || 0), 0)}
+                  </p>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Participating</p>
+              </div>
+          </div>
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 shrink-0">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+              </div>
+              <div className="min-w-0">
+                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Points</p>
+                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
+                      {programs.reduce((acc, p) => acc + (p.teams?.reduce((teamAcc, t) => teamAcc + (t.points || 0) + (t.participants?.reduce((pAcc, pt) => pAcc + (pt.points || 0), 0) || 0), 0) || 0), 0).toLocaleString()}
+                  </p>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Points awarded</p>
+              </div>
+          </div>
       </div>
-      
-      {/* TAB CONTENT */}
-      <div>
-        {subTab === 'tracker' && <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} />}
 
-        
-        {subTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} />}
+      {/* TAB CONTENT */}
+      <div key={activeTab} className="w-full animate-fadeIn transition-all duration-300 ease-in-out">
+        {activeTab === 'tracker' && <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} staffs={staffs} />}
+
+        {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} />}
         
         {/* NEW TAB RENDER LOGIC */}
-        {subTab === 'results' && (
-          <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden shadow-sm">
+        {activeTab === 'results' && (
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
             <ConsolidationView programs={programs} />
           </div>
         )}
 
-        {subTab === 'performers' && <ParticipantList programs={programs} />}
+        {activeTab === 'performers' && <ParticipantList programs={programs} />}
                  
-        {subTab === 'requests' && (
-          <div className="bg-white border border-slate-200 rounded-b-xl overflow-hidden divide-y divide-slate-100">
+        {activeTab === 'requests' && (
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
             {pendingRequests.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs font-bold uppercase tracking-wider">No pending removal requests.</div>
             ) : (
@@ -264,7 +294,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {subTab === 'staff' && (
+        {activeTab === 'staff' && (
           <div className="space-y-4 pt-4">
             <div className="flex justify-between items-center bg-white border border-slate-200 p-4 rounded-xl">
               <div>

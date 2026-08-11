@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Program, ProgramStatus, CustomProgramScore } from '../types';
+import { Program, ProgramStatus, CustomProgramScore, Team, Participant, Staff } from '../types';
 import { calculatePoints } from '../utils/pointsCalculator';
+import { AdminRegistrationModal } from './AdminRegistrationModal';
 
 interface ProgramAccordionProps {
   program: Program;
@@ -13,6 +14,8 @@ interface ProgramAccordionProps {
   onRequestCancel: (id: string) => void;
   onUpdateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
   customScores?: Record<string, CustomProgramScore>;
+  allPrograms?: Program[];
+  staffs?: Staff[];
 }
 
 export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
@@ -24,11 +27,16 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   onPublishResult,
   onRequestCancel,
   onUpdateProgram,
-  customScores
+  customScores,
+  allPrograms = [],
+  staffs = []
 }) => {
 
   const [isOpen, setIsOpen] = useState(false);
-  const hasPerformers = (program.teams?.reduce((acc, team) => acc + (team.participants?.length || 0), 0) || 0) > 0;
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
+  
+  const participantCount = program.teams?.reduce((acc, team) => acc + (team.participants?.length || 0), 0) || 0;
+  const hasPerformers = participantCount > 0;
   const isUpcoming = program.startTime ? new Date(program.startTime).getTime() > Date.now() - 4 * 60 * 60 * 1000 : false;
 
   // Custom alert / confirmation modal state
@@ -221,7 +229,45 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     }
   };
 
+  const handleManualRegistration = async (teamName: string, participantName: string, chestNumber: string) => {
+    if (!onUpdateProgram) return false;
+
+    // Check if chest number exists in ANY program (simple check within this program for now)
+    const chestExists = (program.teams || []).some(t => 
+      (t.participants || []).some(p => p.chestNumber === chestNumber)
+    );
+    if (chestExists) {
+      throw new Error(`Chest number ${chestNumber} already exists in this program.`);
+    }
+
+    const newParticipant: Participant = {
+      name: participantName,
+      chestNumber: chestNumber,
+    };
+
+    let updatedTeams = [...(program.teams || [])];
+    const existingTeamIndex = updatedTeams.findIndex(t => t.teamName.toLowerCase() === teamName.toLowerCase());
+
+    if (existingTeamIndex >= 0) {
+      updatedTeams[existingTeamIndex] = {
+        ...updatedTeams[existingTeamIndex],
+        participants: [...(updatedTeams[existingTeamIndex].participants || []), newParticipant]
+      };
+    } else {
+      const newTeam: Team = {
+        id: `team_${Date.now()}_${Math.random().toString(36).substring(2,9)}`,
+        teamName: teamName,
+        participants: [newParticipant],
+      };
+      updatedTeams.push(newTeam);
+    }
+
+    const success = await onUpdateProgram(program.id, { teams: updatedTeams });
+    return success;
+  };
+
   return (
+    <>
     <div className={`mb-3 transition-all duration-300 bg-white border rounded-xl overflow-hidden ${isOpen ? 'border-indigo-300 ring-2 ring-indigo-500/20' : 'border-slate-200'}`}>
       <div className="w-full shadow-sm hover:border-indigo-300 transition-colors">
         
@@ -241,7 +287,12 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                {/* Mobile Participant Badge */}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${hasPerformers ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-500'}`}>
+                  {hasPerformers ? `👥 ${participantCount} Registered` : '⚠️ No Registrations'}
+                </span>
+                
                 <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">{program.category}</span>
                 {program.judgePanel && (
                   <span className="flex items-center text-[11px] text-amber-700 font-bold px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200">
@@ -270,7 +321,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           </span>
                         )}
                     </div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${program.venue && isUpcoming ? 'text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 w-fit flex items-center gap-1' : 'text-slate-400'}`}>
+                    <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${program.venue && isUpcoming ? 'text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 w-fit flex items-center gap-1' : 'text-slate-400'}`}>
                       {program.venue ? (
                         <>
                           <span>📍 {program.venue}</span>
@@ -279,6 +330,13 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                       ) : (
                         `#${program.id.substring(0,8)}`
                       )}
+                    </span>
+                 </div>
+                 
+                 {/* Desktop Participant Badge */}
+                 <div className="w-[140px] flex items-center justify-center flex-shrink-0">
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${hasPerformers ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                      {hasPerformers ? `👥 ${participantCount} Reg` : '⚠️ No Reg'}
                     </span>
                  </div>
                  
@@ -294,7 +352,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
           
           <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 flex-shrink-0 whitespace-nowrap">
             {/* Blue Button: Send to GR / Recall (GR) with Custom Confirm */}
-            {hasPerformers && (
+            {hasPerformers && program.status === ProgramStatus.PENDING && (
               <button
                 onClick={() => {
                   if (program.isPublished) {
@@ -407,38 +465,59 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        {/* Accordion Content */}
+    {/* Accordion Content */}
         {isOpen && (
-          <div className="bg-white border-t border-slate-200 p-4 sm:p-5">
-            {program.status === ProgramStatus.COMPLETED && (
-              <div className="flex justify-end mb-4">
-                {!isEditingScores ? (
+          <div className="border-t border-slate-100 bg-white animate-in slide-in-from-top-2 duration-200">
+            <div className="p-4 sm:p-5">
+                <div className="flex justify-between items-center mb-4">
+                  {/* Add Registration Button for Admin */}
                   <button
-                    onClick={() => { setIsEditingScores(true); setEditedTeams(program.teams || []); }}
-                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                    Edit Results
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
+                    onClick={() => setIsRegistrationModalOpen(true)}
+                disabled={program.status === ProgramStatus.COMPLETED}
+                className={`text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors ${
+                  program.status === ProgramStatus.COMPLETED 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Registration
+              </button>
+
+              {program.status === ProgramStatus.COMPLETED && (
+                <div>
+                  {!isEditingScores ? (
                     <button
-                      onClick={() => { setIsEditingScores(false); setEditedTeams(program.teams || []); }}
-                      className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 transition-colors"
+                      onClick={() => { setIsEditingScores(true); setEditedTeams(program.teams || []); }}
+                      className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
                     >
-                      Cancel
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      Edit Results
                     </button>
-                    <button
-                      onClick={saveScores}
-                      className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setIsEditingScores(false); setEditedTeams(program.teams || []); }}
+                        className="text-xs bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveScores}
+                        className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 transition-colors"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             
             <div className="overflow-x-auto rounded-xl border border-slate-100">
               <table className="w-full text-left min-w-[600px]">
@@ -677,8 +756,8 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
               </table>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Styled Modern Custom Modal (Alert / Confirm) */}
       {modalConfig.isOpen && (
@@ -730,6 +809,16 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
           </div>
         </div>
       )}
-    </div>
+
+      {/* Admin Registration Modal */}
+      <AdminRegistrationModal
+        isOpen={isRegistrationModalOpen}
+        onClose={() => setIsRegistrationModalOpen(false)}
+        program={program}
+        allPrograms={allPrograms}
+        staffs={staffs}
+        onSave={handleManualRegistration}
+      />
+    </>
   );
 };

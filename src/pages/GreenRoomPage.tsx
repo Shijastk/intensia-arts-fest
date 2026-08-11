@@ -71,6 +71,7 @@ const getWinnerNode = (results: any[], targetRank: number) => {
 export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram }) => {
     const [judgePanels, setJudgePanels] = useState<string[]>([]);
     const [activeTab, setActiveTab] = useState<'PROGRAMS' | 'GALLERY' | 'STATUS'>('PROGRAMS');
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         const festId = programs?.[0]?.festId;
@@ -210,7 +211,8 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
             const isPublished = p?.isPublished === true;
             const hasParticipants = (p?.teams || []).some(t => (t?.participants?.length ?? 0) > 0);
             const isPending = p?.status === ProgramStatus.PENDING && !p?.isAllocatedToJudge;
-            return isPublished && hasParticipants && isPending;
+            const matchesSearch = !searchTerm || p?.name.toLowerCase().includes(searchTerm.toLowerCase()) || p?.category.toLowerCase().includes(searchTerm.toLowerCase());
+            return isPublished && hasParticipants && isPending && matchesSearch;
         })
         .sort((a, b) => (a?.startTime || '').localeCompare(b?.startTime || ''));
 
@@ -374,9 +376,25 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                     </div>
                 </div>
             ) : (
-                <div className="space-y-10">
+                <div className="space-y-6">
+                    {/* Search Bar */}
+                    <div className="relative max-w-md">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search active programs..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs font-bold transition-all shadow-sm"
+                        />
+                    </div>
+
                     {filteredPrograms.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+                        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center mt-6">
                             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Program, ProgramStatus, ParticipantSummary, CustomProgramScore } from '../types';
+import { Program, ProgramStatus, ParticipantSummary, CustomProgramScore, Staff } from '../types';
 import { ProgramAccordion } from './ProgramAccordion';
 
 interface ProgramListProps {
@@ -9,6 +9,7 @@ interface ProgramListProps {
     updateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
     onEdit: (program: Program) => void;
     customScores?: Record<string, CustomProgramScore>;
+    staffs?: Staff[];
 }
 
 export const ProgramList: React.FC<ProgramListProps> = ({ 
@@ -17,7 +18,8 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     deleteProgram, 
     updateProgram, 
     onEdit,
-    customScores
+    customScores,
+    staffs
 }) => {
     const [filter, setFilter] = useState<ProgramStatus | 'ALL'>('ALL');
     const [sortBy, setSortBy] = useState<'name' | 'time' | 'category'>('name');
@@ -157,55 +159,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
 
     return (
         <>
-            {/* METRIC CARDS - Image 1 Style */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 shrink-0">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Events</p>
-                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">{programs.length}</p>
-                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Across all categories</p>
-                    </div>
-                </div>
-                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Performers</p>
-                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
-                            {programs.reduce((acc, p) => acc + (p.teams?.reduce((a, t) => a + (t.participants?.length || 0), 0) || 0), 0)}
-                        </p>
-                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Registered</p>
-                    </div>
-                </div>
-                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 shrink-0">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Teams</p>
-                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
-                            {programs.reduce((acc, p) => acc + (p.teams?.length || 0), 0)}
-                        </p>
-                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Participating</p>
-                    </div>
-                </div>
-                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 shrink-0">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Points</p>
-                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
-                            {programs.reduce((acc, p) => acc + (p.teams?.reduce((teamAcc, t) => teamAcc + (t.points || 0) + (t.participants?.reduce((pAcc, pt) => pAcc + (pt.points || 0), 0) || 0), 0) || 0), 0).toLocaleString()}
-                        </p>
-                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Points awarded</p>
-                    </div>
-                </div>
-            </div>
+            {/* Metrics moved to AdminPage Overview */}
 
             <div className="bg-white rounded-xl border border-slate-200 p-4 text-left shadow-sm">
                 <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -261,10 +215,19 @@ export const ProgramList: React.FC<ProgramListProps> = ({
                                     onRequestCancel={setCancelProgramId}
                                     onUpdateProgram={updateProgram}
                                     customScores={customScores}
+                                    staffs={staffs}
                                 />
                             ))}
                             {filteredPrograms.length === 0 && (
-                                <div className="text-center py-12 text-slate-400 text-sm font-bold uppercase tracking-widest">No events found.</div>
+                                <div className="text-center py-16 px-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+                                        <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-sm font-black uppercase text-slate-500 mb-1">No Events Found</h3>
+                                    <p className="text-xs text-slate-400 font-medium">Try adjusting your filters or search terms.</p>
+                                </div>
                             )}
                         </div>
             </div>

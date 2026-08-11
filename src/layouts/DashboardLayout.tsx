@@ -58,6 +58,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [adminSubView, setAdminSubView] = useState<'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results'>('tracker');
+  
+  const pendingRequestsCount = useMemo(() => {
+    let count = 0;
+    programs.forEach(p => {
+      (p.teams || []).forEach(t => {
+        (t.participants || []).forEach(part => {
+          if ((part as any).removalRequested) count++;
+        });
+      });
+    });
+    return count;
+  }, [programs]);
+
   const [adminActiveTeam, setAdminActiveTeam] = useState<string>('');
   const [adminActiveJudgePanel, setAdminActiveJudgePanel] = useState<string>('GLOBAL');
 
@@ -186,6 +200,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             deleteStaff={deleteStaff!}
             settings={settings}
             updateSettings={updateSettings}
+            adminSubView={adminSubView}
           />
         );
       case 'GREEN_ROOM':
@@ -242,7 +257,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       
       {/* LEFT SIDEBAR (Premium Blue Style) */}
       <aside className={`w-[280px] bg-[#3B3BFA] text-white flex flex-col fixed inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 shadow-2xl lg:shadow-none`}>
-        <div className="p-6 relative">
+        <div className="p-6 relative flex-1 overflow-y-auto min-h-0 hidden-scrollbar">
           <button className="absolute top-6 right-6 lg:hidden w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-lg transition-colors" onClick={() => setIsSidebarOpen(false)}>
              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
@@ -273,23 +288,51 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </div>
 
           {/* Navigation */}
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-1">
             <div className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-2 px-3">Portals</div>
             
             {canAccessView('ADMIN') && (
-              <button 
-                onClick={() => { setView('ADMIN'); setIsSidebarOpen(false); }} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'ADMIN' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                Dashboard
-              </button>
+              <div className="flex flex-col gap-1">
+                <button 
+                  onClick={() => { setView('ADMIN'); setIsSidebarOpen(false); }} 
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'ADMIN' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                  Dashboard
+                </button>
+                {view === 'ADMIN' && (
+                  <div className="flex flex-col gap-1 pl-4 mt-1 border-l-2 border-white/20 ml-6">
+                    {[
+                      { id: 'tracker', label: 'Events & Scoring' },
+                      { id: 'scheduler', label: 'Schedule' },
+                      { id: 'results', label: 'Live Results' },
+                      { id: 'performers', label: 'Performers' },
+                      { id: 'requests', label: 'Requests', badge: pendingRequestsCount },
+                      { id: 'staff', label: 'Staff & Setup' }
+                    ].map(tab => (
+                      <button 
+                        key={tab.id}
+                        onClick={() => { setAdminSubView(tab.id as any); setIsSidebarOpen(false); }} 
+                        className={`flex items-center justify-between px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all
+                          ${adminSubView === tab.id ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
+                      >
+                        {tab.label}
+                        {(tab.badge || 0) > 0 && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${adminSubView === tab.id ? 'bg-white text-[#3B3BFA]' : 'bg-rose-500 text-white'}`}>
+                            {tab.badge}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             
             {canAccessView('GREEN_ROOM') && (
               <button 
                 onClick={() => { setView('GREEN_ROOM'); setIsSidebarOpen(false); }} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'GREEN_ROOM' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'GREEN_ROOM' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
                 Green Room
@@ -299,7 +342,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {canAccessView('JUDGES') && (
               <button 
                 onClick={() => { setView('JUDGES'); setIsSidebarOpen(false); }} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'JUDGES' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'JUDGES' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 Judges
@@ -309,7 +352,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {canAccessView('TEAM_LEADER') && (
               <button 
                 onClick={() => { setView('TEAM_LEADER'); setIsSidebarOpen(false); }} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'TEAM_LEADER' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${view === 'TEAM_LEADER' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 Team Leader
@@ -319,7 +362,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             {canAccessView('SETTINGS') && (
               <button 
                 onClick={() => { setView('SETTINGS'); setIsSidebarOpen(false); }} 
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all mt-4 ${view === 'SETTINGS' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all mt-2 ${view === 'SETTINGS' ? 'bg-white text-[#3B3BFA] shadow-md' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 Settings
@@ -330,13 +373,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
         {/* Bottom Actions */}
         <div className="mt-auto p-6 space-y-4">
-          <div className="bg-white/10 rounded-2xl p-4">
-             <div className="w-8 h-8 bg-[#06D6A0] rounded-xl flex items-center justify-center mb-3 shadow-sm">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-             </div>
-             <p className="text-[10px] font-black uppercase mb-1">Manage. Track. Celebrate.</p>
-             <p className="text-[9px] text-white/60">All in one place.</p>
-          </div>
+
 
           <div className="flex gap-2">
             {String(currentUser.role).toLowerCase() === 'admin' && (
@@ -377,7 +414,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </button>
         </div>
 
-        <div className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8 overflow-x-auto">
+        <div key={view} className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8 overflow-x-auto animate-fadeIn transition-all duration-300">
           {renderContent()}
         </div>
       </main>

@@ -14,6 +14,26 @@ const parseTime = (timeStr?: string) => {
     return hours * 60 + minutes;
 };
 
+const formatDisplayTime = (timeStr?: string) => {
+    if (!timeStr) return 'TBA';
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return timeStr;
+    
+    const datePart = d.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        timeZone: 'Asia/Kolkata' 
+    });
+    const timePart = d.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: true, 
+        timeZone: 'Asia/Kolkata' 
+    });
+    
+    return `${datePart} - ${timePart}`;
+};
+
 interface SchedulePageProps {
     programs: Program[];
 }
@@ -29,10 +49,23 @@ export const SchedulePage: React.FC<SchedulePageProps & { festId?: string }> = (
     }, [programs]);
 
     const upcomingPrograms = useMemo(() => {
-        let filtered = programs.filter(p => p.status !== ProgramStatus.COMPLETED && p.status !== ProgramStatus.CANCELLED);
+        let filtered = programs.filter(p => !!p.startTime && p.status !== ProgramStatus.COMPLETED && p.status !== ProgramStatus.CANCELLED);
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(p => p.name.toLowerCase().includes(query));
+            filtered = filtered.filter(p => {
+                if (p.name.toLowerCase().includes(query)) return true;
+                if (p.category && p.category.toLowerCase().includes(query)) return true;
+                
+                let foundInParticipant = false;
+                p.teams?.forEach(t => {
+                    if (t.teamName && t.teamName.toLowerCase().includes(query)) foundInParticipant = true;
+                    t.participants?.forEach(pt => {
+                        if (pt.name && pt.name.toLowerCase().includes(query)) foundInParticipant = true;
+                        if (pt.chestNumber && pt.chestNumber.toLowerCase().includes(query)) foundInParticipant = true;
+                    });
+                });
+                return foundInParticipant;
+            });
         }
         if (selectedVenue !== 'All') {
             filtered = filtered.filter(p => p.venue === selectedVenue);
@@ -135,7 +168,7 @@ export const SchedulePage: React.FC<SchedulePageProps & { festId?: string }> = (
                                 <div key={program.id} className="flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:gap-4 px-6 py-5 hover:bg-slate-50/50 transition-colors group">
                                     <div className="col-span-2 flex lg:flex-col justify-between items-start gap-2 border-b border-slate-100 pb-3 lg:border-0 lg:pb-0">
                                         <div className="flex flex-col gap-2">
-                                            <span className="text-sm font-black text-slate-900">{program.startTime || 'TBA'}</span>
+                                            <span className="text-sm font-black text-slate-900">{formatDisplayTime(program.startTime)}</span>
                                             {program.status === ProgramStatus.JUDGING && (
                                                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-black uppercase tracking-widest w-fit">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>

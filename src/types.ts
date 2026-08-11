@@ -49,6 +49,7 @@ export interface Program {
   isResultPublished?: boolean; // Flag for Public Result visibility (Publish to Website)
   isAllocatedToJudge?: boolean; // Flag for Green Room allocation
   judgePanel?: string; // Stage/Panel assignment (e.g., "Stage 1", "Stage 2", "Panel A")
+  isOffStage?: boolean;
 }
 
 export interface FestivalStats {
