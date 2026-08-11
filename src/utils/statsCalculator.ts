@@ -56,7 +56,7 @@ const getProgramZone = (program: Program): string | null => getCategoryZone(prog
 
 const getAllZones = (programs: Program[]): string[] => {
   const zones = new Set<string>();
-  programs.forEach(program => {
+  (programs || []).forEach(program => {
     const zone = getProgramZone(program);
     if (zone) zones.add(zone);
   });
@@ -65,9 +65,9 @@ const getAllZones = (programs: Program[]): string[] => {
 
 const getAllTeams = (programs: Program[]): string[] => {
   const teams = new Set<string>();
-  programs.forEach(program => {
-    program.teams.forEach(team => {
-      const name = normalizeTeamName(team.teamName);
+  (programs || []).forEach(program => {
+    (program.teams || []).forEach(team => {
+      const name = normalizeTeamName(team.teamName || '');
       if (name) teams.add(name);
     });
   });
@@ -77,7 +77,7 @@ const getAllTeams = (programs: Program[]): string[] => {
 const sumUniqueCodeLetterPoints = (team: Program['teams'][number]): number => {
   const uniqueByCodeLetter = new Map<string, number>();
 
-  team.participants.forEach(participant => {
+  (team?.participants || []).forEach(participant => {
     const codeLetter = participant.codeLetter || participant.chestNumber;
     if (codeLetter && !uniqueByCodeLetter.has(codeLetter)) {
       uniqueByCodeLetter.set(codeLetter, participant.points || 0);
@@ -92,21 +92,21 @@ const calculateTeamEventPoints = (program: Program, team: Program['teams'][numbe
     return sumUniqueCodeLetterPoints(team);
   }
 
-  if (typeof team.points === 'number') {
+  if (typeof team?.points === 'number') {
     return team.points;
   }
 
-  return team.participants[0]?.points || 0;
+  return (team?.participants || [])[0]?.points || 0;
 };
 
 const calculateZoneScores = (programs: Program[], targetZone: string, teamNames: string[]): Record<string, number> => {
   const scores = Object.fromEntries(teamNames.map(teamName => [teamName, 0]));
 
-  programs
+  (programs || [])
     .filter(program => program.status === ProgramStatus.COMPLETED && program.isResultPublished && getProgramZone(program) === targetZone)
     .forEach(program => {
-      program.teams.forEach(team => {
-        const teamName = normalizeTeamName(team.teamName);
+      (program.teams || []).forEach(team => {
+        const teamName = normalizeTeamName(team.teamName || '');
         if (!(teamName in scores)) scores[teamName] = 0;
         scores[teamName] += calculateTeamEventPoints(program, team);
       });
@@ -129,7 +129,7 @@ const aggregateIndividualScores = (
 ): IndividualScore[] => {
   const scores = new Map<string, IndividualScore>();
 
-  programs
+  (programs || [])
     .filter(program =>
       program.status === ProgramStatus.COMPLETED &&
       program.isResultPublished &&
@@ -138,9 +138,9 @@ const aggregateIndividualScores = (
       (!nonStageOnly || isOffStageCategory(program.category))
     )
     .forEach(program => {
-      program.teams.forEach(team => {
-        const teamName = normalizeTeamName(team.teamName);
-        team.participants.forEach(participant => {
+      (program.teams || []).forEach(team => {
+        const teamName = normalizeTeamName(team.teamName || '');
+        (team.participants || []).forEach(participant => {
           const points = participant.points || 0;
           if (points <= 0 || !participant.chestNumber) return;
 
@@ -184,8 +184,9 @@ const sortTeamScores = (scores: Record<string, number>): TeamScore[] => {
 };
 
 export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats => {
-  const teamNames = getAllTeams(programs);
-  const zoneKeys = getAllZones(programs);
+  const safePrograms = programs || [];
+  const teamNames = getAllTeams(safePrograms);
+  const zoneKeys = getAllZones(safePrograms);
   const overallScores = Object.fromEntries(teamNames.map(teamName => [teamName, 0]));
   const zones: Record<string, ZoneStats> = {};
 
@@ -198,7 +199,7 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
 
     const zoneScoreRows = sortTeamScores(teamScores);
     const zoneFilter = (category: string) => getCategoryZone(category) === zoneKey;
-    const zonePrograms = programs.filter(program => program.status === ProgramStatus.COMPLETED && getProgramZone(program) === zoneKey);
+    const zonePrograms = safePrograms.filter(program => program.status === ProgramStatus.COMPLETED && getProgramZone(program) === zoneKey);
     const zoneCategories = new Set(zonePrograms.map(program => extractCategoryType(program.category, zoneKey)));
 
     const categories: ZoneStats['categories'] = {};
@@ -208,8 +209,8 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
         extractCategoryType(category, zoneKey) === categoryType;
 
       categories[categoryType] = {
-        kalaPrathibha: toChampion(aggregateIndividualScores(programs, categoryFilter)[0]),
-        sargaPrathibha: toChampion(aggregateIndividualScores(programs, categoryFilter, true)[0]),
+        kalaPrathibha: toChampion(aggregateIndividualScores(safePrograms, categoryFilter)[0]),
+        sargaPrathibha: toChampion(aggregateIndividualScores(safePrograms, categoryFilter, true)[0]),
       };
     });
 
@@ -217,8 +218,8 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
       name: `${zoneKey} Zone`,
       teamScores,
       leadingTeam: zoneScoreRows[0]?.score > 0 ? zoneScoreRows[0] : null,
-      kalaPrathibha: toChampion(aggregateIndividualScores(programs, zoneFilter)[0]),
-      sargaPrathibha: toChampion(aggregateIndividualScores(programs, zoneFilter, true)[0]),
+      kalaPrathibha: toChampion(aggregateIndividualScores(safePrograms, zoneFilter)[0]),
+      sargaPrathibha: toChampion(aggregateIndividualScores(safePrograms, zoneFilter, true)[0]),
       categories,
     };
   });
@@ -229,8 +230,8 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
   return {
     leadingTeam,
     trailingTeam: overallScoreRows[1] ?? null,
-    kalaPrathibha: toChampion(aggregateIndividualScores(programs, () => true)[0]),
-    sarkhaPrathibha: toChampion(aggregateIndividualScores(programs, () => true, true)[0]),
+    kalaPrathibha: toChampion(aggregateIndividualScores(safePrograms, () => true)[0]),
+    sarkhaPrathibha: toChampion(aggregateIndividualScores(safePrograms, () => true, true)[0]),
     zones,
   };
 };
@@ -238,13 +239,13 @@ export const calculateLeaderboardStats = (programs: Program[]): LeaderboardStats
 export const getDetailedTeamScores = (programs: Program[]): DetailedTeamScores => {
   const detailedScores: DetailedTeamScores = { totals: {} };
 
-  programs
+  (programs || [])
     .filter(program => program.status === ProgramStatus.COMPLETED)
     .forEach(program => {
       const eventKey = `${program.category}: ${program.name}`;
 
-      program.teams.forEach(team => {
-        const teamName = normalizeTeamName(team.teamName);
+      (program.teams || []).forEach(team => {
+        const teamName = normalizeTeamName(team.teamName || '');
         if (!teamName) return;
 
         const eventPoints = roundScore(calculateTeamEventPoints(program, team));
