@@ -82,7 +82,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
             if (data) {
                 const panels = new Set<string>();
                 Object.values(data).forEach((staff: any) => {
-                    if (staff?.role === 'judge' && staff?.judgePanel) {
+                    if (staff?.role?.toUpperCase() === 'JUDGE' && staff?.judgePanel) {
                         panels.add(staff.judgePanel);
                     }
                 });
