@@ -48,7 +48,7 @@ interface ScheduleManagerProps {
 // UI COMPONENTS
 // -------------------------------------------------------------
 
-const DraggableProgram: React.FC<{ program: Program }> = ({ program }) => {
+const DraggableProgram: React.FC<{ program: Program, onManualAdd?: (p: Program) => void }> = ({ program, onManualAdd }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: program.id,
     data: { type: 'UnscheduledProgram', program }
@@ -61,13 +61,23 @@ const DraggableProgram: React.FC<{ program: Program }> = ({ program }) => {
       {...attributes}
       className={`p-3 bg-white rounded-lg border ${isDragging ? 'opacity-50 border-indigo-400' : 'border-slate-200 hover:border-indigo-300'} shadow-sm transition-colors cursor-grab flex justify-between items-center`}
     >
-      <div>
+      <div className="flex-1">
         <h4 className="text-xs font-black text-slate-900 leading-tight uppercase">{program.name}</h4>
         <div className="flex gap-2 items-center mt-1">
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
           <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{program.duration || 30}m</p>
         </div>
       </div>
+      {onManualAdd && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onManualAdd(program); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="p-1.5 ml-2 shrink-0 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors no-print-btn"
+          title="Assign to Stage manually"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+        </button>
+      )}
     </div>
   );
 };
@@ -162,6 +172,7 @@ const DroppableVenue = ({ venue, programs, updateProgram, formatTime, onEditTime
 export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, updateProgram }) => {
   const [clashWarning, setClashWarning] = useState<{ targetId: string, clashes: ClashDetail[], pendingUpdate: Partial<Program>, updatesToSave: {id: string, updates: Partial<Program>}[] } | null>(null);
   const [activeDragProgram, setActiveDragProgram] = useState<Program | null>(null);
+  const [manualAssignProgram, setManualAssignProgram] = useState<Program | null>(null);
   
   // Custom Stages Feature
   const [customStages, setCustomStages] = useState<string[]>([]);
@@ -216,6 +227,25 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
         return Array.from(set);
       });
     }
+  };
+
+  const handleManualAdd = async (program: Program, targetVenue: string) => {
+    const currentVenuePrograms = scheduledPrograms.filter(p => p.venue === targetVenue);
+    const newOrderedVenuePrograms = [...currentVenuePrograms, program];
+    
+    const batchUpdates = calculateCascadingTimes(newOrderedVenuePrograms, targetVenue);
+    
+    if (!batchUpdates) {
+      setPendingBaselineDrop({
+        newOrderedVenuePrograms,
+        targetVenue,
+        activeId: program.id,
+        activeProgram: program
+      });
+      return;
+    }
+
+    await processBatchUpdates(batchUpdates, program.id, program, targetVenue);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -455,7 +485,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
               
               <div className="space-y-2 overflow-y-auto custom-scrollbar pr-1 flex-1">
                 {unscheduledPrograms.map(p => (
-                  <DraggableProgram key={p.id} program={p} />
+                  <DraggableProgram key={p.id} program={p} onManualAdd={setManualAssignProgram} />
                 ))}
                 {unscheduledPrograms.length === 0 && (
                   <div className="text-center py-12">
@@ -565,7 +595,37 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
               </div>
             </div>
           )}
+
           
+          {/* Manual Assign Modal */}
+          {manualAssignProgram && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <h4 className="text-sm font-black text-slate-900 uppercase">Assign "{manualAssignProgram.name}"</h4>
+                  <button onClick={() => setManualAssignProgram(null)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                </div>
+                <div className="p-5">
+                  <p className="text-[11px] text-slate-600 font-bold mb-4 uppercase tracking-wider">Select a stage to append this event:</p>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {uniqueVenues.map(venue => (
+                      <button 
+                        key={venue}
+                        onClick={() => {
+                          handleManualAdd(manualAssignProgram, venue);
+                          setManualAssignProgram(null);
+                        }}
+                        className="w-full text-left px-4 py-3 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 rounded-lg text-sm font-bold transition-colors"
+                      >
+                        {venue}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Time Edit Modal */}
           {timeEditProgram && (
             <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">

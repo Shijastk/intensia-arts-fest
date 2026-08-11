@@ -141,7 +141,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                 return { ...t, participants: newParticipants };
             });
         } else {
-            const allParticipants = teams.flatMap(t => t?.participants || []);
+            const allParticipants = teams.reduce((acc: any[], t) => acc.concat(t?.participants || []), []);
             const totalCount = allParticipants.length;
 
             const pool: string[] = [];
@@ -218,8 +218,8 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
     const availableZones = Object.keys(stats.zones).sort();
     
     const overallTeamScoresMap: Record<string, { score: number, zone: string }> = {};
-    Object.entries(stats.zones).forEach(([zoneKey, zone]) => {
-        Object.entries(zone.teamScores).forEach(([teamName, score]) => {
+    Object.entries(stats.zones).forEach(([zoneKey, zone]: [string, any]) => {
+        Object.entries(zone.teamScores as Record<string, number>).forEach(([teamName, score]) => {
             if (!overallTeamScoresMap[teamName]) {
                 overallTeamScoresMap[teamName] = { score: 0, zone: zoneKey };
             }

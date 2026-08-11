@@ -117,7 +117,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
         const confirm = window.confirm('Are you sure you want to submit these scores? This will mark the program as completed.');
         if (!confirm) return;
 
-        const allParticipantsRaw = selectedProgram.teams.flatMap(team =>
+        const allParticipantsRaw = selectedProgram.teams.reduce((acc: any[], team) => acc.concat(
             team.participants.map(p => {
                 const scoreData = scores[p.chestNumber];
                 const score = parseFloat(scoreData?.score || '0');
@@ -131,7 +131,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                     rank: 0
                 };
             })
-        );
+        ), []);
 
         allParticipantsRaw.sort((a, b) => b.score - a.score);
 
@@ -289,7 +289,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                             </div>
                                         </div>
                                         <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[9px] font-black uppercase">
-                                            {program.teams.flatMap(t => t.participants).length} Participants
+                                            {program.teams.reduce((acc: any[], t) => acc.concat(t.participants), []).length} Participants
                                         </span>
                                     </div>
                                     <div className="space-y-2 mb-3">
@@ -356,7 +356,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {selectedProgram.isGroup ? (
-                                        selectedProgram.teams.flatMap((team) => {
+                                        selectedProgram.teams.reduce((acc: any[], team) => {
                                             const limit = (selectedProgram.membersPerGroup && selectedProgram.membersPerGroup > 0) ? selectedProgram.membersPerGroup : 999;
                                             const subTeams = [];
                                             const pList = team.participants;
@@ -367,8 +367,8 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                                     uniqueKey: `${team.id}-${pList[i]?.chestNumber}`
                                                 });
                                             }
-                                            return subTeams;
-                                        }).map((subTeam) => {
+                                            return acc.concat(subTeams);
+                                        }, []).map((subTeam) => {
                                             const representative = subTeam.participants[0];
                                             if (!representative) return null;
                                             return (

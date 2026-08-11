@@ -171,9 +171,9 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
       return;
     }
 
-    let allParticipants = editedTeams.flatMap(team => 
+    let allParticipants = editedTeams.reduce((acc: any[], team) => acc.concat(
       (team.participants || []).map(p => ({ ...p, teamId: team.id }))
-    );
+    ), []);
 
     allParticipants.sort((a, b) => (b.score || 0) - (a.score || 0));
 
@@ -440,7 +440,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {editedTeams.length > 0 ? (
                     !program.isGroup ? (
-                      editedTeams.flatMap(team => (team.participants || []).map(p => ({ ...p, teamId: team.id, teamName: team.teamName }))).map((participant, flatIdx) => (
+                      editedTeams.reduce((acc: any[], team) => acc.concat((team.participants || []).map(p => ({ ...p, teamId: team.id, teamName: team.teamName }))), []).map((participant, flatIdx) => (
                         <tr key={`${participant.teamId}-${participant.chestNumber}-${flatIdx}`} className="group hover:bg-slate-50/50">
                           <td className="py-3 px-4 align-top">
                             <div className="flex flex-col">
@@ -535,17 +535,17 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                         </tr>
                       ))
                     ) : (
-                      editedTeams.flatMap(team => {
+                      editedTeams.reduce((acc: any[], team) => {
                         const limit = (program.membersPerGroup && program.membersPerGroup > 0) ? program.membersPerGroup : 999;
                         const pList = team.participants || [];
                         if (pList.length <= limit) {
-                          return [{
+                          return acc.concat([{
                             ...team,
                             displayName: team.teamName,
                             displayScore: team.score,
                             displayGrade: team.grade,
                             displayPoints: team.points
-                          }];
+                          }]);
                         }
                         const subTeams = [];
                         let subIndex = 0;
@@ -564,8 +564,8 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           });
                           subIndex++;
                         }
-                        return subTeams;
-                      }).map((team) => (
+                        return acc.concat(subTeams);
+                      }, []).map((team) => (
                         <tr key={team.isVirtual ? team.virtualId : team.id} className="group hover:bg-slate-50/50">
                           <td className="py-3 px-4 align-top">
                             <div className="flex flex-col">

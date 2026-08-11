@@ -97,11 +97,11 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
             <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                     {program.isGroup ? (
-                        teamsList.flatMap((team) => {
+                        teamsList.reduce((acc: any[], team) => {
                             const memberLimit = (program.membersPerGroup && program.membersPerGroup > 0) ? program.membersPerGroup : 999;
                             const subTeams = [];
                             const pList = team?.participants || [];
-                            if (pList.length === 0) return [];
+                            if (pList.length === 0) return acc;
 
                             for (let i = 0; i < pList.length; i += memberLimit) {
                                 subTeams.push({
@@ -110,8 +110,8 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
                                     participants: pList.slice(i, i + memberLimit),
                                 });
                             }
-                            return subTeams;
-                        }).map((subTeam) => {
+                            return acc.concat(subTeams);
+                        }, []).map((subTeam) => {
                             const representative = subTeam.participants[0];
                             const isRevealed = subTeam.participants.every(p => p.isCodeRevealed);
                             const codeLetter = representative?.codeLetter;
@@ -162,7 +162,8 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
                             );
                         })
                     ) : (
-                        teamsList.flatMap((team) => (team?.participants || []).map((participant) => (
+                        teamsList.reduce((acc: any[], team) => acc.concat(
+                            (team?.participants || []).map((participant) => (
                             <div key={participant.chestNumber} className="relative bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm flex flex-col items-center text-center">
                                 <div className={`w-24 h-24 rounded-3xl flex items-center justify-center text-5xl font-black transition-all duration-1000 ${participant.isCodeRevealed ? 'bg-indigo-600 text-white shadow-2xl scale-100' : 'bg-slate-100 text-slate-200 border-2 border-dashed border-slate-300 rotate-12 scale-90'}`}>
                                     {participant.isCodeRevealed ? participant.codeLetter : '?'}
@@ -198,7 +199,7 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
                                     )}
                                 </div>
                             </div>
-                        )))
+                        ))), [])
                     )}
                 </div>
             </div>
