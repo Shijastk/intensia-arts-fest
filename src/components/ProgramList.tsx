@@ -95,7 +95,12 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         }
 
         if (updateProgram) {
-            const success = await updateProgram(id, { status: newStatus });
+            const updates: Partial<Program> = { status: newStatus };
+            if (newStatus === ProgramStatus.PENDING) {
+                updates.isAllocatedToJudge = false;
+                updates.judgePanel = null as any;
+            }
+            const success = await updateProgram(id, updates);
             if (!success) {
                 console.error('Failed to update status');
             }
@@ -140,10 +145,11 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         const newPublishedState = !program.isPublished;
         const updates: any = { isPublished: newPublishedState };
 
-        if (!newPublishedState && program.status === ProgramStatus.JUDGING) {
-            if (window.confirm('This program is currently assigned to a judge. Recalling it will remove it from the judge\'s panel and reset it to PENDING. Continue?')) {
+        if (!newPublishedState && (program.status === ProgramStatus.JUDGING || program.status === ProgramStatus.COMPLETED)) {
+            if (window.confirm('Recalling this program will remove it from the judge\'s panel/Green Room and reset it to PENDING. Continue?')) {
                 updates.status = ProgramStatus.PENDING;
                 updates.isAllocatedToJudge = false;
+                updates.isResultPublished = false;
             } else {
                 return; 
             }
@@ -216,6 +222,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
                                     onUpdateProgram={updateProgram}
                                     customScores={customScores}
                                     staffs={staffs}
+                                    allPrograms={programs}
                                 />
                             ))}
                             {filteredPrograms.length === 0 && (

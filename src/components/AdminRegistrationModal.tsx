@@ -27,16 +27,16 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({ 
     // Always include teams explicitly created in the Staff list!
     staffs.forEach(s => {
       if (s.role === 'TEAM_LEADER' && s.teamName) {
-        teams.add(s.teamName);
+        teams.add(s.teamName.trim());
       }
     });
 
     allPrograms.forEach(p => {
       (p.teams || []).forEach(t => {
-        if (t.teamName) teams.add(t.teamName);
+        if (t.teamName) teams.add(t.teamName.trim());
         (t.participants || []).forEach(part => {
           if (part.chestNumber && !participants.has(part.chestNumber)) {
-            participants.set(part.chestNumber, { name: part.name, teamName: t.teamName });
+            participants.set(part.chestNumber, { name: part.name, teamName: (t.teamName || '').trim() });
           }
         });
       });
@@ -47,7 +47,7 @@ export const AdminRegistrationModal: React.FC<AdminRegistrationModalProps> = ({ 
   const teamParticipants = useMemo(() => {
     if (!teamName || isNewTeam) return [];
     return Array.from(existingData.participants.entries())
-      .filter(([chest, data]) => data.teamName === teamName)
+      .filter(([chest, data]) => data.teamName.toLowerCase() === teamName.trim().toLowerCase())
       .map(([chest, data]) => ({ chestNumber: chest, name: data.name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [teamName, isNewTeam, existingData.participants]);

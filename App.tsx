@@ -132,7 +132,16 @@ export default function App() {
         <Route path="/maintenance" element={<MaintenancePage />} />
         
         {/* Supreme Admin Route */}
-        <Route path="/supreme-admin" element={<SuperAdminPage />} />
+        <Route path="/supreme-admin" element={<SuperAdminPage onEnterFest={(festId) => {
+          const superAdminUser: User = {
+            uid: auth.currentUser?.uid || 'super-admin-uid',
+            username: auth.currentUser?.email || 'superadmin',
+            role: 'admin',
+            festId: festId,
+            displayName: 'Supreme Admin'
+          };
+          setCurrentUser(superAdminUser);
+        }} />} />
         
         {/* Base URL: Now mapped to our new Marketing Page */}
         <Route path="/" element={<MarketingPage />} />

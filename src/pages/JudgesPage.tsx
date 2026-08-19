@@ -27,6 +27,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
 }) => {
     const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
     const [scores, setScores] = useState<{ [key: string]: { score: string, grade: string } }>({});
+    const [searchQuery, setSearchQuery] = useState('');
 
     const allocatedPrograms = useMemo(() => {
         return programs
@@ -35,10 +36,12 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                 const matchesPanel = currentUser?.judgePanel
                     ? p.judgePanel === currentUser.judgePanel
                     : true;
-                return isAllocated && matchesPanel;
+                const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                      p.category.toLowerCase().includes(searchQuery.toLowerCase());
+                return isAllocated && matchesPanel && matchesSearch;
             })
             .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-    }, [programs, currentUser]);
+    }, [programs, currentUser, searchQuery]);
 
     const completedPrograms = useMemo(() => {
         return programs
@@ -47,10 +50,12 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                 const matchesPanel = currentUser?.judgePanel
                     ? p.judgePanel === currentUser.judgePanel
                     : true;
-                return isCompleted && matchesPanel;
+                const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                      p.category.toLowerCase().includes(searchQuery.toLowerCase());
+                return isCompleted && matchesPanel && matchesSearch;
             })
             .sort((a, b) => (b.startTime || '').localeCompare(a.startTime || ''));
-    }, [programs, currentUser]);
+    }, [programs, currentUser, searchQuery]);
 
     const handleSelectProgram = (program: Program) => {
         setSelectedProgram(program);
@@ -297,31 +302,43 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                 </div>
             )}
 
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center">
-                        <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Compact Header and Search */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <div className="flex-1">
-                        <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Judges Panel</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-slate-500 font-medium">Evaluate performances and assign scores</p>
+                    <div>
+                        <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                            Judges Panel
                             {currentUser?.judgePanel && (
-                                <>
-                                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase">
-                                        {currentUser.judgePanel}
-                                    </span>
-                                </>
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[9px] font-black uppercase">
+                                    {currentUser.judgePanel}
+                                </span>
                             )}
-                        </div>
+                        </h2>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Evaluate performances</p>
                     </div>
-                    <div className="text-right">
-                        <p className="text-3xl font-black text-emerald-600">{allocatedPrograms.length}</p>
-                        <p className="text-xs font-bold text-slate-400 uppercase">Pending</p>
+                </div>
+                
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex-1 sm:w-64 relative">
+                        <input 
+                            type="text" 
+                            placeholder="Search programs..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                        />
+                        <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <div className="text-right shrink-0">
+                        <p className="text-xl font-black text-emerald-600 leading-none">{allocatedPrograms.length}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Pending</p>
                     </div>
                 </div>
             </div>
@@ -583,17 +600,20 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                     <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight mb-4">
                         Completed Programs ({completedPrograms.length})
                     </h3>
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {completedPrograms.map(program => (
-                            <div key={program.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50">
-                                <div className="flex items-center justify-between">
+                            <div key={program.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
+                                <div className="flex items-start justify-between mb-2">
                                     <div>
                                         <h4 className="text-sm font-bold text-slate-900">{program.name}</h4>
-                                        <p className="text-xs text-slate-500 mt-1">{program.category} • {program.startTime}</p>
+                                        <p className="text-xs text-slate-500 mt-1">{program.category}</p>
                                     </div>
-                                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-black uppercase">
+                                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-black uppercase whitespace-nowrap ml-2">
                                         Judged
                                     </span>
+                                </div>
+                                <div className="text-xs text-slate-400 font-medium mt-auto pt-2 border-t border-slate-200/60">
+                                    {program.startTime || 'Time TBA'}
                                 </div>
                             </div>
                         ))}

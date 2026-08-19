@@ -54,6 +54,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     isOpen: boolean;
     title?: string;
     message: string;
+    confirmText?: string;
+    confirmVariant?: 'danger' | 'warning' | 'primary';
     onConfirm?: () => void;
   }>({
     isOpen: false,
@@ -140,11 +142,33 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
   const handleSaveStaff = async (staffData: Omit<Staff, 'id'>, editId?: string) => {
     if (editId) {
+      if (editingStaff && editingStaff.role === 'TEAM_LEADER' && staffData.role === 'TEAM_LEADER') {
+        const oldTeamName = editingStaff.teamName;
+        const newTeamName = staffData.teamName;
+        if (oldTeamName && newTeamName && oldTeamName !== newTeamName) {
+          const updatePromises = programs.map(async (p) => {
+            if (!p.teams) return;
+            let changed = false;
+            const updatedTeams = p.teams.map(t => {
+              if (t.teamName.toLowerCase() === oldTeamName.toLowerCase()) {
+                changed = true;
+                return { ...t, teamName: newTeamName };
+              }
+              return t;
+            });
+            if (changed) {
+              await updateProgram(p.id, { teams: updatedTeams });
+            }
+          });
+          await Promise.all(updatePromises);
+        }
+      }
       await updateStaff(editId, staffData);
     } else {
       await addStaff(staffData);
     }
     setEditingStaff(null);
+    setShowStaffModal(false);
   };
 
   const confirmDeleteStaff = (id: string, username: string) => {
@@ -152,6 +176,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       isOpen: true,
       title: 'Delete Staff Member',
       message: `Are you sure you want to delete staff account "${username}"? This action cannot be undone.`,
+      confirmVariant: 'danger',
+      confirmText: 'Delete',
       onConfirm: async () => {
         await deleteStaff(id);
         setStaffDeleteId(null);
@@ -260,14 +286,33 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
         {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} />}
         
-        {/* NEW TAB RENDER LOGIC */}
         {activeTab === 'results' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
             <ConsolidationView programs={programs} />
           </div>
         )}
 
-        {activeTab === 'performers' && <ParticipantList programs={programs} />}
+        {activeTab === 'performers' && <ParticipantList programs={programs} deleteParticipant={async (chestNo) => {
+          if (!window.confirm(`Are you SURE you want to completely delete participant (Chest No: ${chestNo}) from the entire festival? This will remove them from ALL programs. This action cannot be undone.`)) return;
+          
+          const updatePromises = programs.map(async (p) => {
+            if (!p.teams) return;
+            let changed = false;
+            const updatedTeams = p.teams.map(t => {
+              const initialLen = t.participants?.length || 0;
+              const newParticipants = (t.participants || []).filter(pt => pt.chestNumber !== chestNo);
+              if (newParticipants.length !== initialLen) changed = true;
+              return { ...t, participants: newParticipants };
+            }).filter(t => t.participants && t.participants.length > 0);
+            
+            if (changed) {
+              await updateProgram(p.id, { teams: updatedTeams });
+            }
+          });
+          
+          await Promise.all(updatePromises);
+          alert('Participant completely deleted from all programs.');
+        }} />}
                  
         {activeTab === 'requests' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
@@ -302,27 +347,36 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Manage access for Green Room, Judges & Leaders</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={async () => {
-                  const defaults: any[] = [
-                    { role: 'ADMIN', username: 'admin', password: 'admin123' },
-                    { role: 'GREEN_ROOM', username: 'greenroom', password: 'greenroom123' },
-                    { role: 'JUDGE', username: 'judge1', password: 'judge123', judgePanel: 'Stage 1' },
-                    { role: 'JUDGE', username: 'judge2', password: 'judge123', judgePanel: 'Stage 2' },
-                    { role: 'TEAM_LEADER', username: 'teamA', password: 'team123', teamName: 'Team A' },
-                    { role: 'TEAM_LEADER', username: 'teamB', password: 'team123', teamName: 'Team B' }
-                  ];
-                  let addedCount = 0;
-                  for (const d of defaults) {
-                    if (!staffs?.find(s => s.username === d.username)) {
-                      await addStaff(d);
-                      addedCount++;
+                <button onClick={() => {
+                  setModalConfig({
+                    isOpen: true,
+                    title: 'Seed Default Staff',
+                    message: 'Are you sure you want to seed the default credentials? This will create standard accounts for Judges and Team Leaders if they do not already exist.',
+                    confirmVariant: 'primary',
+                    confirmText: 'Yes, Seed Defaults',
+                    onConfirm: async () => {
+                      const defaults: any[] = [
+                        { role: 'ADMIN', username: 'admin', password: 'admin123' },
+                        { role: 'GREEN_ROOM', username: 'greenroom', password: 'greenroom123' },
+                        { role: 'JUDGE', username: 'judge1', password: 'judge123', judgePanel: 'Stage 1' },
+                        { role: 'JUDGE', username: 'judge2', password: 'judge123', judgePanel: 'Stage 2' },
+                        { role: 'TEAM_LEADER', username: 'teamA', password: 'team123', teamName: 'Team A' },
+                        { role: 'TEAM_LEADER', username: 'teamB', password: 'team123', teamName: 'Team B' }
+                      ];
+                      let addedCount = 0;
+                      for (const d of defaults) {
+                        if (!staffs?.find(s => s.username === d.username)) {
+                          await addStaff(d);
+                          addedCount++;
+                        }
+                      }
+                      if (addedCount > 0) {
+                        alert(`Successfully seeded ${addedCount} new default credentials!`);
+                      } else {
+                        alert("All default credentials already exist.");
+                      }
                     }
-                  }
-                  if (addedCount > 0) {
-                    alert(`Successfully seeded ${addedCount} new default credentials!`);
-                  } else {
-                    alert("All default credentials already exist.");
-                  }
+                  });
                 }} className="px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded-lg text-xs font-bold shadow-sm transition-all">Seed Defaults</button>
                 <button onClick={() => { setEditingStaff(null); setShowStaffModal(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold shadow-sm transition-all">+ Add Staff</button>
               </div>
@@ -353,7 +407,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
+                    <div className="flex gap-2 w-full sm:w-auto flex-wrap">
                       <button 
                         onClick={() => updateStaff(staff.id, { isDisabled: !staff.isDisabled })} 
                         className={`flex-1 sm:flex-none px-4 py-2 border rounded-lg text-xs font-bold transition-all
@@ -362,7 +416,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         {staff.isDisabled ? 'Enable' : 'Disable'}
                       </button>
                       <button onClick={() => { setEditingStaff(staff); setShowStaffModal(true); }} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:border-indigo-400 rounded-lg text-xs font-bold transition-all">Edit</button>
-                      <button onClick={() => confirmDeleteStaff(staff.id, staff.username)} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-all">Delete</button>
+                      
+                      {staff.role === 'TEAM_LEADER' && staff.teamName && (
+                        <button onClick={async () => {
+                          if (!window.confirm(`Are you SURE you want to completely wipe out ALL participants and entries for Team "${staff.teamName}" from EVERY program? This action CANNOT be undone.`)) return;
+                          
+                          const updatePromises = programs.map(async (p) => {
+                            if (!p.teams) return;
+                            const newTeams = p.teams.filter(t => t.teamName.toLowerCase() !== staff.teamName!.toLowerCase());
+                            if (newTeams.length !== p.teams.length) {
+                              await updateProgram(p.id, { teams: newTeams });
+                            }
+                          });
+                          await Promise.all(updatePromises);
+                          alert(`Team "${staff.teamName}" data wiped from all programs.`);
+                        }} className="flex-1 sm:flex-none px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-bold transition-all" title="Delete Team from all Programs">Wipe Team</button>
+                      )}
+                      
+                      <button onClick={() => confirmDeleteStaff(staff.id, staff.username)} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-all">Delete Staff</button>
                     </div>
                   </div>
                 ))
@@ -389,7 +460,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 transform transition-all">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-rose-100 text-rose-600">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                modalConfig.confirmVariant === 'danger' ? 'bg-rose-100 text-rose-600' :
+                modalConfig.confirmVariant === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'
+              }`}>
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
@@ -414,9 +488,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   if (modalConfig.onConfirm) await modalConfig.onConfirm();
                   setModalConfig(prev => ({ ...prev, isOpen: false }));
                 }}
-                className="px-3.5 py-1.5 text-xs font-bold text-white rounded-lg transition-colors cursor-pointer shadow-sm bg-rose-600 hover:bg-rose-700"
+                className={`px-3.5 py-1.5 text-xs font-bold text-white rounded-lg transition-colors cursor-pointer shadow-sm ${
+                  modalConfig.confirmVariant === 'danger'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : modalConfig.confirmVariant === 'warning'
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
               >
-                Delete
+                {modalConfig.confirmText || 'Confirm'}
               </button>
             </div>
           </div>

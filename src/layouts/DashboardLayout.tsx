@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Program, User, ViewType, STORAGE_KEYS, Staff } from '../types';
 import { AdminPage } from '../pages/AdminPage';
 import { GreenRoomPage } from '../pages/GreenRoomPage';
@@ -47,6 +48,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   settings,
   updateSettings
 }) => {
+  const navigate = useNavigate();
   const [view, setView] = useState<ViewType>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.VIEW);
@@ -373,8 +375,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
         {/* Bottom Actions */}
         <div className="mt-auto p-6 space-y-4">
-
-
           <div className="flex gap-2">
             {String(currentUser.role).toLowerCase() === 'admin' && (
               <button 
@@ -392,6 +392,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               Logout
             </button>
           </div>
+          
+          {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && (
+            <button 
+              onClick={() => navigate('/supreme-admin')} 
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-900 hover:bg-indigo-800 text-white rounded-xl text-xs font-black uppercase transition-all shadow-md mt-2"
+              title="Return to Supreme Admin Dashboard"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              Supreme Admin
+            </button>
+          )}
         </div>
       </aside>
 

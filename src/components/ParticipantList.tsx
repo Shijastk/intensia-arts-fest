@@ -3,9 +3,10 @@ import { Program } from '../types';
 
 interface ParticipantListProps {
   programs: Program[];
+  deleteParticipant?: (chestNo: string) => Promise<void>;
 }
 
-export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) => {
+export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, deleteParticipant }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState<any | null>(null);
 
@@ -133,7 +134,15 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs }) =>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-2">
+               {deleteParticipant && (
+                 <button onClick={async () => {
+                   await deleteParticipant(selectedParticipant.chestNumber);
+                   setSelectedParticipant(null);
+                 }} className="w-full py-2.5 bg-rose-50 text-rose-600 text-xs font-bold rounded-lg uppercase tracking-wider hover:bg-rose-100 transition-colors border border-rose-200 shadow-sm">
+                    Delete Participant Completely
+                 </button>
+               )}
                <button onClick={() => setSelectedParticipant(null)} className="w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-lg uppercase tracking-wider hover:bg-slate-800 transition-colors">
                   Close Detail
                </button>

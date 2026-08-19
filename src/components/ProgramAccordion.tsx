@@ -37,22 +37,27 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   
   const participantCount = program.teams?.reduce((acc, team) => acc + (team.participants?.length || 0), 0) || 0;
   const hasPerformers = participantCount > 0;
+  const isJudgesPanel = window.location.pathname.includes('judges');
+
+  const hasCodesGenerated = (program.teams || []).some(t => (t.participants || []).some(p => p.codeLetter || p.isCodeRevealed));
   const isUpcoming = program.startTime ? new Date(program.startTime).getTime() > Date.now() - 4 * 60 * 60 * 1000 : false;
 
   // Custom alert / confirmation modal state
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
-    type: 'alert' | 'confirm';
+    type: 'alert' | 'confirm' | 'prompt';
     title?: string;
     message: string;
     confirmText?: string;
     confirmVariant?: 'danger' | 'warning' | 'primary';
-    onConfirm?: () => void;
+    defaultValue?: string;
+    onConfirm?: (value?: string) => void;
   }>({
     isOpen: false,
     type: 'alert',
     message: ''
   });
+  const [promptValue, setPromptValue] = useState('');
 
   const showAlert = (message: string, title?: string) => {
     setModalConfig({
@@ -78,6 +83,25 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
       confirmText,
       confirmVariant,
       onConfirm
+    });
+  };
+
+  const showPrompt = (
+    title: string,
+    message: string,
+    defaultValue: string,
+    onConfirm: (value: string) => void
+  ) => {
+    setPromptValue(defaultValue);
+    setModalConfig({
+      isOpen: true,
+      type: 'prompt',
+      title,
+      message,
+      confirmText: 'Save',
+      confirmVariant: 'primary',
+      defaultValue,
+      onConfirm: (val) => onConfirm(val || '')
     });
   };
 
@@ -266,6 +290,57 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     return success;
   };
 
+  const handleGlobalParticipantRename = async (chestNumber: string, currentName: string) => {
+    if (!onUpdateProgram || !allPrograms) return;
+    
+    showPrompt(
+      'Edit Participant Name',
+      `Enter correct name for Chest #${chestNumber}:`,
+      currentName,
+      (newName) => {
+        if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+        
+        showConfirm(
+          'Rename Globally',
+          `Are you sure you want to rename "${currentName}" to "${newName.trim()}" across ALL programs?`,
+          async () => {
+            const updatePromises = allPrograms.map(async (p) => {
+              let changed = false;
+              const updatedTeams = (p.teams || []).map(t => {
+                let teamChanged = false;
+                const updatedParticipants = (t.participants || []).map(pt => {
+                  if (pt.chestNumber === chestNumber && pt.name !== newName.trim()) {
+                    teamChanged = true;
+                    return { ...pt, name: newName.trim() };
+                  }
+                  return pt;
+                });
+                if (teamChanged) {
+                  changed = true;
+                  return { ...t, participants: updatedParticipants };
+                }
+                return t;
+              });
+
+              if (changed) {
+                await onUpdateProgram(p.id, { teams: updatedTeams });
+                if (p.id === program.id) {
+                  setEditedTeams(updatedTeams);
+                }
+              }
+            });
+
+            await Promise.all(updatePromises);
+            setModalConfig(prev => ({ ...prev, isOpen: false }));
+            setTimeout(() => alert('Participant name updated globally!'), 100);
+          },
+          'warning',
+          'Rename Everywhere'
+        );
+      }
+    );
+  };
+
   return (
     <>
     <div className={`mb-3 transition-all duration-300 bg-white border rounded-xl overflow-hidden ${isOpen ? 'border-indigo-300 ring-2 ring-indigo-500/20' : 'border-slate-200'}`}>
@@ -417,6 +492,43 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
               </>
             )}
 
+            {/* Supreme Admin Actions */}
+            {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && hasCodesGenerated && program.status !== ProgramStatus.COMPLETED && (
+              <button
+                onClick={async () => {
+                  showConfirm(
+                    'Full Code Reset',
+                    'Are you sure you want to completely erase all participant codes and reset this program back to the Green Room?',
+                    async () => {
+                      if (!onUpdateProgram) return;
+                      const newTeams = (program.teams || []).map(t => ({
+                        ...t,
+                        participants: (t.participants || []).map(p => {
+                          const updatedP = { ...p, isCodeRevealed: false };
+                          delete updatedP.codeLetter; // Erase the generated code
+                          return updatedP;
+                        })
+                      }));
+                      await onUpdateProgram(program.id, { 
+                        teams: newTeams,
+                        status: ProgramStatus.PENDING,
+                        isAllocatedToJudge: false,
+                        judgePanel: null,
+                        isResultPublished: false 
+                      });
+                    },
+                    'warning',
+                    'Reset Codes & Return to GR'
+                  );
+                }}
+                className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+                title="Supreme Admin Override"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                Reset Codes
+              </button>
+            )}
+
             {/* Status Select */}
             <select
               value={program.status}
@@ -544,9 +656,21 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           </td>
                           <td className="py-3 px-4 align-top">
                             <p className="font-bold text-slate-700 text-xs">{participant.teamName}</p>
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5 group/name">
                               <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                               {participant.name}
+                              {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGlobalParticipantRename(participant.chestNumber, participant.name);
+                                  }}
+                                  className="opacity-0 group-hover/name:opacity-100 text-indigo-400 hover:text-indigo-600 p-0.5 transition-opacity"
+                                  title="Edit Name Globally"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                              )}
                             </div>
                             {(program.status !== ProgramStatus.COMPLETED || isEditingScores) && (
                               <button
@@ -673,10 +797,59 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           <td className="py-3 px-4 align-top">
                             <p className="font-bold text-slate-700 text-xs uppercase">{team.displayName}</p>
                             <div className="flex flex-col gap-1 mt-1.5">
-                              {team.participants.map((p, idx) => (
-                                <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-500">
-                                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                  {p.name}
+                              {team.participants.map((p: any, idx: number) => (
+                                <div key={idx} className="group/member flex items-center justify-between text-xs text-slate-500 hover:text-slate-700 transition-colors py-0.5">
+                                  <div className="flex items-center gap-1.5 group/name">
+                                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                                    {p.name}
+                                    {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleGlobalParticipantRename(p.chestNumber, p.name);
+                                        }}
+                                        className="opacity-0 group-hover/name:opacity-100 text-indigo-400 hover:text-indigo-600 p-0.5 transition-opacity"
+                                        title="Edit Name Globally"
+                                      >
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                  {(program.status !== ProgramStatus.COMPLETED || isEditingScores) && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        showConfirm(
+                                          'Remove Participant',
+                                          `Are you sure you want to remove ${p.name} from this team?`,
+                                          async () => {
+                                            const teamToUpdate = (program.teams || []).find(t => t.id === team.id);
+                                            if (teamToUpdate) {
+                                              const newParticipants = teamToUpdate.participants.filter(pt => pt.chestNumber !== p.chestNumber);
+                                              let newTeams;
+                                              if (newParticipants.length === 0) {
+                                                newTeams = (program.teams || []).filter(t => t.id !== team.id);
+                                              } else {
+                                                newTeams = (program.teams || []).map(t => 
+                                                  t.id === team.id ? { ...t, participants: newParticipants } : t
+                                                );
+                                              }
+                                              if (onUpdateProgram) {
+                                                await onUpdateProgram(program.id, { teams: newTeams });
+                                                setEditedTeams(newTeams);
+                                              }
+                                            }
+                                          },
+                                          'danger',
+                                          'Remove'
+                                        );
+                                      }}
+                                      className="opacity-0 group-hover/member:opacity-100 text-rose-400 hover:text-rose-600 p-0.5"
+                                      title="Remove from team"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -779,8 +952,26 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
 
             <p className="text-xs text-slate-600 mb-5 leading-relaxed pl-1">{modalConfig.message}</p>
             
+            {modalConfig.type === 'prompt' && (
+              <div className="mb-5">
+                <input
+                  type="text"
+                  autoFocus
+                  value={promptValue}
+                  onChange={(e) => setPromptValue(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (modalConfig.onConfirm) modalConfig.onConfirm(promptValue);
+                      setModalConfig(prev => ({ ...prev, isOpen: false }));
+                    }
+                  }}
+                />
+              </div>
+            )}
+            
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              {modalConfig.type === 'confirm' && (
+              {(modalConfig.type === 'confirm' || modalConfig.type === 'prompt') && (
                 <button
                   type="button"
                   onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
@@ -792,7 +983,13 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (modalConfig.onConfirm) modalConfig.onConfirm();
+                  if (modalConfig.onConfirm) {
+                    if (modalConfig.type === 'prompt') {
+                      modalConfig.onConfirm(promptValue);
+                    } else {
+                      modalConfig.onConfirm();
+                    }
+                  }
                   setModalConfig(prev => ({ ...prev, isOpen: false }));
                 }}
                 className={`px-3.5 py-1.5 text-xs font-bold text-white rounded-lg transition-colors cursor-pointer shadow-sm ${

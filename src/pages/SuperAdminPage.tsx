@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ref, get, remove, update } from 'firebase/database';
 import { db, auth } from '../config/firebase';
-import { Shield, Trash2, Power, PowerOff, Layout } from 'lucide-react';
+import { Shield, Trash2, Power, PowerOff, Layout, ExternalLink, LogOut } from 'lucide-react';
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const ALLOWED_EMAILS = [
   'shijastk.work@gmail.com',
@@ -11,13 +11,32 @@ const ALLOWED_EMAILS = [
   'shijasmuhammed573@gmail.com'
 ];
 
-export const SuperAdminPage = () => {
+export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string) => void }) => {
+  const navigate = useNavigate();
   const [passkey, setPasskey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [fests, setFests] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    const isSupreme = sessionStorage.getItem('supreme_admin_auth');
+    if (isSupreme === 'true') {
+      const unsubscribe = auth.onAuthStateChanged((user) => {
+        let rawEmail = user?.email || '';
+        if (!rawEmail && user?.providerData) {
+          const googleProvider = user.providerData.find(p => p.providerId === 'google.com');
+          if (googleProvider?.email) rawEmail = googleProvider.email;
+        }
+        if (user && rawEmail && ALLOWED_EMAILS.includes(rawEmail.toLowerCase())) {
+          setIsAuthenticated(true);
+          fetchData();
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, []);
 
   // Simple hardcoded auth for the supreme admin
   const handleLogin = async (e: React.FormEvent) => {
@@ -51,6 +70,7 @@ export const SuperAdminPage = () => {
           return;
         }
 
+        sessionStorage.setItem('supreme_admin_auth', 'true');
         setIsAuthenticated(true);
         fetchData();
       } catch (err: any) {
@@ -276,6 +296,20 @@ export const SuperAdminPage = () => {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-2">
+                            {fest && (
+                              <button
+                                onClick={() => {
+                                  if (onEnterFest && user.festId) {
+                                    onEnterFest(user.festId);
+                                    navigate(`/fests/${user.festId}/dashboard`);
+                                  }
+                                }}
+                                className="p-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors flex items-center justify-center"
+                                title="Enter Fest Dashboard as Admin"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </button>
+                            )}
                             <button
                               onClick={() => handleDeactivate(user.uid, isActive)}
                               className={`p-2 rounded-lg transition-colors flex items-center justify-center ${isActive ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'}`}
