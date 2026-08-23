@@ -18,6 +18,14 @@ export interface Participant {
   rank?: number;
 }
 
+export interface GlobalStudent {
+  id: string;
+  festId: string;
+  name: string;
+  chestNumber: string;
+  teamName: string;
+}
+
 export interface Team {
   id: string;
   teamName: string;
@@ -132,4 +140,7 @@ export interface Settings {
   maxNonGeneralPerStudent: number;
   customScores?: Record<string, CustomProgramScore>; // keyed by program id
   showOverallLeaderboardInPublic?: boolean;
+  festName?: string;
+  festSlogan?: string;
+  theme?: 'emerald' | 'purple' | 'blue' | 'crimson';
 }

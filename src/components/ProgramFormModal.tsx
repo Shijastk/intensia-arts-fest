@@ -48,9 +48,19 @@ export const ProgramFormModal: React.FC<ProgramFormModalProps> = ({
         <form onSubmit={onSave} className="flex flex-col overflow-hidden">
           <div className="p-5 overflow-y-auto space-y-4 flex-1">
             
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Program Name</label>
-              <input type="text" name="name" defaultValue={editingProgram?.name} required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" placeholder="e.g. Oppana, Duffmuttu" />
+            <div className="space-y-2">
+              <div className="flex justify-between items-center mb-1">
+                 <label className="block text-[10px] font-bold text-slate-600 uppercase">Program Name(s)</label>
+                 <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Bulk Add Supported</span>
+              </div>
+              <textarea 
+                 name="names" 
+                 defaultValue={editingProgram?.name} 
+                 required 
+                 rows={4}
+                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" 
+                 placeholder="ഇവിടെ പ്രോഗ്രാമുകളുടെ പേരുകൾ നൽകുക. ഒന്നിലധികം പ്രോഗ്രാമുകൾക്ക്, ഓരോ പേരിനും ശേഷം Enter അമർത്തുക (ഉദാഹരണത്തിന് ഒപ്പന, അടുത്ത വരിയിൽ ദഫ്മുട്ട്). താഴെ നൽകുന്ന വിവരങ്ങൾ എല്ലാ പ്രോഗ്രാമുകൾക്കും ബാധകമായിരിക്കും." 
+              />
             </div>
 
             {zones.length > 0 ? (

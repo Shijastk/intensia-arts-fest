@@ -16,6 +16,8 @@ interface ProgramAccordionProps {
   customScores?: Record<string, CustomProgramScore>;
   allPrograms?: Program[];
   staffs?: Staff[];
+  onPrintCertificate?: (programId: string) => void;
+  onDownloadPoster?: (programId: string) => void;
 }
 
 export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
@@ -29,7 +31,9 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   onUpdateProgram,
   customScores,
   allPrograms = [],
-  staffs = []
+  staffs = [],
+  onPrintCertificate,
+  onDownloadPoster
 }) => {
 
   const [isOpen, setIsOpen] = useState(false);
@@ -346,41 +350,30 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     <div className={`mb-3 transition-all duration-300 bg-white border rounded-xl overflow-hidden ${isOpen ? 'border-indigo-300 ring-2 ring-indigo-500/20' : 'border-slate-200'}`}>
       <div className="w-full shadow-sm hover:border-indigo-300 transition-colors">
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between p-3.5 md:p-4 gap-3">
-          <button onClick={() => setIsOpen(!isOpen)} className="flex-1 flex items-center space-x-3 text-left min-w-0">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 border bg-slate-50 text-slate-400 border-slate-200">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between p-3.5 md:p-4 gap-4">
+          <button onClick={() => setIsOpen(!isOpen)} className="flex-1 flex items-center gap-4 text-left min-w-0 group/btn">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-slate-50 text-slate-400 border border-slate-100 group-hover/btn:border-indigo-200 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             
             {/* MOBILE LAYOUT */}
             <div className="lg:hidden min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-slate-900 truncate">{program.name}</h3>
+                <h3 className="text-base font-black text-slate-900 truncate uppercase">{program.name}</h3>
                 {program.isResultPublished && (
-                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-emerald-200">
                     Result Live
                   </span>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                {/* Mobile Participant Badge */}
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${hasPerformers ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-500'}`}>
-                  {hasPerformers ? `👥 ${participantCount} Registered` : '⚠️ No Registrations'}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${hasPerformers ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                  {hasPerformers ? `👥 ${participantCount} REG` : '⚠️ NO REG'}
                 </span>
                 
-                <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">{program.category}</span>
-                {program.judgePanel && (
-                  <span className="flex items-center text-[11px] text-amber-700 font-bold px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200">
-                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                    {program.judgePanel}
-                  </span>
-                )}
-                {program.venue && (
-                  <span className={`text-[10px] font-bold truncate flex items-center gap-1 ${isUpcoming ? 'text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100' : 'text-slate-500'}`}>
-                    <span>📍 {program.venue}</span>
-                    {program.startTime && <span>• 🕒 {new Date(program.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
-                  </span>
-                )}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap ${program.category.toLowerCase().includes('stage') && !program.category.toLowerCase().includes('off') ? 'bg-indigo-50 text-indigo-600' : program.category.toLowerCase().includes('off-stage') ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                  {program.category}
+                </span>
               </div>
             </div>
 
@@ -388,7 +381,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
             <div className="hidden lg:flex flex-1 items-center gap-4 text-xs">
                  <div className="flex-1 flex flex-col min-w-0">
                     <div className="flex items-center gap-2">
-                        <span className="font-black text-slate-900 truncate uppercase">{program.name}</span>
+                        <span className="font-black text-slate-900 truncate uppercase text-sm">{program.name}</span>
                         {program.judgePanel && (
                           <span className="flex items-center text-[9px] text-amber-700 font-bold px-1.5 py-0.5 rounded-sm bg-amber-50 border border-amber-200 uppercase tracking-widest flex-shrink-0">
                             <svg className="w-2.5 h-2.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -396,182 +389,123 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           </span>
                         )}
                     </div>
-                    <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${program.venue && isUpcoming ? 'text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 w-fit flex items-center gap-1' : 'text-slate-400'}`}>
-                      {program.venue ? (
-                        <>
-                          <span>📍 {program.venue}</span>
-                          {program.startTime && <span>• 🕒 {new Date(program.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>}
-                        </>
-                      ) : (
-                        `#${program.id.substring(0,8)}`
-                      )}
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
+                      #{program.id.substring(0,8).toUpperCase()}
                     </span>
                  </div>
                  
-                 {/* Desktop Participant Badge */}
-                 <div className="w-[140px] flex items-center justify-center flex-shrink-0">
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${hasPerformers ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-                      {hasPerformers ? `👥 ${participantCount} Reg` : '⚠️ No Reg'}
-                    </span>
-                 </div>
-                 
-                 <div className="w-[100px] flex justify-center flex-shrink-0">
-                    <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${program.category.toLowerCase().includes('stage') && !program.category.toLowerCase().includes('off') ? 'bg-indigo-50 text-indigo-600' : program.category.toLowerCase().includes('off-stage') ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
+                 {/* Desktop Category Badge */}
+                 <div className="w-[140px] flex justify-center flex-shrink-0">
+                    <span className={`text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap ${program.category.toLowerCase().includes('stage') && !program.category.toLowerCase().includes('off') ? 'bg-indigo-50 text-indigo-700' : program.category.toLowerCase().includes('off-stage') ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
                         {program.category}
                     </span>
                  </div>
-                 
 
+                 {/* Desktop Participant Badge */}
+                 <div className="w-[120px] flex items-center justify-center flex-shrink-0">
+                    <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 ${hasPerformers ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {hasPerformers ? `👥 ${participantCount} REG` : '⚠️ NO REG'}
+                    </span>
+                 </div>
             </div>
           </button>
           
-          <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 flex-shrink-0 whitespace-nowrap">
-            {/* Blue Button: Send to GR / Recall (GR) with Custom Confirm */}
-            {hasPerformers && program.status === ProgramStatus.PENDING && (
-              <button
-                onClick={() => {
-                  if (program.isPublished) {
-                    showConfirm(
-                      'Recall from GR',
-                      `Are you sure you want to recall "${program.name}" from the Judges Panel / GR?`,
-                      () => onPublish(program.id),
-                      'warning',
-                      'Recall'
-                    );
-                  } else {
-                    onPublish(program.id);
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                  program.isPublished
-                    ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
-                    : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                }`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                </svg>
-                {program.isPublished ? 'Recall (GR)' : 'Send to GR'}
-              </button>
-            )}
+          {/* Right Section: Status & Actions */}
+          <div className="w-full lg:w-auto flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-2 lg:gap-4 flex-shrink-0 mt-3 lg:mt-0 border-t lg:border-none border-slate-100 pt-3 lg:pt-0">
             
-            {program.status === ProgramStatus.COMPLETED && (
-              <>
-                {/* Orange Button: Re-evaluate */}
+            {/* Status Select */}
+            <div className="w-auto lg:w-[140px] flex justify-start lg:justify-center shrink-0">
+              <select
+                value={program.status}
+                onChange={handleStatusChange}
+                disabled={program.status === ProgramStatus.COMPLETED}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border outline-none cursor-pointer transition-colors ${getStatusColor(program.status)} ${program.status === ProgramStatus.COMPLETED ? 'opacity-80 cursor-not-allowed' : ''}`}
+              >
+                {program.status === ProgramStatus.COMPLETED && <option value={ProgramStatus.COMPLETED}>COMPLETED</option>}
+                <option value={ProgramStatus.JUDGING}>JUDGING</option>
+                <option value={ProgramStatus.PENDING}>PENDING</option>
+                <option value={ProgramStatus.CANCELLED}>CANCELLED</option>
+              </select>
+            </div>
+
+            {/* Actions Block */}
+            <div className="contents lg:flex lg:w-[340px] lg:items-center lg:justify-end lg:gap-1.5 shrink-0">
+              {/* Primary Action Button */}
+              {hasPerformers && program.status === ProgramStatus.PENDING && (
                 <button
                   onClick={() => {
-                    showConfirm(
-                      'Re-evaluate Program',
-                      'Send this program back to judges for re-evaluation?',
-                      () => onUpdateStatus(program.id, ProgramStatus.JUDGING),
-                      'warning',
-                      'Re-evaluate'
-                    );
+                    if (program.isPublished) {
+                      showConfirm('Recall from GR', `Are you sure you want to recall "${program.name}" from the Judges Panel / GR?`, () => onPublish(program.id), 'warning', 'Recall');
+                    } else {
+                      onPublish(program.id);
+                    }
                   }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                  Re-evaluate
-                </button>
-
-                {/* Green Button: Result Live / Publish Result */}
-                <button
-                  onClick={() => onPublishResult(program.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border ${
-                    program.isResultPublished
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border mr-1 whitespace-nowrap ${
+                    program.isPublished
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
-                  {program.isResultPublished ? 'Result Live' : 'Publish Result'}
+                  {program.isPublished ? 'Recall (GR)' : 'Send to GR'}
                 </button>
-              </>
-            )}
+              )}
+              
+              {program.status === ProgramStatus.COMPLETED && (
+                <>
+                  <button
+                    onClick={() => {
+                      showConfirm('Re-evaluate Program', 'Send this program back to judges for re-evaluation?', () => onUpdateStatus(program.id, ProgramStatus.JUDGING), 'warning', 'Re-evaluate');
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 mr-1 whitespace-nowrap"
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Re-eval
+                  </button>
 
-            {/* Supreme Admin Actions */}
-            {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && hasCodesGenerated && program.status !== ProgramStatus.COMPLETED && (
-              <button
-                onClick={async () => {
-                  showConfirm(
-                    'Full Code Reset',
-                    'Are you sure you want to completely erase all participant codes and reset this program back to the Green Room?',
-                    async () => {
-                      if (!onUpdateProgram) return;
-                      const newTeams = (program.teams || []).map(t => ({
-                        ...t,
-                        participants: (t.participants || []).map(p => {
-                          const updatedP = { ...p, isCodeRevealed: false };
-                          delete updatedP.codeLetter; // Erase the generated code
-                          return updatedP;
-                        })
-                      }));
-                      await onUpdateProgram(program.id, { 
-                        teams: newTeams,
-                        status: ProgramStatus.PENDING,
-                        isAllocatedToJudge: false,
-                        judgePanel: null,
-                        isResultPublished: false 
-                      });
-                    },
-                    'warning',
-                    'Reset Codes & Return to GR'
-                  );
-                }}
-                className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
-                title="Supreme Admin Override"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                Reset Codes
-              </button>
-            )}
+                  <button
+                    onClick={() => onPublishResult(program.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border mr-1 whitespace-nowrap ${
+                      program.isResultPublished
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    {program.isResultPublished ? 'Live' : 'Publish'}
+                  </button>
+                </>
+              )}
 
-            {/* Status Select */}
-            <select
-              value={program.status}
-              onChange={handleStatusChange}
-              disabled={program.status === ProgramStatus.COMPLETED}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors ${getStatusColor(program.status)} ${program.status === ProgramStatus.COMPLETED ? 'opacity-80 cursor-not-allowed' : ''}`}
-            >
-              {program.status === ProgramStatus.COMPLETED && <option value={ProgramStatus.COMPLETED}>COMPLETED</option>}
-              <option value={ProgramStatus.JUDGING}>JUDGING</option>
-              <option value={ProgramStatus.PENDING}>PENDING</option>
-              <option value={ProgramStatus.CANCELLED}>CANCELLED</option>
-            </select>
-            
-            {/* Action Buttons: Schedule & Delete */}
-            <div className="flex items-center gap-1 border-l border-slate-200 pl-2 ml-1">
-              <button 
-                onClick={() => onEdit(program)} 
-                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors" 
-                title="Edit Program"
-              >
+              {/* Icon Buttons: Print, Edit, Delete */}
+              {onPrintCertificate && program.status === ProgramStatus.COMPLETED && (
+                <button onClick={() => onPrintCertificate(program.id)} className="p-2 text-blue-600 bg-blue-50/50 hover:bg-blue-100 rounded-lg transition-colors border border-transparent hover:border-blue-200" title="Print Certificates">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                </button>
+              )}
+              {onDownloadPoster && program.status === ProgramStatus.COMPLETED && program.isResultPublished && (
+                <button onClick={() => onDownloadPoster(program.id)} className="p-2 text-violet-600 bg-violet-50/50 hover:bg-violet-100 rounded-lg transition-colors border border-transparent hover:border-violet-200" title="Download Poster">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </button>
+              )}
+              <button onClick={() => onEdit(program)} className="p-2 text-slate-600 bg-slate-50 hover:bg-slate-200 rounded-lg transition-colors border border-transparent hover:border-slate-300" title="Edit Program">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               </button>
-              
-              {/* Red Action: Delete Program */}
               <button 
-                onClick={() => {
-                  showConfirm(
-                    'Delete Program',
-                    `Are you sure you want to delete "${program.name}"? This action cannot be undone.`,
-                    () => onDelete(program.id),
-                    'danger',
-                    'Delete'
-                  );
-                }} 
-                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                title="Delete Program"
+                onClick={() => { showConfirm('Delete Program', `Are you sure you want to delete "${program.name}"?`, () => onDelete(program.id), 'danger', 'Delete'); }} 
+                className="p-2 text-rose-600 bg-rose-50/50 hover:bg-rose-100 rounded-lg transition-colors border border-transparent hover:border-rose-200" title="Delete Program"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               </button>
 
-              <button onClick={() => setIsOpen(!isOpen)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors">
+              <button onClick={() => setIsOpen(!isOpen)} className="p-1 ml-1 text-slate-400 hover:text-slate-600 rounded-lg transition-colors">
                 <svg className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7" />
                 </svg>
               </button>
             </div>

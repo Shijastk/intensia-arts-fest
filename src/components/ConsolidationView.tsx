@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Program } from '../types';
 import { calculateConsolidatedResults } from '../utils/consolidationCalc';
 
@@ -8,8 +8,10 @@ interface ConsolidationViewProps {
 
 export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }) => {
   
+  const [includeUnpublished, setIncludeUnpublished] = useState(false);
+
   // Using the shared, bug-free utility function
-  const stats = useMemo(() => calculateConsolidatedResults(programs), [programs]);
+  const stats = useMemo(() => calculateConsolidatedResults(programs, includeUnpublished), [programs, includeUnpublished]);
 
   const handlePrint = () => {
     window.print();
@@ -19,17 +21,28 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
     <div className="bg-white text-black min-h-screen p-4 sm:p-8 font-serif" id="print-area">
       
       {/* Header & Actions */}
-      <div className="flex justify-between items-center border-b-2 border-black pb-4 mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b-2 border-black pb-4 mb-6 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-wider">Final Result Consolidation</h1>
           <p className="text-sm font-semibold text-gray-600 mt-1">Live Dynamic Calculation Report</p>
         </div>
-        <button 
-          onClick={handlePrint}
-          className="print:hidden px-6 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors border-2 border-black"
-        >
-          Download PDF / Print
-        </button>
+        <div className="flex flex-col items-start md:items-end gap-3">
+          <label className="print:hidden flex items-center gap-2 cursor-pointer bg-gray-100 px-3 py-1.5 rounded border border-gray-300">
+            <input 
+              type="checkbox" 
+              className="w-4 h-4 accent-black" 
+              checked={includeUnpublished} 
+              onChange={(e) => setIncludeUnpublished(e.target.checked)} 
+            />
+            <span className="text-xs font-bold uppercase text-gray-800">Include Unpublished Results</span>
+          </label>
+          <button 
+            onClick={handlePrint}
+            className="print:hidden px-6 py-2 bg-black text-white font-bold uppercase text-xs hover:bg-gray-800 transition-colors border-2 border-black w-full md:w-auto"
+          >
+            Download PDF / Print
+          </button>
+        </div>
       </div>
 
       {/* TOP SECTION: HIGHLIGHT GRID */}

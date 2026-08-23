@@ -1,17 +1,45 @@
 import React, { useMemo, useState } from 'react';
 import { Program } from '../types';
+import { useStudents } from '../hooks/useStudents';
+import { StudentBulkEntryModal } from './StudentBulkEntryModal';
 
 interface ParticipantListProps {
   programs: Program[];
   deleteParticipant?: (chestNo: string) => Promise<void>;
+  onPrintCertificate?: (participant: { name: string; chestNumber: string; teamName: string; programNames: string[] }) => void;
 }
 
-export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, deleteParticipant }) => {
+export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, deleteParticipant, onPrintCertificate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState<any | null>(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+
+  const festId = programs[0]?.festId || null;
+  const { students, addBulkStudents } = useStudents(festId);
+
+  const availableTeams = useMemo(() => {
+    const teams = new Set<string>();
+    programs.forEach(p => {
+      (p.teams || []).forEach(t => teams.add(t.teamName));
+    });
+    students.forEach(s => teams.add(s.teamName));
+    return Array.from(teams);
+  }, [programs, students]);
 
   const participants = useMemo(() => {
     const map = new Map<string, any>();
+    
+    // 1. Add global students
+    students.forEach(s => {
+      map.set(s.chestNumber, {
+        chestNumber: s.chestNumber,
+        name: s.name,
+        teamName: s.teamName,
+        programs: []
+      });
+    });
+
+    // 2. Add / Merge from programs
     programs.forEach(p => {
       (p.teams || []).forEach(team => {
         (team.participants || []).forEach(pt => {
@@ -40,21 +68,37 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
       result = result.filter(p => p.name.toLowerCase().includes(term) || p.chestNumber.includes(term));
     }
     return result.sort((a, b) => a.chestNumber.localeCompare(b.chestNumber));
-  }, [programs, searchTerm]);
+  }, [programs, students, searchTerm]);
 
   return (
     <div className="space-y-4">
       {/* Header and Search */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row gap-3 justify-between items-center">
         <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">All Performers ({participants.length})</h3>
-        <input 
-          type="text" 
-          placeholder="Search by name or chest no..." 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full sm:w-64 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600"
-        />
+        <div className="flex gap-2 w-full sm:w-auto">
+          <input 
+            type="text" 
+            placeholder="Search by name or chest no..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-64 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600"
+          />
+          <button 
+            onClick={() => setShowBulkModal(true)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 whitespace-nowrap shadow-sm transition-all"
+          >
+            + Bulk Add
+          </button>
+        </div>
       </div>
+
+      <StudentBulkEntryModal 
+         show={showBulkModal} 
+         onClose={() => setShowBulkModal(false)} 
+         onSave={addBulkStudents} 
+         availableTeams={availableTeams} 
+         existingChestNumbers={participants.map(p => p.chestNumber)}
+      />
 
       {/* List View converted to 2 or 3 columns in desktop */}
        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden p-4">
@@ -73,12 +117,28 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
                      <p className="text-[10px] font-bold text-slate-500 uppercase mt-0.5 truncate">{p.teamName}</p>
                    </div>
                  </div>
-                 <button 
-                   onClick={() => setSelectedParticipant(p)}
-                   className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded text-[10px] font-bold uppercase transition-all shrink-0 ml-2"
-                 >
-                   View Details
-                 </button>
+                 <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                   {onPrintCertificate && (
+                     <button 
+                       onClick={() => onPrintCertificate({
+                         name: p.name,
+                         chestNumber: p.chestNumber,
+                         teamName: p.teamName,
+                         programNames: p.programs.map((pr: any) => pr.name)
+                       })}
+                       className="p-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 rounded transition-all"
+                       title="Print Certificate"
+                     >
+                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                     </button>
+                   )}
+                   <button 
+                     onClick={() => setSelectedParticipant(p)}
+                     className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded text-[10px] font-bold uppercase transition-all"
+                   >
+                     View Details
+                   </button>
+                 </div>
                </div>
              ))}
            </div>

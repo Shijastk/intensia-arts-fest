@@ -1,6 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { Program, ProgramStatus, ParticipantSummary, CustomProgramScore, Staff } from '../types';
 import { ProgramAccordion } from './ProgramAccordion';
+import { Users, Award, LayoutTemplate, Download } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import { toJpeg } from 'html-to-image';
+import { getBackgroundSettings } from '../services/backgroundService';
+import { CertificateTemplate } from './generators/CertificateTemplate';
+import { StudentCardBatchTemplate } from './generators/StudentCardBatchTemplate';
+import { PosterTemplate, WinnerDetails } from './generators/PosterTemplate';
 
 interface ProgramListProps {
     programs: Program[];
@@ -30,6 +37,11 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
     const [deleteStatus, setDeleteStatus] = useState<'idle' | 'deleting' | 'success' | 'error'>('idle');
     const [deleteMessage, setDeleteMessage] = useState('');
+    
+    // Bulk Export State
+    const [exportProgress, setExportProgress] = useState<{ current: number, total: number, label: string } | null>(null);
+    const [exportItem, setExportItem] = useState<any>(null);
+    const [isExporting, setIsExporting] = useState(false);
 
     const participantSummaries: ParticipantSummary[] = useMemo(() => {
         const map = new Map<string, ParticipantSummary>();
@@ -163,39 +175,440 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         }
     };
 
+    const getBase64Image = async (url: string) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            return new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (e) {
+            console.warn("Failed to convert image to base64, using original URL", e);
+            return url;
+        }
+    };
+
+    const generateBulkCertificates = async () => {
+      if (isExporting) return;
+      const participants = participantSummaries;
+      if (participants.length === 0) return alert("No participants found.");
+      
+      setIsExporting(true);
+      const festId = programs[0]?.festId;
+      if (!festId) { setIsExporting(false); return; }
+      
+      const backgrounds = await getBackgroundSettings(festId);
+      const bgId = Object.keys(backgrounds?.certificateBgs || {})[0];
+      const bgUrlOriginal = bgId ? backgrounds!.certificateBgs[bgId] : undefined;
+      const config = bgId ? backgrounds!.configs?.[bgId] : (backgrounds?.configs?.['blank'] || {
+          contentTop: 350,
+          contentLeft: 96,
+          textAlign: 'left',
+          textColor: '#000000',
+          secondaryColor: '#ca8a04',
+          layout: 'simple',
+          posterSize: 'portrait',
+          cardsPerPage: 9,
+          bgPositionX: 50,
+          bgPositionY: 50,
+          bgScale: 100
+      });
+      
+      if (!backgrounds) {
+         alert("Unable to fetch configurations.");
+         setIsExporting(false);
+         return;
+      }
+  
+      // Pre-fetch the image as Base64 so html-to-image doesn't hang on CORS
+      setExportProgress({ current: 0, total: participants.length, label: 'Fetching Template...' });
+      const bgUrl = await getBase64Image(bgUrlOriginal);
+
+      const pdf = new jsPDF('p', 'px', [794, 1123]);
+  
+      for (let i = 0; i < participants.length; i++) {
+        setExportProgress({ current: i + 1, total: participants.length, label: 'Certificates' });
+        const rawFestId = programs[0]?.festId || 'Arts Fest';
+        const festParts = rawFestId.split('-');
+        const cleanFestName = (festParts.length > 1 ? festParts.slice(0, -1).join(' ') : rawFestId).toUpperCase();
+        
+        const pData = {
+           participantName: participants[i].name,
+           chestNo: participants[i].chestNumber,
+           team: participants[i].teamName,
+           category: cleanFestName,
+           events: participants[i].programNames,
+           festName: cleanFestName
+        };
+        
+        setExportItem({ type: 'certificate', data: pData, bgUrl, config });
+        await new Promise(resolve => setTimeout(resolve, 100)); // Allow DOM to render
+        
+        const element = document.getElementById('export-render-container');
+        if (element) {
+          try {
+             const imgData = await toJpeg(element, { quality: 0.8, pixelRatio: 1.5, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
+             if (i > 0) pdf.addPage([794, 1123], 'p');
+             pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
+          } catch (e) {
+             console.error("Error generating image:", e);
+          }
+        }
+      }
+      
+      pdf.save('Bulk_Certificates.pdf');
+      setExportProgress(null);
+      setExportItem(null);
+      setIsExporting(false);
+    };
+  
+    const generateStudentCards = async (layoutOverride: 'detailed' | 'simple') => {
+      if (isExporting) return;
+      const participants = participantSummaries;
+      if (participants.length === 0) return alert("No participants found.");
+  
+      setIsExporting(true);
+      const festId = programs[0]?.festId;
+      if (!festId) { setIsExporting(false); return; }
+
+      const backgrounds = await getBackgroundSettings(festId);
+      const bgId = Object.keys(backgrounds?.studentCardBgs || {})[0];
+      const bgUrlOriginal = bgId ? backgrounds!.studentCardBgs[bgId] : undefined;
+      const baseConfig = bgId ? (backgrounds!.configs?.[bgId] || {}) : (backgrounds?.configs?.['blank'] || { cardsPerPage: 9 });
+      const config = { ...baseConfig, layout: layoutOverride };
+      const perPage = config.cardsPerPage || 9;
+      
+      const totalPages = Math.ceil(participants.length / perPage);
+      
+      setExportProgress({ current: 0, total: totalPages, label: 'Fetching Template...' });
+      const bgUrl = bgUrlOriginal ? await getBase64Image(bgUrlOriginal) : undefined;
+      
+      const pdf = new jsPDF('p', 'px', [794, 1123]);
+  
+      for (let i = 0; i < totalPages; i++) {
+        setExportProgress({ current: i + 1, total: totalPages, label: layoutOverride === 'detailed' ? 'Participation Lists' : 'Chest Cards' });
+        const rawFestId = programs[0]?.festId || 'Arts Fest';
+        const festParts = rawFestId.split('-');
+        const cleanFestName = (festParts.length > 1 ? festParts.slice(0, -1).join(' ') : rawFestId).toUpperCase();
+
+        const batch = participants.slice(i * perPage, (i + 1) * perPage).map(p => ({
+            name: p.name,
+            chestNo: p.chestNumber,
+            team: p.teamName,
+            category: cleanFestName,
+            events: p.programNames
+        }));
+        setExportItem({ type: 'studentCards', data: batch, bgUrl, config, festName: cleanFestName });
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const element = document.getElementById('export-render-container');
+        if (element) {
+          try {
+             const imgData = await toJpeg(element, { quality: 0.8, pixelRatio: 1.5, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
+             if (i > 0) pdf.addPage([794, 1123], 'p');
+             pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
+          } catch (e) {
+             console.error("Error generating image:", e);
+          }
+        }
+      }
+      
+      pdf.save('Participation_Lists.pdf');
+      setExportProgress(null);
+      setExportItem(null);
+      setIsExporting(false);
+    };
+
+    const generateProgramCertificates = async (programId: string) => {
+      if (isExporting) return;
+      const program = programs.find(p => p.id === programId);
+      if (!program) return;
+      
+      const programParticipants: { name: string; chestNumber: string; teamName: string; programNames: string[] }[] = [];
+      (program.teams || []).forEach(team => {
+        (team.participants || []).forEach(pt => {
+          programParticipants.push({
+            name: pt.name,
+            chestNumber: pt.chestNumber || pt.chestNumber,
+            teamName: team.teamName,
+            programNames: [program.name]
+          });
+        });
+      });
+      
+      if (programParticipants.length === 0) return alert('No participants in this program.');
+
+      setIsExporting(true);
+      const festId = program.festId;
+      if (!festId) { setIsExporting(false); return; }
+
+      const backgrounds = await getBackgroundSettings(festId);
+      const bgId = Object.keys(backgrounds?.certificateBgs || {})[0];
+      const bgUrlOriginal = bgId ? backgrounds!.certificateBgs[bgId] : undefined;
+      const config = bgId ? backgrounds!.configs?.[bgId] : (backgrounds?.configs?.['blank'] || {
+        contentTop: 350, contentLeft: 96, textAlign: 'left', textColor: '#000000',
+        secondaryColor: '#ca8a04', layout: 'simple', posterSize: 'portrait',
+        cardsPerPage: 9, bgPositionX: 50, bgPositionY: 50, bgScale: 100
+      });
+
+      if (!backgrounds) {
+        alert('Unable to fetch configurations.');
+        setIsExporting(false);
+        return;
+      }
+
+      setExportProgress({ current: 0, total: programParticipants.length, label: 'Fetching Template...' });
+      const bgUrl = await getBase64Image(bgUrlOriginal);
+
+      const pdf = new jsPDF('p', 'px', [794, 1123]);
+      const rawFestId = festId;
+      const festParts = rawFestId.split('-');
+      const cleanFestName = (festParts.length > 1 ? festParts.slice(0, -1).join(' ') : rawFestId).toUpperCase();
+
+      for (let i = 0; i < programParticipants.length; i++) {
+        setExportProgress({ current: i + 1, total: programParticipants.length, label: `${program.name} Certificates` });
+        const pData = {
+          participantName: programParticipants[i].name,
+          chestNo: programParticipants[i].chestNumber,
+          team: programParticipants[i].teamName,
+          category: program.category || 'Arts Fest',
+          events: [program.name],
+          festName: cleanFestName
+        };
+
+        setExportItem({ type: 'certificate', data: pData, bgUrl, config });
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const element = document.getElementById('export-render-container');
+        if (element) {
+          try {
+            const imgData = await toJpeg(element, { quality: 0.8, pixelRatio: 1.5, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
+            if (i > 0) pdf.addPage([794, 1123], 'p');
+            pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
+          } catch (e) {
+            console.error('Error generating image:', e);
+          }
+        }
+      }
+
+      pdf.save(`${program.name}_Certificates.pdf`);
+      setExportProgress(null);
+      setExportItem(null);
+      setIsExporting(false);
+    };
+
+    const generatePoster = async (programId: string) => {
+      if (isExporting) return;
+      const program = programs.find(p => p.id === programId);
+      if (!program) return;
+
+      setIsExporting(true);
+      const festId = program.festId;
+      if (!festId) { setIsExporting(false); return; }
+
+      const backgrounds = await getBackgroundSettings(festId);
+      const bgId = Object.keys(backgrounds?.posterBgs || {})[0];
+      const bgUrlOriginal = bgId ? backgrounds!.posterBgs![bgId] : undefined;
+      const config = bgId ? backgrounds!.configs?.[bgId] : (backgrounds?.configs?.['blank'] || {
+        contentTop: 350, contentLeft: 96, textAlign: 'left', textColor: '#000000',
+        secondaryColor: '#ca8a04', layout: 'simple', posterSize: 'portrait',
+        cardsPerPage: 9, bgPositionX: 50, bgPositionY: 50, bgScale: 100
+      });
+
+      if (!bgUrlOriginal) {
+        alert('No poster background uploaded yet. Please upload a poster background in the "Posters & Certificates" tab first.');
+        setIsExporting(false);
+        return;
+      }
+
+      // Build winner list from ranked teams/participants
+      const getWinners = (): WinnerDetails[] => {
+        const results: { place: 1|2|3; name: string; team: string }[] = [];
+        if (program.isGroup) {
+          (program.teams || [])
+            .filter(t => t.rank && t.rank >= 1 && t.rank <= 3)
+            .sort((a, b) => (a.rank || 99) - (b.rank || 99))
+            .slice(0, 3)
+            .forEach(t => results.push({ place: t.rank as 1|2|3, name: t.teamName, team: '' }));
+        } else {
+          const allParts: any[] = [];
+          (program.teams || []).forEach(t =>
+            (t.participants || []).forEach(p => allParts.push({ ...p, teamName: t.teamName }))
+          );
+          allParts
+            .filter(p => p.rank && p.rank >= 1 && p.rank <= 3)
+            .sort((a, b) => (a.rank || 99) - (b.rank || 99))
+            .slice(0, 3)
+            .forEach(p => results.push({ place: p.rank as 1|2|3, name: p.name, team: p.teamName }));
+        }
+        return results;
+      };
+
+      const winners = getWinners();
+      if (winners.length === 0) {
+        alert('No ranked results found for this program. Please enter scores/grades and publish results first.');
+        setIsExporting(false);
+        return;
+      }
+
+      setExportProgress({ current: 1, total: 1, label: `Generating ${program.name} Poster...` });
+      const bgUrl = await getBase64Image(bgUrlOriginal);
+
+      const posterSize = config?.posterSize || 'portrait';
+      const width = 1080;
+      const height = posterSize === 'square' ? 1080 : 1350;
+
+      setExportItem({ type: 'poster', data: { program, winners, config, bgUrl } });
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      const element = document.getElementById('export-render-container');
+      if (element) {
+        try {
+          const imgData = await toJpeg(element, {
+            quality: 0.95,
+            pixelRatio: 1,
+            style: { transform: 'scale(1)', transformOrigin: 'top left' }
+          });
+          // Download as JPG
+          const link = document.createElement('a');
+          link.download = `${program.name.replace(/\s+/g, '_')}_Winner_Poster.jpg`;
+          link.href = imgData;
+          link.click();
+        } catch (e) {
+          console.error('Error generating poster:', e);
+          alert('Failed to generate poster. Please try again.');
+        }
+      }
+
+      setExportProgress(null);
+      setExportItem(null);
+      setIsExporting(false);
+    };
+
+    const generateSingleCertificate = async (participant: ParticipantSummary) => {
+      if (isExporting) return;
+
+      setIsExporting(true);
+      const festId = programs[0]?.festId;
+      if (!festId) { setIsExporting(false); return; }
+
+      const backgrounds = await getBackgroundSettings(festId);
+      const bgId = Object.keys(backgrounds?.certificateBgs || {})[0];
+      const bgUrlOriginal = bgId ? backgrounds!.certificateBgs[bgId] : undefined;
+      const config = bgId ? backgrounds!.configs?.[bgId] : (backgrounds?.configs?.['blank'] || {
+        contentTop: 350, contentLeft: 96, textAlign: 'left', textColor: '#000000',
+        secondaryColor: '#ca8a04', layout: 'simple', posterSize: 'portrait',
+        cardsPerPage: 9, bgPositionX: 50, bgPositionY: 50, bgScale: 100
+      });
+
+      if (!backgrounds) {
+        alert('Unable to fetch configurations.');
+        setIsExporting(false);
+        return;
+      }
+
+      setExportProgress({ current: 1, total: 1, label: 'Generating Certificate...' });
+      const bgUrl = await getBase64Image(bgUrlOriginal);
+
+      const pdf = new jsPDF('p', 'px', [794, 1123]);
+      const rawFestId = festId;
+      const festParts = rawFestId.split('-');
+      const cleanFestName = (festParts.length > 1 ? festParts.slice(0, -1).join(' ') : rawFestId).toUpperCase();
+
+      const pData = {
+        participantName: participant.name,
+        chestNo: participant.chestNumber,
+        team: participant.teamName,
+        category: cleanFestName,
+        events: participant.programNames,
+        festName: cleanFestName
+      };
+
+      setExportItem({ type: 'certificate', data: pData, bgUrl, config });
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const element = document.getElementById('export-render-container');
+      if (element) {
+        try {
+          const imgData = await toJpeg(element, { quality: 0.8, pixelRatio: 1.5, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
+          pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
+        } catch (e) {
+          console.error('Error generating image:', e);
+        }
+      }
+
+      pdf.save(`${participant.name}_Certificate.pdf`);
+      setExportProgress(null);
+      setExportItem(null);
+      setIsExporting(false);
+    };
+
     return (
         <>
             {/* Metrics moved to AdminPage Overview */}
 
-            <div className="bg-white rounded-xl border border-slate-200 p-4 text-left shadow-sm">
-                <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                    <div className="relative flex-1">
-                        <input 
-                            type="text" 
-                            placeholder="Search events..." 
-                            value={searchTerm} 
-                            onChange={(e) => setSearchTerm(e.target.value)} 
-                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-[#3B3BFA]/20 focus:border-[#3B3BFA] transition-all" 
-                        />
-                        <svg className="w-5 h-5 absolute left-3 top-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+            <div className="text-left">
+                <div className="flex flex-col lg:flex-row gap-3 mb-6 justify-between items-center">
+                    <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full lg:w-auto">
+                        <div className="relative flex-1 max-w-md">
+                            <input 
+                                type="text" 
+                                placeholder="Search events..." 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700 placeholder-slate-400 shadow-sm" 
+                            />
+                            <svg className="w-5 h-5 absolute left-3 top-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <select 
+                            value={filter} 
+                            onChange={(e) => setFilter(e.target.value as any)} 
+                            className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide text-slate-700 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shrink-0 shadow-sm"
+                        >
+                            <option value="ALL">All States</option>
+                            {Object.values(ProgramStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                     </div>
-                    <select 
-                        value={filter} 
-                        onChange={(e) => setFilter(e.target.value as any)} 
-                        className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest outline-none cursor-pointer focus:ring-2 focus:ring-[#3B3BFA]/20 focus:border-[#3B3BFA] transition-all"
-                    >
-                        <option value="ALL">All States</option>
-                        {Object.values(ProgramStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    
+                    {/* Bulk Export Actions */}
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 lg:justify-end shrink-0 w-full lg:w-auto">
+                        <button 
+                        onClick={() => generateStudentCards('detailed')}
+                        disabled={isExporting}
+                        className="col-span-1 flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm uppercase tracking-wide"
+                        >
+                        <Download className="w-4 h-4 opacity-70 shrink-0" /> <span className="truncate">Participation Lists</span>
+                        </button>
+                        <button 
+                        onClick={generateBulkCertificates}
+                        disabled={isExporting}
+                        className="col-span-1 flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm uppercase tracking-wide"
+                        >
+                        <Download className="w-4 h-4 opacity-70 shrink-0" /> <span className="truncate">Bulk Certificates</span>
+                        </button>
+                        <button 
+                        onClick={() => generateStudentCards('simple')}
+                        disabled={isExporting}
+                        className="col-span-2 sm:col-span-1 flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2.5 bg-white text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm uppercase tracking-wide"
+                        >
+                        <Download className="w-4 h-4 opacity-70 shrink-0" /> <span className="truncate">Chest Number Cards</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* TABLE HEADER - Image 1 Style */}
-                <div className="hidden lg:flex items-center justify-between px-6 py-4 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 gap-4">
-                    <div className="flex-1 pl-12">Event</div>
-                    <div className="w-[100px] text-center">Category</div>
-                    <div className="w-[450px] text-right pr-2">Actions</div>
+                <div className="hidden lg:flex items-center justify-between px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2 gap-4">
+                    <div className="flex-1 pl-[52px]">Event</div>
+                    <div className="w-[140px] text-center">Category</div>
+                    <div className="w-[120px] text-center">Registrations</div>
+                    <div className="w-[140px] text-center">Status</div>
+                    <div className="w-[340px] text-right pr-6">Actions</div>
                 </div>
 
                 <div className="space-y-3">
@@ -223,6 +636,8 @@ export const ProgramList: React.FC<ProgramListProps> = ({
                                     customScores={customScores}
                                     staffs={staffs}
                                     allPrograms={programs}
+                                    onPrintCertificate={generateProgramCertificates}
+                                    onDownloadPoster={generatePoster}
                                 />
                             ))}
                             {filteredPrograms.length === 0 && (
@@ -364,6 +779,70 @@ export const ProgramList: React.FC<ProgramListProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Progress Modal */}
+            {exportProgress && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
+                <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm w-full text-center">
+                    <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                    <h3 className="text-lg font-black text-slate-800 mb-1">Generating {exportProgress.label}...</h3>
+                    <p className="text-sm font-bold text-slate-500 mb-4">Processing page {exportProgress.current} of {exportProgress.total}</p>
+                    <div className="w-full bg-slate-100 rounded-full h-2.5 mb-3 overflow-hidden shadow-inner">
+                        <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 relative overflow-hidden" style={{ width: `${(exportProgress.current / exportProgress.total) * 100}%` }}>
+                        <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_1s_infinite]"></div>
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-2 italic font-medium">Please do not close or switch tabs.</p>
+                </div>
+                </div>
+            )}
+
+            {/* Hidden Rendering Container for html2canvas */}
+            <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none', opacity: 0 }}>
+                {exportItem && (
+                    <div id="export-render-container" className="bg-white">
+                    {exportItem.type === 'certificate' && (
+                        <CertificateTemplate 
+                            backgroundUrl={exportItem.bgUrl} 
+                            {...exportItem.data} 
+                            bgPositionX={exportItem.config?.bgPositionX}
+                            bgPositionY={exportItem.config?.bgPositionY}
+                            bgScale={exportItem.config?.bgScale}
+                            festName={exportItem.data.festName}
+                        />
+                    )}
+                    {exportItem.type === 'studentCards' && (
+                        <StudentCardBatchTemplate 
+                            students={exportItem.data} 
+                            layoutType={exportItem.config?.layout as any} 
+                            backgroundUrl={exportItem.config?.layout === 'detailed' ? exportItem.bgUrl : undefined}
+                            cardsPerPage={exportItem.config?.cardsPerPage} 
+                            bgPositionX={exportItem.config?.bgPositionX}
+                            bgPositionY={exportItem.config?.bgPositionY}
+                            bgScale={exportItem.config?.bgScale}
+                            festName={exportItem.festName}
+                        />
+                    )}
+                    {exportItem.type === 'poster' && (
+                        <PosterTemplate
+                            backgroundUrl={exportItem.data.bgUrl}
+                            eventName={exportItem.data.program.name}
+                            category={exportItem.data.program.category}
+                            winners={exportItem.data.winners}
+                            contentTop={exportItem.data.config?.contentTop}
+                            contentLeft={exportItem.data.config?.contentLeft}
+                            textAlign={exportItem.data.config?.textAlign}
+                            textColor={exportItem.data.config?.textColor}
+                            secondaryColor={exportItem.data.config?.secondaryColor}
+                            posterSize={exportItem.data.config?.posterSize}
+                            bgPositionX={exportItem.data.config?.bgPositionX}
+                            bgPositionY={exportItem.data.config?.bgPositionY}
+                            bgScale={exportItem.data.config?.bgScale}
+                        />
+                    )}
+                    </div>
+                )}
+            </div>
         </>
     );
 };

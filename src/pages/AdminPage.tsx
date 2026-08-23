@@ -1,13 +1,19 @@
-import React, { useState, useMemo } from 'react';
-import { Program, ProgramStatus, Staff } from '../types';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Program, ProgramStatus, Staff, ParticipantSummary } from '../types';
 import { StaffCredentialModal } from '../components/StaffCredentialModal';
 import { ProgramList } from '../components/ProgramList';
 import { ParticipantList } from '../components/ParticipantList';
 import { ProgramFormModal } from '../components/ProgramFormModal';
 import { ConsolidationView } from '../components/ConsolidationView';
+import { calculateConsolidatedResults } from '../utils/consolidationCalc';
 import { ScheduleManager } from '../components/ScheduleManager';
 import { BulkUploadModal } from '../components/BulkUploadModal';
 import { CATEGORIES, ZONES } from '../constants/categories';
+import { PublishingPage } from './PublishingPage';
+import { jsPDF } from 'jspdf';
+import { toJpeg } from 'html-to-image';
+import { getBackgroundSettings } from '../services/backgroundService';
+import { CertificateTemplate } from '../components/generators/CertificateTemplate';
 
 interface AdminPageProps {
   programs: Program[];
@@ -20,14 +26,15 @@ interface AdminPageProps {
   updateStaff: (id: string, updates: Partial<Staff>) => Promise<boolean>;
   deleteStaff: (id: string) => Promise<boolean>;
   settings?: any;
-  updateSettings?: (updates: any) => Promise<boolean>;
-  adminSubView?: 'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results';
+  adminSubView?: string;
+  pendingRequestsCount?: number;
 }
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   programs, setPrograms, addProgram, updateProgram, deleteProgram,
-  staffs, addStaff, updateStaff, deleteStaff, settings, updateSettings, adminSubView
+  staffs, addStaff, updateStaff, deleteStaff, settings, updateSettings, pendingRequestsCount
 }) => {
+  const [activeTab, setActiveTab] = useState<'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results' | 'publishing'>('tracker');
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
   const showOverallPoints = settings?.showOverallLeaderboardInPublic === true;
 
@@ -38,11 +45,64 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     setIsUpdatingSettings(false);
   };
 
+  const eligibleForGR = useMemo(() => {
+    return programs.filter(p => {
+      const participantCount = p.teams?.reduce((acc, team) => acc + (team.participants?.length || 0), 0) || 0;
+      return p.status === ProgramStatus.PENDING && participantCount > 0;
+    });
+  }, [programs]);
+
+  const allInGR = eligibleForGR.length > 0 && eligibleForGR.every(p => p.isPublished);
+
+  const handleToggleAllToGR = () => {
+    if (isUpdatingSettings) return;
+    
+    if (eligibleForGR.length === 0) {
+      setModalConfig({
+        isOpen: true,
+        title: 'Notice',
+        message: 'No pending events with performers found.',
+        confirmVariant: 'primary',
+        confirmText: 'OK',
+        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
+      });
+      return;
+    }
+
+    setModalConfig({
+      isOpen: true,
+      title: allInGR ? 'Recall All' : 'Send All to GR',
+      message: allInGR 
+        ? 'Are you sure you want to recall ALL eligible events from the Green Room?' 
+        : 'Are you sure you want to send ALL eligible events to the Green Room?',
+      confirmVariant: allInGR ? 'warning' : 'primary',
+      confirmText: allInGR ? 'Yes, Recall' : 'Yes, Send All',
+      onConfirm: async () => {
+        setIsUpdatingSettings(true);
+        const targetState = !allInGR;
+        
+        const updatePromises = eligibleForGR.map(p => {
+          if (p.isPublished !== targetState) {
+            return updateProgram(p.id, { isPublished: targetState });
+          }
+          return Promise.resolve(true);
+        });
+        
+        await Promise.all(updatePromises);
+        setIsUpdatingSettings(false);
+      }
+    });
+  };
+
   // Removed local subTab state, using adminSubView prop
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [isGroup, setIsGroup] = useState(false);
+  
+  // Individual certificate state
+  const [certExportItem, setCertExportItem] = useState<any>(null);
+  const [isCertExporting, setIsCertExporting] = useState(false);
   
   // Staff Modal State
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -104,12 +164,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const handleSaveProgram = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const programData = {
-      name: formData.get('name') as string,
+    
+    // In edit mode, it might still be name (if we didn't change it), but we changed it to 'names' in the form
+    const namesStr = formData.get('names') as string;
+    const names = namesStr.split('\n').map(n => n.trim()).filter(n => n);
+
+    if (names.length === 0) return;
+
+    const baseProgramData = {
       category: formData.get('category') as string,
       zone: formData.get('zone') as string,
       duration: Number(formData.get('duration')) || 30,
-      startTime: editingProgram?.startTime, // Preserved, assigned in ScheduleManager
+      startTime: editingProgram?.startTime, 
       endTime: editingProgram?.endTime,
       venue: editingProgram?.venue,
       isGroup,
@@ -120,23 +186,31 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       teams: editingProgram ? (editingProgram.teams || []) : [],
       description: editingProgram ? editingProgram.description : '',
     };
-    let success = false;
+
+    let success = true;
+
     if (editingProgram) {
-      success = await updateProgram(editingProgram.id, programData);
+      // If editing, we only update the first name provided (bulk edit not supported)
+      success = await updateProgram(editingProgram.id, { ...baseProgramData, name: names[0] });
     } else {
-      success = await addProgram(programData as Omit<Program, 'id' | 'festId'>);
+      // Bulk add all names
+      for (const name of names) {
+        const added = await addProgram({ ...baseProgramData, name } as Omit<Program, 'id' | 'festId'>);
+        if (!added) success = false;
+      }
     }
     
     if (success) {
       if (!editingProgram) {
         (e.target as HTMLFormElement).reset();
+        setShowProgramModal(false); // Optionally close after bulk add, or leave open. Let's close it for better UX.
       } else {
         setShowProgramModal(false);
       }
       setEditingProgram(null);
       setIsGroup(false);
     } else {
-      alert("Failed to save program. Please check console or try again.");
+      alert("Failed to save some programs. Please check console or try again.");
     }
   };
 
@@ -185,104 +259,163 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     });
   };
 
-  const activeTab = adminSubView || 'tracker';
-
   return (
     <div className="max-w-7xl mx-auto space-y-6 font-sans">
       
       {/* HEADER - Image 1 Style */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-        <div>
-          <h1 className="text-[28px] font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
-            Welcome back, Admin! <span className="text-2xl animate-wave origin-bottom-right">👋</span>
-          </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">Here's what's happening at your festival.</p>
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
+        {/* Top bar on mobile (Title + Add Button) / Left section on desktop (Title only) */}
+        <div className="flex items-center justify-between w-full xl:w-auto gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-[28px] font-black text-slate-900 uppercase tracking-tight flex items-center gap-2 sm:gap-3">
+              Welcome back, Admin! <span className="text-xl sm:text-2xl animate-wave origin-bottom-right">👋</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5 sm:mt-1 hidden sm:block">Here's what's happening at your festival.</p>
+          </div>
+
+          {/* Add Event Button for Mobile/Tablet (Top Right) */}
+          <button 
+            onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
+            className="xl:hidden px-3.5 sm:px-5 py-2 sm:py-2.5 bg-[#3B3BFA] hover:bg-blue-700 text-white rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-widest shadow-md shadow-blue-500/30 transition-all flex items-center gap-1.5 shrink-0"
+          >
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            <span className="hidden sm:inline">Add Event</span>
+            <span className="sm:hidden">Add</span>
+          </button>
         </div>
-        <div className="flex gap-3 items-center flex-wrap justify-end">
+        
+        {/* Controls Container: Row 2 on Mobile/Tablet, Right side of Row 1 on Desktop */}
+        <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto custom-scrollbar pb-1 xl:pb-0 w-full xl:w-auto xl:justify-end shrink-0">
           {/* Quick Toggle */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-200 shadow-sm sm:mr-2">
-             <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-600">Public Leaderboard</span>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl border border-slate-200 shadow-sm shrink-0">
+             <span className="text-[10px] font-bold uppercase text-slate-800 whitespace-nowrap">Public Leaderboard</span>
              <button
                onClick={handleToggleOverallPoints}
                disabled={isUpdatingSettings}
-               className={`w-10 h-5 rounded-full p-0.5 transition-colors flex shrink-0 ${showOverallPoints ? 'bg-emerald-500' : 'bg-slate-300'} ${isUpdatingSettings ? 'opacity-50' : ''}`}
+               className={`w-9 h-5 rounded-full p-0.5 transition-colors flex shrink-0 ${showOverallPoints ? 'bg-emerald-400' : 'bg-slate-300'} ${isUpdatingSettings ? 'opacity-50' : ''}`}
              >
-               <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${showOverallPoints ? 'translate-x-5' : 'translate-x-0'}`} />
+               <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${showOverallPoints ? 'translate-x-4' : 'translate-x-0'}`} />
              </button>
           </div>
-          
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setShowBulkUploadModal(true)} 
-              className="px-6 py-3 bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm transition-all flex items-center gap-2 shrink-0"
-            >
-              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-              Bulk Upload 
-            </button>
-            <button 
-              onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
-              className="px-6 py-3 bg-[#3B3BFA] hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 shrink-0"
-            >
-              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-              Add Event
-            </button>
+
+          {/* All to GR Toggle */}
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl border border-slate-200 shadow-sm shrink-0">
+             <span className="text-[10px] font-bold uppercase text-slate-800 whitespace-nowrap">Auto to GR</span>
+             <button
+               onClick={handleToggleAllToGR}
+               disabled={isUpdatingSettings || eligibleForGR.length === 0}
+               className={`w-9 h-5 rounded-full p-0.5 transition-colors flex shrink-0 ${allInGR ? 'bg-emerald-400' : 'bg-slate-300'} ${(isUpdatingSettings || eligibleForGR.length === 0) ? 'opacity-50' : ''}`}
+             >
+               <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${allInGR ? 'translate-x-4' : 'translate-x-0'}`} />
+             </button>
           </div>
+
+          {/* Add Event Button for Desktop */}
+          <button 
+            onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
+            className="hidden xl:flex px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider shadow-md transition-all items-center gap-2 shrink-0 whitespace-nowrap"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
+            Add Event
+          </button>
+          
+          {/* Bulk Upload */}
+          <button 
+            onClick={() => setShowBulkUploadModal(true)} 
+            className="px-4 py-2.5 bg-white text-blue-800 border border-slate-200 hover:bg-slate-50 rounded-xl text-[11px] font-bold uppercase tracking-wider shadow-sm transition-all flex items-center gap-2 shrink-0 whitespace-nowrap"
+          >
+            <svg className="w-4 h-4 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            Bulk Upload 
+          </button>
         </div>
       </div>
       
-      {/* METRIC CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-2">
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 shrink-0">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              </div>
-              <div className="min-w-0">
-                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Events</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">{programs.length}</p>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Across all categories</p>
-              </div>
-          </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-              </div>
-              <div className="min-w-0">
-                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Performers</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
-                      {programs.reduce((acc, p) => acc + (p.teams?.reduce((a, t) => a + (t.participants?.length || 0), 0) || 0), 0)}
-                  </p>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Registered</p>
-              </div>
-          </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 shrink-0">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-              </div>
-              <div className="min-w-0">
-                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Teams</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
-                      {programs.reduce((acc, p) => acc + (p.teams?.length || 0), 0)}
-                  </p>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Participating</p>
-              </div>
-          </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 shrink-0">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-              </div>
-              <div className="min-w-0">
-                  <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Points</p>
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
-                      {programs.reduce((acc, p) => acc + (p.teams?.reduce((teamAcc, t) => teamAcc + (t.points || 0) + (t.participants?.reduce((pAcc, pt) => pAcc + (pt.points || 0), 0) || 0), 0) || 0), 0).toLocaleString()}
-                  </p>
-                  <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Points awarded</p>
-              </div>
-          </div>
+      {/* TAB NAVIGATION */}
+      <div className="flex flex-wrap w-full gap-1 sm:gap-2 border-b border-slate-200 pb-2 mb-6">
+        {[
+          { id: 'tracker', label: 'Events' },
+          { id: 'scheduler', label: 'Schedule' },
+          { id: 'results', label: 'Results' },
+          { id: 'performers', label: 'Students' },
+          { id: 'requests', label: 'Requests', badge: pendingRequestsCount },
+          { id: 'staff', label: 'Staff Setup' },
+          { id: 'publishing', label: 'Posters & Cirticates' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center justify-center gap-1 sm:gap-2 px-2.5 sm:px-4 py-2 text-[10px] sm:text-xs md:text-sm font-black uppercase tracking-wider transition-all rounded-xl
+              ${activeTab === tab.id
+                ? 'bg-[#3B3BFA] text-white border border-slate-200 font-black'
+                : 'bg-blue-50 text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            {tab.label}
+            {(tab.badge || 0) > 0 && (
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ml-1 ${activeTab === tab.id ? 'bg-[#3B3BFA] text-white' : 'bg-rose-500 text-white'}`}>
+                {tab.badge}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* TAB CONTENT */}
       <div key={activeTab} className="w-full animate-fadeIn transition-all duration-300 ease-in-out">
-        {activeTab === 'tracker' && <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} staffs={staffs} />}
+        {activeTab === 'tracker' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-2">
+                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 shrink-0">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Events</p>
+                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">{programs.length}</p>
+                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Across all categories</p>
+                    </div>
+                </div>
+                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Performers</p>
+                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
+                            {programs.reduce((acc, p) => acc + (p.teams?.reduce((a, t) => a + (t.participants?.length || 0), 0) || 0), 0)}
+                        </p>
+                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Registered</p>
+                    </div>
+                </div>
+                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 shrink-0">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Teams</p>
+                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
+                            {programs.reduce((acc, p) => acc + (p.teams?.length || 0), 0)}
+                        </p>
+                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Participating</p>
+                    </div>
+                </div>
+                <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 transition-transform hover:-translate-y-1 duration-300">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 shrink-0">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight truncate">Total Points</p>
+                        <p className="text-xl sm:text-2xl font-black text-slate-900 leading-none my-1">
+                            {calculateConsolidatedResults(programs).sortedTeams.reduce((sum, t) => sum + t.score, 0).toLocaleString()}
+                        </p>
+                        <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold hidden xl:block truncate">Points awarded</p>
+                    </div>
+                </div>
+            </div>
+            
+            <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} staffs={staffs} />
+          </div>
+        )}
 
         {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} />}
         
@@ -292,7 +425,65 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {activeTab === 'performers' && <ParticipantList programs={programs} deleteParticipant={async (chestNo) => {
+        {activeTab === 'performers' && <ParticipantList programs={programs} onPrintCertificate={async (p) => {
+          if (isCertExporting) return;
+          setIsCertExporting(true);
+          const festId = programs[0]?.festId;
+          if (!festId) { setIsCertExporting(false); return; }
+
+          const backgrounds = await getBackgroundSettings(festId);
+          const bgId = Object.keys(backgrounds?.certificateBgs || {})[0];
+          const bgUrlOriginal = bgId ? backgrounds!.certificateBgs[bgId] : undefined;
+          const config = bgId ? backgrounds!.configs?.[bgId] : (backgrounds?.configs?.['blank'] || {
+            bgPositionX: 50, bgPositionY: 50, bgScale: 100
+          });
+
+          if (!backgrounds) { alert('Unable to fetch configurations.'); setIsCertExporting(false); return; }
+
+          // Convert bg to base64
+          let bgUrl = bgUrlOriginal;
+          if (bgUrlOriginal) {
+            try {
+              const response = await fetch(bgUrlOriginal);
+              const blob = await response.blob();
+              bgUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+            } catch { /* use original */ }
+          }
+
+          const rawFestId = festId;
+          const festParts = rawFestId.split('-');
+          const cleanFestName = (festParts.length > 1 ? festParts.slice(0, -1).join(' ') : rawFestId).toUpperCase();
+
+          const pData = {
+            participantName: p.name,
+            chestNo: p.chestNumber,
+            team: p.teamName,
+            category: cleanFestName,
+            events: p.programNames,
+            festName: cleanFestName
+          };
+
+          setCertExportItem({ data: pData, bgUrl, config });
+          await new Promise(resolve => setTimeout(resolve, 150));
+
+          const element = document.getElementById('admin-cert-render-container');
+          if (element) {
+            try {
+              const pdf = new jsPDF('p', 'px', [794, 1123]);
+              const imgData = await toJpeg(element, { quality: 0.8, pixelRatio: 1.5, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
+              pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
+              pdf.save(`${p.name}_Certificate.pdf`);
+            } catch (e) { console.error('Error:', e); }
+          }
+
+          setCertExportItem(null);
+          setIsCertExporting(false);
+        }} deleteParticipant={async (chestNo) => {
           if (!window.confirm(`Are you SURE you want to completely delete participant (Chest No: ${chestNo}) from the entire festival? This will remove them from ALL programs. This action cannot be undone.`)) return;
           
           const updatePromises = programs.map(async (p) => {
@@ -441,6 +632,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             </div>
           </div>
         )}
+
+        {activeTab === 'publishing' && (
+          <PublishingPage festId={programs[0]?.festId || 'default-fest'} />
+        )}
       </div>
              
       <ProgramFormModal show={showProgramModal} onClose={() => { setShowProgramModal(false); setEditingProgram(null); setIsGroup(false); }} onSave={handleSaveProgram} editingProgram={editingProgram} isGroup={isGroup} setIsGroup={setIsGroup} categories={settings?.categories || CATEGORIES} zones={settings?.zones || ZONES} />
@@ -502,6 +697,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         </div>
       )}
+      {/* Hidden Rendering Container for individual cert export */}
+      <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none', opacity: 0 }}>
+        {certExportItem && (
+          <div id="admin-cert-render-container" className="bg-white">
+            <CertificateTemplate 
+              backgroundUrl={certExportItem.bgUrl} 
+              {...certExportItem.data} 
+              bgPositionX={certExportItem.config?.bgPositionX}
+              bgPositionY={certExportItem.config?.bgPositionY}
+              bgScale={certExportItem.config?.bgScale}
+              festName={certExportItem.data.festName}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

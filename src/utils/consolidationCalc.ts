@@ -12,7 +12,7 @@ export interface CandidateStat {
   thirds: number;
 }
 
-export const calculateConsolidatedResults = (programs: Program[]) => {
+export const calculateConsolidatedResults = (programs: Program[], includeUnpublished: boolean = false) => {
   const teamScores: Record<string, number> = {};
   const candidatesMap = new Map<string, CandidateStat>();
 
@@ -21,7 +21,7 @@ export const calculateConsolidatedResults = (programs: Program[]) => {
     return lower.includes('no stage') || lower.includes('non stage') || lower.includes('off stage') || lower.includes('off-stage');
   };
 
-  const completedPrograms = programs.filter(p => p.status === ProgramStatus.COMPLETED);
+  const completedPrograms = programs.filter(p => p.status === ProgramStatus.COMPLETED && (includeUnpublished || p.isResultPublished));
 
   completedPrograms.forEach(prog => {
     const isGrp = prog.isGroup;

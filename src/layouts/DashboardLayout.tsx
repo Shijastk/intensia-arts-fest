@@ -60,7 +60,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [adminSubView, setAdminSubView] = useState<'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results'>('tracker');
   
   const pendingRequestsCount = useMemo(() => {
     let count = 0;
@@ -202,7 +201,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             deleteStaff={deleteStaff!}
             settings={settings}
             updateSettings={updateSettings}
-            adminSubView={adminSubView}
+            pendingRequestsCount={pendingRequestsCount}
           />
         );
       case 'GREEN_ROOM':
@@ -302,32 +301,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                   Dashboard
                 </button>
-                {view === 'ADMIN' && (
-                  <div className="flex flex-col gap-1 pl-4 mt-1 border-l-2 border-white/20 ml-6">
-                    {[
-                      { id: 'tracker', label: 'Events & Scoring' },
-                      { id: 'scheduler', label: 'Schedule' },
-                      { id: 'results', label: 'Live Results' },
-                      { id: 'performers', label: 'Performers' },
-                      { id: 'requests', label: 'Requests', badge: pendingRequestsCount },
-                      { id: 'staff', label: 'Staff & Setup' }
-                    ].map(tab => (
-                      <button 
-                        key={tab.id}
-                        onClick={() => { setAdminSubView(tab.id as any); setIsSidebarOpen(false); }} 
-                        className={`flex items-center justify-between px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all
-                          ${adminSubView === tab.id ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
-                      >
-                        {tab.label}
-                        {(tab.badge || 0) > 0 && (
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${adminSubView === tab.id ? 'bg-white text-[#3B3BFA]' : 'bg-rose-500 text-white'}`}>
-                            {tab.badge}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
             

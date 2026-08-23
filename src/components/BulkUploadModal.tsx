@@ -15,7 +15,7 @@ interface BulkUploadModalProps {
 type TabType = 'programs' | 'students';
 
 export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose, addProgram, programs, updateProgram }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('programs');
+  const activeTab = 'programs';
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -291,12 +291,7 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
   };
 
   const handleTabSwitch = (tab: TabType) => {
-    if (isUploading) return;
-    setActiveTab(tab);
-    setParsedData([]);
-    setError(null);
-    setSuccessCount(0);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    // Deprecated. We only use programs tab now.
   };
 
   const programsPrompt = `CRITICAL INSTRUCTION: Do NOT generate visual cards, image widgets, HTML previews, or UI components. Output ONLY a real downloadable .csv file.
@@ -356,31 +351,9 @@ Rules:
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
           <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">
-            Bulk Upload Dashboard
+            Bulk Upload Programs (CSV)
           </h3>
           <button type="button" onClick={handleClose} disabled={isUploading} className="text-slate-400 hover:text-slate-600 font-bold text-lg leading-none disabled:opacity-50">✕</button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-slate-100">
-          <button 
-            onClick={() => handleTabSwitch('programs')}
-            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'programs' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/30' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            Upload Programs
-          </button>
-          <button 
-            onClick={() => handleTabSwitch('students')}
-            className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'students' ? 'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/30' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Upload Students
-          </button>
         </div>
 
         {/* Body */}

@@ -1,7 +1,10 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Program, ProgramStatus } from '../types';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../hooks/useSettings';
+import { getBackgroundSettings, BackgroundSettings } from '../services/backgroundService';
+import { PosterTemplate, WinnerDetails } from '../components/generators/PosterTemplate';
+import { toJpeg } from 'html-to-image';
 
 const extractZone = (category: string): string => {
   const catLower = category.toLowerCase();
@@ -54,9 +57,20 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedZone, setSelectedZone] = useState<string>('All');
   const [activeSlide, setActiveSlide] = useState(0);
+  const [backgrounds, setBackgrounds] = useState<BackgroundSettings | null>(null);
+  const [isGeneratingPoster, setIsGeneratingPoster] = useState(false);
+  const [posterRenderItem, setPosterRenderItem] = useState<any>(null);
+  const posterResolveRef = useRef<(() => void) | null>(null);
 
   const { settings } = useSettings(festId || null);
   const showOverallPoints = settings?.showOverallLeaderboardInPublic === true;
+
+  useEffect(() => {
+    if (!festId) return;
+    getBackgroundSettings(festId).then(bgs => setBackgrounds(bgs));
+  }, [festId]);
+
+  const hasPosterBg = backgrounds?.posterBgs && Object.keys(backgrounds.posterBgs).length > 0;
 
   const completedPrograms = useMemo(
     () => programs
@@ -72,11 +86,6 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
         if (team.points) {
           scores[team.teamName] = (scores[team.teamName] || 0) + team.points;
         }
-        team.participants?.forEach(p => {
-          if (p.points) {
-            scores[team.teamName] = (scores[team.teamName] || 0) + p.points;
-          }
-        });
       });
     });
     return Object.entries(scores)
@@ -85,6 +94,74 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
   }, [completedPrograms]);
 
   const latestPrograms = completedPrograms.slice(0, 5);
+
+  const getWinnersForProgram = (program: Program): WinnerDetails[] => {
+    const results: WinnerDetails[] = [];
+    if (program.isGroup) {
+      (program.teams || [])
+        .filter(t => t.rank && t.rank >= 1 && t.rank <= 3)
+        .sort((a, b) => (a.rank || 99) - (b.rank || 99))
+        .slice(0, 3)
+        .forEach(t => results.push({ place: t.rank as 1|2|3, name: t.teamName, team: '' }));
+    } else {
+      const allParts: any[] = [];
+      (program.teams || []).forEach(t =>
+        (t.participants || []).forEach(p => allParts.push({ ...p, teamName: t.teamName }))
+      );
+      allParts
+        .filter(p => p.rank && p.rank >= 1 && p.rank <= 3)
+        .sort((a, b) => (a.rank || 99) - (b.rank || 99))
+        .slice(0, 3)
+        .forEach(p => results.push({ place: p.rank as 1|2|3, name: p.name, team: p.teamName }));
+    }
+    return results;
+  };
+
+  const generateAndDownloadPoster = async (program: Program) => {
+    if (isGeneratingPoster || !hasPosterBg || !backgrounds) return;
+    const bgId = Object.keys(backgrounds.posterBgs!)[0];
+    const bgUrlOriginal = backgrounds.posterBgs![bgId];
+    const config = backgrounds.configs?.[bgId];
+
+    const winners = getWinnersForProgram(program);
+    if (winners.length === 0) return;
+
+    setIsGeneratingPoster(true);
+
+    // Convert to base64 to avoid CORS issues
+    let bgUrl = bgUrlOriginal;
+    try {
+      const res = await fetch(bgUrlOriginal);
+      const blob = await res.blob();
+      bgUrl = await new Promise<string>(resolve => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) { /* use original url */ }
+
+    setPosterRenderItem({ program, winners, config, bgUrl });
+    // Wait for DOM render
+    await new Promise<void>(resolve => { posterResolveRef.current = resolve; });
+
+    const element = document.getElementById('results-poster-render');
+    if (element) {
+      try {
+        const imgData = await toJpeg(element, {
+          quality: 0.95, pixelRatio: 1,
+          style: { transform: 'scale(1)', transformOrigin: 'top left' }
+        });
+        const link = document.createElement('a');
+        link.download = `${program.name.replace(/\s+/g, '_')}_Winner_Poster.jpg`;
+        link.href = imgData;
+        link.click();
+      } catch (e) { console.error('Poster generation failed', e); }
+    }
+
+    setPosterRenderItem(null);
+    posterResolveRef.current = null;
+    setIsGeneratingPoster(false);
+  };
 
   const carouselItems = useMemo(() => {
     const items: any[] = [];
@@ -318,13 +395,24 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                                 <div key={program.id} className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-4 px-6 py-5 hover:bg-slate-50/50 transition-colors group md:bg-white md:border md:border-slate-100 md:rounded-[1.5rem] md:shadow-sm lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none">
                                     <div className="col-span-3 pb-4 lg:pb-0 border-b border-slate-100 lg:border-0">
                                         <h3 className="text-base font-black text-slate-900 leading-tight mb-2 group-hover:text-emerald-700 transition-colors">{program.name}</h3>
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-wrap gap-2">
                                             <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest">
                                                 {program.category}
                                             </span>
                                             <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">
                                                 {program.isGroup ? 'GROUP' : 'INDIV'}
                                             </span>
+                                            {hasPosterBg && (
+                                              <button
+                                                onClick={() => generateAndDownloadPoster(program)}
+                                                disabled={isGeneratingPoster}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded text-[9px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                                title="Download Winner Poster"
+                                              >
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                {isGeneratingPoster ? '...' : 'Poster'}
+                                              </button>
+                                            )}
                                         </div>
                                     </div>
                                     
@@ -357,7 +445,7 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                 )}
         </div>
       </div>
-      <style dangerouslySetInnerHTML={{__html: `
+        <style dangerouslySetInnerHTML={{__html: `
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
@@ -368,6 +456,42 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
+
+      {/* Generating poster overlay */}
+      {isGeneratingPoster && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-violet-100 border-t-violet-600 rounded-full animate-spin" />
+            <p className="text-sm font-black text-slate-800 uppercase tracking-widest">Generating Poster...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden poster render container */}
+      <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none', opacity: 0 }}>
+        {posterRenderItem && (
+          <div
+            id="results-poster-render"
+            ref={(el) => { if (el && posterResolveRef.current) { setTimeout(posterResolveRef.current, 150); } }}
+          >
+            <PosterTemplate
+              backgroundUrl={posterRenderItem.bgUrl}
+              eventName={posterRenderItem.program.name}
+              category={posterRenderItem.program.category}
+              winners={posterRenderItem.winners}
+              contentTop={posterRenderItem.config?.contentTop}
+              contentLeft={posterRenderItem.config?.contentLeft}
+              textAlign={posterRenderItem.config?.textAlign}
+              textColor={posterRenderItem.config?.textColor}
+              secondaryColor={posterRenderItem.config?.secondaryColor}
+              posterSize={posterRenderItem.config?.posterSize}
+              bgPositionX={posterRenderItem.config?.bgPositionX}
+              bgPositionY={posterRenderItem.config?.bgPositionY}
+              bgScale={posterRenderItem.config?.bgScale}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

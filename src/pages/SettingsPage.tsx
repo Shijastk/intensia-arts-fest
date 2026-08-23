@@ -54,6 +54,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
   const [maxStudents, setMaxStudents] = useState<number>(settings?.maxStudentsPerTeam || 50);
   const [maxNonGeneral, setMaxNonGeneral] = useState<number>(settings?.maxNonGeneralPerStudent || 3);
   const [showOverallPoints, setShowOverallPoints] = useState<boolean>(settings?.showOverallLeaderboardInPublic ?? true);
+  
+  const [festName, setFestName] = useState(settings?.festName || 'Arts Fest');
+  const [festSlogan, setFestSlogan] = useState(settings?.festSlogan || 'The Art Form of Creativity');
+  const [theme, setTheme] = useState(settings?.theme || 'emerald');
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [alertModal, setAlertModal] = useState<{isOpen: boolean; message: string}>({isOpen: false, message: ''});
@@ -169,6 +174,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
         maxStudentsPerTeam: maxStudents,
         maxNonGeneralPerStudent: maxNonGeneral,
         showOverallLeaderboardInPublic: showOverallPoints,
+        festName,
+        festSlogan,
+        theme: theme as any,
       });
       setIsSaving(false);
       if (success) {
@@ -180,7 +188,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [categories, zones, maxStudents, maxNonGeneral, showOverallPoints, updateSettings]);
+  }, [categories, zones, maxStudents, maxNonGeneral, showOverallPoints, festName, festSlogan, theme, updateSettings]);
 
   // ── Custom score helpers ──────────────────────────────────────────────────
   const handleCustomFormChange = (section: 'gradePoints' | 'rankPoints', key: string, value: string) => {
@@ -238,6 +246,61 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
 
       <div className="space-y-5">
 
+      {/* ── Branding & Customization ── */}
+      <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+          <h2 className="text-xs font-black uppercase tracking-widest text-slate-900">Custom Branding</h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">Customize the landing page and certificate identity.</p>
+        </div>
+        <div className="p-5 space-y-5">
+          <div className="grid sm:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Festival Name</label>
+              <input
+                type="text" value={festName}
+                onChange={e => setFestName(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-indigo-600 outline-none"
+                placeholder="e.g. Intensia Arts Fest"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Festival Slogan</label>
+              <input
+                type="text" value={festSlogan}
+                onChange={e => setFestSlogan(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-indigo-600 outline-none"
+                placeholder="e.g. A Celebration of Culture"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-[10px] font-black text-slate-600 uppercase mb-2">Landing Page Theme</label>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setTheme('emerald')}
+                className={`w-16 h-16 rounded-2xl border-4 ${theme === 'emerald' ? 'border-emerald-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-emerald-600 via-teal-600 to-amber-500`}
+                title="Emerald & Amber"
+              />
+              <button 
+                onClick={() => setTheme('purple')}
+                className={`w-16 h-16 rounded-2xl border-4 ${theme === 'purple' ? 'border-purple-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-500`}
+                title="Royal Purple & Pink"
+              />
+              <button 
+                onClick={() => setTheme('blue')}
+                className={`w-16 h-16 rounded-2xl border-4 ${theme === 'blue' ? 'border-blue-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-blue-600 via-cyan-600 to-emerald-400`}
+                title="Ocean Blue & Cyan"
+              />
+              <button 
+                onClick={() => setTheme('crimson')}
+                className={`w-16 h-16 rounded-2xl border-4 ${theme === 'crimson' ? 'border-rose-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-rose-700 via-red-600 to-orange-500`}
+                title="Midnight Crimson & Orange"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ── Public Portal Settings ── */}
       <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -385,37 +448,67 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
             <button onClick={handleAddCategory} className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors">+ Add</button>
           </div>
           <div className="flex flex-wrap gap-2 mt-4">
-            {categories.map((cat, idx) => (
-              <div 
-                key={idx} 
-                draggable
-                onDragStart={() => setDraggedCatIdx(idx)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (draggedCatIdx !== null && draggedCatIdx !== idx) {
-                    const newCats = [...categories];
-                    const [moved] = newCats.splice(draggedCatIdx, 1);
-                    newCats.splice(idx, 0, moved);
-                    setCategories(newCats);
-                  }
-                  setDraggedCatIdx(null);
-                }}
-                className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-sm px-2.5 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all group select-none"
-              >
-                <div className="flex items-center justify-center bg-white border border-slate-200 w-5 h-5 rounded text-[9px] font-black text-slate-500 shadow-sm">
-                  {idx + 1}
-                </div>
-                <span className="text-xs font-bold text-slate-700 pr-1">{cat}</span>
-                <button
-                  onClick={() => handleRemoveCategory(cat)}
-                  className="flex items-center justify-center w-5 h-5 rounded-md text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition-colors leading-none"
-                  title="Remove"
+            {categories.map((cat, idx) => {
+              const isStage = cat.includes('(Stage)');
+              const isOffStage = cat.includes('(Off-Stage)');
+              const typeLabel = isStage ? 'Stage' : isOffStage ? 'Off-Stage' : 'None';
+              const baseName = cat.replace(/\s*\((Stage|Off-Stage)\)$/, '').trim();
+              
+              const toggleType = () => {
+                let newCat = baseName;
+                if (typeLabel === 'Stage') {
+                  newCat = `${baseName} (Off-Stage)`;
+                } else if (typeLabel === 'Off-Stage') {
+                  newCat = baseName; // Remove type (None)
+                } else {
+                  newCat = `${baseName} (Stage)`;
+                }
+                setCategories(categories.map((c, i) => i === idx ? newCat : c));
+              };
+
+              return (
+                <div 
+                  key={idx} 
+                  draggable
+                  onDragStart={() => setDraggedCatIdx(idx)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggedCatIdx !== null && draggedCatIdx !== idx) {
+                      const newCats = [...categories];
+                      const [moved] = newCats.splice(draggedCatIdx, 1);
+                      newCats.splice(idx, 0, moved);
+                      setCategories(newCats);
+                    }
+                    setDraggedCatIdx(null);
+                  }}
+                  className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-sm px-2.5 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all group select-none"
                 >
-                  ✕
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center justify-center bg-white border border-slate-200 w-5 h-5 rounded text-[9px] font-black text-slate-500 shadow-sm">
+                    {idx + 1}
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 pr-0.5">{baseName}</span>
+                  <button
+                    onClick={toggleType}
+                    className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border transition-colors ${
+                      isStage ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' : 
+                      isOffStage ? 'bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-100' : 
+                      'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                    }`}
+                    title={`Click to change type (Currently: ${typeLabel})`}
+                  >
+                    {typeLabel}
+                  </button>
+                  <button
+                    onClick={() => handleRemoveCategory(cat)}
+                    className="flex items-center justify-center w-5 h-5 rounded-md text-slate-400 hover:bg-rose-100 hover:text-rose-600 transition-colors leading-none"
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
             {categories.length === 0 && <p className="text-xs text-slate-400 italic">No categories added yet.</p>}
           </div>
           <p className="text-[11px] text-slate-400 italic flex items-center gap-2">
