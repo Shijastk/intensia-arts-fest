@@ -1,5 +1,5 @@
 import { auth, db } from '../config/firebase';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInAnonymously, signInWithPopup, signOut } from 'firebase/auth';
 import { ref, get, set, update } from 'firebase/database';
 import { User } from '../types';
 
@@ -72,6 +72,15 @@ export const authService = {
 
       if (!foundUser) {
         return { success: false, error: 'Invalid username or password.' };
+      }
+
+      // Staff/judge credentials are application-level credentials, not Firebase Auth
+      // credentials. Previously this left Firebase unauthenticated after a successful
+      // staff login, so RTDB writes (including submitting judge scores) could be rejected
+      // by database rules even though the judge was logged into the UI. Give staff users
+      // an authenticated Firebase session before they start using the database.
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
       }
 
       const userObj: User = {
