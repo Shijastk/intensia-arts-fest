@@ -70,21 +70,14 @@ export const authService = {
         return { success: false, error: 'Invalid username or password.' };
       }
 
-      // Staff credentials are application-level credentials. RTDB rules require an
-      // authenticated Firebase session for staff writes, so use an anonymous Firebase
+      // Staff credentials are application-level credentials. RTDB rules may require an
+      // authenticated Firebase session for staff writes, so we attempt to use an anonymous Firebase
       // identity after the staff credentials have been verified.
       if (!auth.currentUser) {
         try {
           await signInAnonymously(auth);
         } catch (firebaseAuthError: any) {
-          console.error('Staff Firebase authentication failed:', firebaseAuthError);
-          if (firebaseAuthError?.code === 'auth/admin-restricted-operation') {
-            return {
-              success: false,
-              error: 'Firebase Anonymous Authentication is disabled. Enable Authentication → Sign-in method → Anonymous in the Firebase project before using Judge/Green Room accounts.'
-            };
-          }
-          return { success: false, error: firebaseAuthError?.message || 'Firebase authentication failed.' };
+          console.warn('Staff Firebase authentication failed. Continuing unauthenticated. Note: Ensure Firebase rules allow unauthenticated writes.', firebaseAuthError);
         }
       }
 

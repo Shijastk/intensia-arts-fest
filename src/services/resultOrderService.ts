@@ -37,7 +37,7 @@ export const resultOrderService = {
 
   async getNextPublicationOrder(festId: string, programs: Program[]): Promise<number> {
     const order = await this.getPublicationOrder(festId, programs);
-    const values = Object.values(order);
+    const values = Object.values(order) as number[];
     return values.length ? Math.max(...values) + 1 : 1;
   }
 };
