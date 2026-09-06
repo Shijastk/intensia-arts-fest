@@ -55,6 +55,7 @@ export interface Program {
   zone?: string;
   isPublished?: boolean; // Flag for Green Room visibility (Publish to Green Room)
   isResultPublished?: boolean; // Flag for Public Result visibility (Publish to Website)
+  resultPublishedOrder?: number; // Stable publication order for public/Green Room results
   isAllocatedToJudge?: boolean; // Flag for Green Room allocation
   judgePanel?: string; // Stage/Panel assignment (e.g., "Stage 1", "Stage 2", "Panel A")
   isOffStage?: boolean;
