@@ -223,9 +223,9 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                {winner.grade}
              </span>
           )}
-          {winner.score > 0 && (
+          {winner.points > 0 && (
              <span className="text-[10px] font-bold text-slate-500">
-               Score: {winner.score}
+               {winner.points} Pts
              </span>
           )}
         </div>
@@ -358,7 +358,6 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                                <p className="text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest">{r.teamName}</p>
                                <div className="flex items-center gap-1.5 mt-1">
                                  {r.grade && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-black uppercase tracking-widest">{r.grade}</span>}
-                                 {r.score > 0 && <span className="text-slate-500 text-[10px] font-bold">Score: {r.score}</span>}
                                </div>
                              </div>
                            </div>

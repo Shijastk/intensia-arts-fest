@@ -74,9 +74,9 @@ const getWinnerNode = (results: any[], targetRank: number) => {
                         {winner.grade}
                     </span>
                 )}
-                {winner.score > 0 && (
+                {winner.points > 0 && (
                     <span className="text-[10px] font-bold text-slate-500">
-                        Score: {winner.score}
+                        {winner.points} Pts
                     </span>
                 )}
             </div>
