@@ -196,12 +196,7 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     if (selectedZone !== 'All') {
       filtered = filtered.filter(p => extractZone(p.category) === selectedZone);
     }
-    return filtered.sort((a, b) => {
-      const zoneA = extractZone(a.category);
-      const zoneB = extractZone(b.category);
-      const zoneOrder: Record<string, number> = { 'A': 1, 'B': 2, 'C': 3, 'General': 4 };
-      return (zoneOrder[zoneA] || 5) - (zoneOrder[zoneB] || 5);
-    });
+    return filtered;
   }, [completedPrograms, searchQuery, selectedZone]);
 
   const availableZones = useMemo(() => {
