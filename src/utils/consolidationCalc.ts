@@ -21,17 +21,26 @@ export const calculateConsolidatedResults = (programs: Program[], includeUnpubli
     return lower.includes('no stage') || lower.includes('non stage') || lower.includes('off stage') || lower.includes('off-stage');
   };
 
-  const completedPrograms = programs.filter(p => p.status === ProgramStatus.COMPLETED && (includeUnpublished || p.isResultPublished));
+  // General programs are separate from the student's Individual/Non-General score.
+  // Keep the same category convention already used by TeamLeaderPage for registration.
+  const isGeneralProgram = (category: string) =>
+    (category || '').toLowerCase().includes('general');
+
+  const completedPrograms = programs.filter(
+    p => p.status === ProgramStatus.COMPLETED && (includeUnpublished || p.isResultPublished)
+  );
 
   completedPrograms.forEach(prog => {
     const isGrp = prog.isGroup;
+    const isGeneral = isGeneralProgram(prog.category);
     const isOff = isOffStage(prog.category);
 
     prog.teams.forEach(team => {
       const tName = (team.teamName || 'UNKNOWN').toUpperCase().trim();
       if (!teamScores[tName]) teamScores[tName] = 0;
 
-      // Add Group points to Team Overall Score
+      // Group programs contribute their group result to Team Overall Score.
+      // A Group program remains Group based on prog.isGroup, regardless of participant count.
       if (isGrp) {
         const teamEventPts = team.points ?? (team.participants[0]?.points || 0);
         teamScores[tName] += teamEventPts;
@@ -59,14 +68,15 @@ export const calculateConsolidatedResults = (programs: Program[], includeUnpubli
         const pts = p.points || 0;
         const rank = p.rank || team.rank || 0;
 
-        // Add Individual points to Team Overall Score & Prathibha calculations
-        if (!isGrp) {
+        // Individual score MUST contain only Non-General Individual programs.
+        // General programs are deliberately excluded even when isGroup === false.
+        if (!isGrp && !isGeneral) {
           cand.totalPoints += pts;
           teamScores[tName] += pts;
           cand.individualPoints += pts;
           if (isOff) cand.offStagePoints += pts;
 
-          // Count achievements
+          // Count achievements only for Non-General Individual programs.
           if (rank === 1) cand.firsts += 1;
           else if (rank === 2) cand.seconds += 1;
           else if (rank === 3) cand.thirds += 1;
