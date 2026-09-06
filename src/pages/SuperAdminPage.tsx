@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ref, get, remove, update } from 'firebase/database';
 import { db, auth } from '../config/firebase';
 import { Shield, Trash2, Power, PowerOff, Layout, ExternalLink, LogOut, Download } from 'lucide-react';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { signInAnonymously, signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { downloadFestBackup } from '../utils/supremeAdminBackup';
 
@@ -26,18 +26,18 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
   useEffect(() => {
     const isSupreme = sessionStorage.getItem('supreme_admin_auth');
     if (isSupreme === 'true') {
-      const unsubscribe = auth.onAuthStateChanged((user) => {
-        let rawEmail = user?.email || '';
-        if (!rawEmail && user?.providerData) {
-          const googleProvider = user.providerData.find(p => p.providerId === 'google.com');
-          if (googleProvider?.email) rawEmail = googleProvider.email;
-        }
-        if (user && rawEmail && ALLOWED_EMAILS.includes(rawEmail.toLowerCase())) {
-          setIsAuthenticated(true);
-          fetchData();
-        }
-      });
-      return () => unsubscribe();
+      setIsAuthenticated(true);
+      if (auth.currentUser) {
+        fetchData();
+      } else {
+        signInAnonymously(auth)
+          .then(() => fetchData())
+          .catch((err: any) => {
+            setErrorMsg('Firebase authentication failed. Please ensure Anonymous Authentication is enabled in Firebase Console.');
+            console.error('Supreme Admin anonymous authentication failed:', err);
+            setLoading(false);
+          });
+      }
     }
   }, []);
 
@@ -45,29 +45,16 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
     e.preventDefault();
     if (passkey === 'supreme@2026') {
       try {
-        let currentUser = auth.currentUser;
-        if (!currentUser || !currentUser.email) {
-          const provider = new GoogleAuthProvider();
-          provider.addScope('email');
-          const result = await signInWithPopup(auth, provider);
-          currentUser = result.user;
-        }
-        let rawEmail = currentUser?.email || '';
-        if (!rawEmail && currentUser?.providerData) {
-          const googleProvider = currentUser.providerData.find(p => p.providerId === 'google.com');
-          if (googleProvider?.email) rawEmail = googleProvider.email;
-        }
-        const userEmail = rawEmail.toLowerCase();
-        if (!userEmail || !ALLOWED_EMAILS.includes(userEmail)) {
-          await signOut(auth);
-          alert(`Unauthorized account (${userEmail || 'No Email Found'}). You have been logged out. Please try again with an authorized Super Admin account.`);
-          return;
+        // Temporary emergency mode: Google authentication is disabled for Supreme Admin.
+        // Firebase Anonymous Auth keeps the database rules requiring auth != null working.
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
         }
         sessionStorage.setItem('supreme_admin_auth', 'true');
         setIsAuthenticated(true);
         fetchData();
       } catch (err: any) {
-        alert('Firebase Login Failed. You must be signed in to access the database. Error: ' + err.message);
+        alert('Supreme Admin Login Failed: ' + err.message);
       }
     } else {
       alert('Invalid passkey');
@@ -92,7 +79,7 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
       if (festsSnap.exists()) festsData = festsSnap.val();
     } catch (err: any) {
       console.warn("Permission denied on fests node", err);
-      fetchError = "Firebase Rules blocked reading BOTH users and fests. Please update your Firebase Database Rules in the console.";
+      fetchError = "Firebase Rules blocked reading BOTH users and fests. Please update the rules in Firebase Console.";
     }
     if (fetchError) setErrorMsg(fetchError);
     setFests(festsData);
@@ -166,7 +153,7 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
           <div className="flex items-center gap-3"><Shield className="h-8 w-8 text-indigo-500" /><h1 className="text-3xl font-bold">Supreme Admin Dashboard</h1></div>
           <div className="flex gap-4">
             <button onClick={fetchData} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors border border-gray-700">Refresh Data</button>
-            <button onClick={async () => { await signOut(auth); setIsAuthenticated(false); setPasskey(''); }} className="flex items-center gap-2 px-4 py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded-lg text-sm transition-colors border border-red-900"><LogOut className="h-4 w-4" />Logout</button>
+            <button onClick={async () => { await signOut(auth); sessionStorage.removeItem('supreme_admin_auth'); setIsAuthenticated(false); setPasskey(''); }} className="flex items-center gap-2 px-4 py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded-lg text-sm transition-colors border border-red-900"><LogOut className="h-4 w-4" />Logout</button>
           </div>
         </div>
         {loading ? (
