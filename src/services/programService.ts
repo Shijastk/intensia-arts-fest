@@ -2,7 +2,6 @@ import { db } from '../config/firebase';
 import { ref, get, set, update, remove, push, onValue } from 'firebase/database';
 import { Program } from '../types';
 
-// Firebase Realtime Database rejects undefined values anywhere in a write payload.
 const cleanData = (value: any): any => {
   if (value === undefined) return undefined;
   if (value === null) return null;
@@ -18,6 +17,16 @@ export const programService = {
       const data = snapshot.val();
       if (data) {
         const programsList = Object.keys(data).map(key => ({ ...data[key], id: key })) as Program[];
+        // Keep published results in their persisted publication order. Consumers that
+        // intentionally reverse this list (Results/Green Room) therefore get oldest -> newest.
+        programsList.sort((a, b) => {
+          const aOrder = a.resultPublishedOrder || 0;
+          const bOrder = b.resultPublishedOrder || 0;
+          if (aOrder && bOrder) return bOrder - aOrder;
+          if (aOrder) return -1;
+          if (bOrder) return 1;
+          return 0;
+        });
         callback(programsList);
       } else callback([]);
     }, (error) => { console.error('Firebase Subscription Error:', error); callback([]); });
@@ -34,24 +43,19 @@ export const programService = {
     const programRef = ref(db, `fests/${festId}/programs/${id}`);
     const finalUpdates: Partial<Program> = { ...updates };
 
-    // Result publication order is persisted at the moment a result is first published.
-    // This is done here so every existing result-publish path gets the same behavior.
     if (updates.isResultPublished === true) {
       const currentSnapshot = await get(programRef);
       const currentProgram = currentSnapshot.exists() ? currentSnapshot.val() : null;
       if (!currentProgram?.resultPublishedOrder) {
         const programsSnapshot = await get(ref(db, `fests/${festId}/programs`));
         const programsData = programsSnapshot.exists() ? programsSnapshot.val() : {};
-        const maxOrder = Object.values(programsData as Record<string, any>).reduce((max: number, program: any) => {
-          return Math.max(max, Number(program?.resultPublishedOrder) || 0);
-        }, 0);
+        const maxOrder = Object.values(programsData as Record<string, any>).reduce((max: number, program: any) => Math.max(max, Number(program?.resultPublishedOrder) || 0), 0);
         finalUpdates.resultPublishedOrder = maxOrder + 1;
       }
     }
 
-    const cleanedUpdates = cleanData(finalUpdates);
     try {
-      await update(programRef, cleanedUpdates);
+      await update(programRef, cleanData(finalUpdates));
       return true;
     } catch (error: any) {
       console.error('Firebase updateProgram failed:', { code: error?.code, message: error?.message, path: `fests/${festId}/programs/${id}` });
