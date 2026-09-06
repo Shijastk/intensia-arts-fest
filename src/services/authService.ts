@@ -6,7 +6,6 @@ import { User } from '../types';
 const googleProvider = new GoogleAuthProvider();
 
 export const authService = {
-  // 1. Admin Google Sign-In
   async loginWithGoogle() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -30,12 +29,11 @@ export const authService = {
         return { success: true, festId: null, isNewUser: true };
       }
     } catch (error: any) {
-      console.error("Google auth error:", error);
+      console.error('Google auth error:', error);
       return { success: false, error: error.message };
     }
   },
 
-  // 2. Staff / Judge Login (Username & Password)
   async loginStaff(username: string, pass: string, specificFestId?: string): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
       const festsRef = ref(db, 'fests');
@@ -48,11 +46,9 @@ export const authService = {
       const festsData = snapshot.val();
       let foundUser: any = null;
       let targetFestId = '';
-
       const festIdsToCheck = specificFestId ? [specificFestId] : Object.keys(festsData);
 
       for (const festId of festIdsToCheck) {
-        // Checking in the generic 'staff' node where we save them now
         const staffList = festsData[festId]?.staff;
         if (staffList) {
           for (const staffKey of Object.keys(staffList)) {
@@ -74,19 +70,28 @@ export const authService = {
         return { success: false, error: 'Invalid username or password.' };
       }
 
-      // Staff/judge credentials are application-level credentials, not Firebase Auth
-      // credentials. Previously this left Firebase unauthenticated after a successful
-      // staff login, so RTDB writes (including submitting judge scores) could be rejected
-      // by database rules even though the judge was logged into the UI. Give staff users
-      // an authenticated Firebase session before they start using the database.
+      // Staff credentials are application-level credentials. RTDB rules require an
+      // authenticated Firebase session for staff writes, so use an anonymous Firebase
+      // identity after the staff credentials have been verified.
       if (!auth.currentUser) {
-        await signInAnonymously(auth);
+        try {
+          await signInAnonymously(auth);
+        } catch (firebaseAuthError: any) {
+          console.error('Staff Firebase authentication failed:', firebaseAuthError);
+          if (firebaseAuthError?.code === 'auth/admin-restricted-operation') {
+            return {
+              success: false,
+              error: 'Firebase Anonymous Authentication is disabled. Enable Authentication → Sign-in method → Anonymous in the Firebase project before using Judge/Green Room accounts.'
+            };
+          }
+          return { success: false, error: firebaseAuthError?.message || 'Firebase authentication failed.' };
+        }
       }
 
       const userObj: User = {
         uid: foundUser.id || username,
         username: foundUser.username,
-        role: foundUser.role, // 'JUDGE' | 'GREEN_ROOM' | 'TEAM_LEADER'
+        role: foundUser.role,
         festId: targetFestId,
         displayName: foundUser.displayName || foundUser.username,
         ...(foundUser.judgePanel && { judgePanel: foundUser.judgePanel }),
@@ -95,7 +100,7 @@ export const authService = {
 
       return { success: true, user: userObj };
     } catch (error: any) {
-      console.error("Staff login error:", error);
+      console.error('Staff login error:', error);
       return { success: false, error: error.message };
     }
   },
@@ -103,17 +108,14 @@ export const authService = {
   async createFestForAdmin(userId: string, festName: string) {
     try {
       const festId = festName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(1000 + Math.random() * 9000);
-      
       const festRef = ref(db, `fests/${festId}`);
       await set(festRef, {
         name: festName,
         adminUid: userId,
         createdAt: new Date().toISOString()
       });
-
       const userRef = ref(db, `users/${userId}`);
       await update(userRef, { festId });
-
       return { success: true, festId };
     } catch (error: any) {
       return { success: false, error: error.message };
