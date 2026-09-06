@@ -4,6 +4,7 @@ import { GreenRoomProgramCard } from '../components/GreenRoomProgramCard';
 import { db } from '../config/firebase';
 import { ref, onValue } from 'firebase/database';
 import { calculateLeaderboardStats } from '../utils/statsCalculator';
+import { calculateConsolidatedResults } from '../utils/consolidationCalc';
 
 interface GreenRoomPageProps {
     programs: Program[];
@@ -233,21 +234,20 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
         .sort((a, b) => (a?.startTime || '').localeCompare(b?.startTime || ''));
 
     const stats = React.useMemo(() => calculateLeaderboardStats(programs), [programs]);
-    const availableZones = Object.keys(stats.zones).sort();
+    const consolidated = React.useMemo(() => calculateConsolidatedResults(programs), [programs]);
     
-    const overallTeamScoresMap: Record<string, { score: number, zone: string }> = {};
+    const teamZones: Record<string, string> = {};
     Object.entries(stats.zones).forEach(([zoneKey, zone]: [string, any]) => {
-        Object.entries(zone.teamScores as Record<string, number>).forEach(([teamName, score]) => {
-            if (!overallTeamScoresMap[teamName]) {
-                overallTeamScoresMap[teamName] = { score: 0, zone: zoneKey };
-            }
-            overallTeamScoresMap[teamName].score += score;
+        Object.keys(zone.teamScores as Record<string, number>).forEach(teamName => {
+            teamZones[teamName] = zoneKey;
         });
     });
     
-    const overallTeamScores = Object.entries(overallTeamScoresMap)
-        .map(([name, data]) => ({ name, score: data.score, zone: data.zone }))
-        .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    const overallTeamScores = consolidated.sortedTeams.map(t => ({
+        name: t.name,
+        score: t.score,
+        zone: teamZones[t.name] || 'General'
+    }));
 
     const completedPrograms = (programs || []).filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished).reverse();
 
