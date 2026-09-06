@@ -5,6 +5,7 @@ import { useSettings } from '../hooks/useSettings';
 import { getBackgroundSettings, BackgroundSettings } from '../services/backgroundService';
 import { PosterTemplate, WinnerDetails } from '../components/generators/PosterTemplate';
 import { toJpeg } from 'html-to-image';
+import { calculateConsolidatedResults } from '../utils/consolidationCalc';
 
 const extractZone = (category: string): string => {
   const catLower = category.toLowerCase();
@@ -77,27 +78,25 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
   const hasPosterBg = backgrounds?.posterBgs && Object.keys(backgrounds.posterBgs).length > 0;
 
   const completedPrograms = useMemo(
-    () => programs
-      .filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished)
-      .reverse(),
+    () => {
+      const getOrder = (p: Program) => typeof p.resultPublishedOrder === 'number' ? p.resultPublishedOrder : -1;
+      return [...programs]
+        .filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished)
+        .sort((a, b) => getOrder(b) - getOrder(a));
+    },
     [programs]
   );
 
-  const overallTeamScores = useMemo(() => {
-    const scores: Record<string, number> = {};
-    completedPrograms.forEach(program => {
-      program.teams?.forEach(team => {
-        if (team.points) {
-          scores[team.teamName] = (scores[team.teamName] || 0) + team.points;
-        }
-      });
-    });
-    return Object.entries(scores)
-      .map(([teamName, points]) => ({ teamName, points }))
-      .sort((a, b) => b.points - a.points);
-  }, [completedPrograms]);
+  const consolidated = useMemo(() => calculateConsolidatedResults(programs), [programs]);
 
-  const latestPrograms = completedPrograms.slice(0, 5);
+  const overallTeamScores = useMemo(() => {
+    return consolidated.sortedTeams.map(t => ({
+      teamName: t.name,
+      points: t.score
+    }));
+  }, [consolidated]);
+
+  const latestPrograms = useMemo(() => completedPrograms.slice(0, 5), [completedPrograms]);
 
   const getWinnersForProgram = (program: Program): WinnerDetails[] => {
     const results: WinnerDetails[] = [];
@@ -408,25 +407,34 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                             return (
                                 <div key={program.id} className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-4 px-6 py-5 hover:bg-slate-50/50 transition-colors group md:bg-white md:border md:border-slate-100 md:rounded-[1.5rem] md:shadow-sm lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none">
                                     <div className="col-span-3 pb-4 lg:pb-0 border-b border-slate-100 lg:border-0">
-                                        <h3 className="text-base font-black text-slate-900 leading-tight mb-2 group-hover:text-emerald-700 transition-colors">{program.name}</h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest">
-                                                {program.category}
-                                            </span>
-                                            <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">
-                                                {program.isGroup ? 'GROUP' : 'INDIV'}
-                                            </span>
-                                            {hasPosterBg && (
-                                              <button
-                                                onClick={() => generateAndDownloadPoster(program)}
-                                                disabled={isGeneratingPoster}
-                                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded text-[9px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-wait"
-                                                title="Download Winner Poster"
-                                              >
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                                {isGeneratingPoster ? '...' : 'Poster'}
-                                              </button>
+                                        <div className="flex items-start gap-3">
+                                            {typeof program.resultPublishedOrder === 'number' && (
+                                                <span className="flex-shrink-0 flex items-center justify-center min-w-[28px] h-[28px] rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black shadow-sm border border-emerald-200">
+                                                    #{program.resultPublishedOrder}
+                                                </span>
                                             )}
+                                            <div>
+                                                <h3 className="text-base font-black text-slate-900 leading-tight mb-2 group-hover:text-emerald-700 transition-colors">{program.name}</h3>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest">
+                                                        {program.category}
+                                                    </span>
+                                                    <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">
+                                                        {program.isGroup ? 'GROUP' : 'INDIV'}
+                                                    </span>
+                                                    {hasPosterBg && (
+                                                      <button
+                                                        onClick={() => generateAndDownloadPoster(program)}
+                                                        disabled={isGeneratingPoster}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded text-[9px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                                        title="Download Winner Poster"
+                                                      >
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                        {isGeneratingPoster ? '...' : 'Poster'}
+                                                      </button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     

@@ -249,7 +249,12 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
         zone: teamZones[t.name] || 'General'
     }));
 
-    const completedPrograms = (programs || []).filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished).reverse();
+    const completedPrograms = React.useMemo(() => {
+        const getOrder = (p: Program) => typeof p?.resultPublishedOrder === 'number' ? p.resultPublishedOrder : -1;
+        return [...(programs || [])]
+            .filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished)
+            .sort((a, b) => getOrder(b) - getOrder(a));
+    }, [programs]);
 
     const getTeamStyle = (index: number, isLeader: boolean) => {
         if (isLeader) {
@@ -278,6 +283,21 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                         <button onClick={() => setActiveTab('PROGRAMS')} className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === 'PROGRAMS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Programs</button>
                         <button onClick={() => setActiveTab('STATUS')} className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === 'STATUS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Status</button>
                         <button onClick={() => setActiveTab('GALLERY')} className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === 'GALLERY' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Gallery</button>
+                        <button onClick={async () => {
+                            let maxOrder = 0;
+                            (programs || []).forEach(p => {
+                                if (typeof p?.resultPublishedOrder === 'number') {
+                                    maxOrder = Math.max(maxOrder, p.resultPublishedOrder);
+                                }
+                            });
+                            const toUpdate = (programs || []).filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished && typeof p?.resultPublishedOrder !== 'number');
+                            if (toUpdate.length === 0) { alert('No missing orders found.'); return; }
+                            for (const p of toUpdate) {
+                                maxOrder++;
+                                await updateProgram(p.id, { resultPublishedOrder: maxOrder });
+                            }
+                            alert(`Fixed ${toUpdate.length} programs!`);
+                        }} className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap bg-amber-100 text-amber-700 hover:bg-amber-200">Fix Missing Orders</button>
                     </div>
                     {activeTab === 'PROGRAMS' && (
                         <div className="px-4 sm:px-5 py-2 bg-indigo-600 text-white rounded-xl text-center shadow-lg shadow-indigo-100 flex-shrink-0 flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-0">
@@ -354,14 +374,23 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                                     return (
                                         <div key={program.id} className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-4 px-4 sm:px-6 py-5 hover:bg-slate-50/50 transition-colors group">
                                             <div className="col-span-12 lg:col-span-3 pb-4 lg:pb-0 border-b border-slate-100 lg:border-0">
-                                                <h3 className="text-base font-black text-slate-900 leading-tight mb-2">{program.name}</h3>
-                                                <div className="flex flex-wrap gap-2">
-                                                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest">
-                                                        {program.category}
-                                                    </span>
-                                                    <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">
-                                                        {program.isGroup ? 'GROUP' : 'INDIV'}
-                                                    </span>
+                                                <div className="flex items-start gap-3">
+                                                    {typeof program.resultPublishedOrder === 'number' && (
+                                                        <span className="flex-shrink-0 flex items-center justify-center min-w-[28px] h-[28px] rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black shadow-sm border border-emerald-200">
+                                                            #{program.resultPublishedOrder}
+                                                        </span>
+                                                    )}
+                                                    <div>
+                                                        <h3 className="text-base font-black text-slate-900 leading-tight mb-2">{program.name}</h3>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-widest">
+                                                                {program.category}
+                                                            </span>
+                                                            <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-widest">
+                                                                {program.isGroup ? 'GROUP' : 'INDIV'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                             
