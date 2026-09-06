@@ -20,7 +20,9 @@ const getGroupResults = (teams: any[]) => {
       name: team.teamName,
       teamName: team.teamName,
       points: team.points || 0,
-      rank: team.rank || 999
+      rank: team.rank || 999,
+      score: team.score || 0,
+      grade: team.grade || ''
     };
   });
   return results.sort((a, b) => {
@@ -38,7 +40,9 @@ const getIndividualResults = (teams: any[]) => {
           name: p.name,
           teamName: team.teamName,
           points: p.points || 0,
-          rank: p.rank || 999
+          rank: p.rank || 999,
+          score: p.score || 0,
+          grade: p.grade || ''
         });
       }
     });
@@ -210,9 +214,21 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     const winner = results.find(r => r.rank === targetRank);
     if (!winner) return <span className="text-slate-300 text-xs italic">-</span>;
     return (
-      <div className="flex flex-col">
+      <div className="flex flex-col gap-0.5">
         <span className="text-sm font-black text-slate-900 truncate max-w-[200px]" title={winner.name}>{winner.name}</span>
         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate max-w-[200px]">{winner.teamName}</span>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {winner.grade && (
+             <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-widest">
+               {winner.grade}
+             </span>
+          )}
+          {winner.score > 0 && (
+             <span className="text-[10px] font-bold text-slate-500">
+               Score: {winner.score}
+             </span>
+          )}
+        </div>
       </div>
     );
   };
@@ -340,6 +356,10 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                              <div className="text-left">
                                <p className={`font-black uppercase tracking-tight leading-none mb-1 ${r.rank === 1 ? 'text-amber-700 text-lg md:text-xl' : 'text-slate-800 text-base md:text-lg'}`}>{r.name}</p>
                                <p className="text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest">{r.teamName}</p>
+                               <div className="flex items-center gap-1.5 mt-1">
+                                 {r.grade && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-black uppercase tracking-widest">{r.grade}</span>}
+                                 {r.score > 0 && <span className="text-slate-500 text-[10px] font-bold">Score: {r.score}</span>}
+                               </div>
                              </div>
                            </div>
                            <span className={`font-black tracking-tighter ${r.rank === 1 ? 'text-amber-600 text-2xl' : 'text-slate-500 text-xl'}`}>{r.points}</span>
