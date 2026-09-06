@@ -9,7 +9,8 @@ import { downloadFestBackup } from '../utils/supremeAdminBackup';
 const ALLOWED_EMAILS = [
   'shijastk.work@gmail.com',
   'tkshibily@gmail.com',
-  'shijasmuhammed573@gmail.com'
+  'shijasmuhammed573@gmail.com',
+  'muzzammil2007anu@gmail.com'
 ];
 
 export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string) => void }) => {
