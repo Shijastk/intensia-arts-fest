@@ -205,7 +205,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           />
         );
       case 'GREEN_ROOM':
-        return <GreenRoomPage programs={programs} setPrograms={setPrograms} updateProgram={updateProgram} />;
+        return <GreenRoomPage programs={programs} setPrograms={setPrograms} updateProgram={updateProgram} canManageOrders={String(currentUser.role).toLowerCase() === 'admin'} />;
       case 'JUDGES': {
         const isAdmin = String(currentUser.role).toLowerCase() === 'admin';
         const mockJudgeUser = isAdmin 
@@ -366,7 +366,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             </button>
           </div>
           
-          {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && (
+          {currentUser.isSuperAdmin === true && (
             <button 
               onClick={() => navigate('/supreme-admin')} 
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-900 hover:bg-indigo-800 text-white rounded-xl text-xs font-black uppercase transition-all shadow-md mt-2"

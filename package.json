@@ -6,7 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:rules": "node firebase/build-rules.mjs",
+    "test:rules": "firebase emulators:exec --project demo-intensia --only database \"node --test tests/database.rules.test.mjs\"",
+    "typecheck": "tsc --noEmit -p .",
+    "test:functions": "npm --prefix functions run build && firebase emulators:exec --project demo-intensia --only auth,database,functions \"node --test tests/functions.e2e.test.mjs\"",
+    "test:security": "npm run test:rules && npm run test:functions",
+    "emulators": "npm --prefix functions run build && firebase emulators:start --project demo-intensia --only auth,database,functions",
+    "emulators:rules": "node firebase/load-emulator-rules.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -28,11 +35,13 @@
     "react-router-dom": "^7.11.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/aos": "^3.0.8",
     "@types/node": "^22.14.0",
     "@types/papaparse": "^5.5.2",
     "@vitejs/plugin-react": "^5.0.0",
+    "firebase-tools": "^14.27.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

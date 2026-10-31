@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Program, ProgramStatus, CustomProgramScore, Team, Participant, Staff } from '../types';
 import { calculatePoints } from '../utils/pointsCalculator';
 import { AdminRegistrationModal } from './AdminRegistrationModal';
+import { isSuperAdminUi } from '../services/sessionFlags';
 
 interface ProgramAccordionProps {
   program: Program;
@@ -593,7 +594,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                             <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5 group/name">
                               <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                               {participant.name}
-                              {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && (
+                              {isSuperAdminUi() && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -736,7 +737,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                   <div className="flex items-center gap-1.5 group/name">
                                     <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                                     {p.name}
-                                    {window.sessionStorage.getItem('supreme_admin_auth') === 'true' && (
+                                    {isSuperAdminUi() && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();

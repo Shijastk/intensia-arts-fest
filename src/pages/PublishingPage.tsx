@@ -55,7 +55,7 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
     setUploading(true);
     try {
       const file = e.target.files[0];
-      const url = await uploadImageToImgBB(file);
+      const url = await uploadImageToImgBB(file, festId);
       const id = Date.now().toString();
       
       await saveBackground(festId, type, id, url);
@@ -76,7 +76,7 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
     setUploading(true);
     try {
       const file = e.target.files[0];
-      const url = await uploadImageToImgBB(file);
+      const url = await uploadImageToImgBB(file, festId);
       const newId = Date.now().toString();
       
       await saveBackground(festId, type, newId, url);

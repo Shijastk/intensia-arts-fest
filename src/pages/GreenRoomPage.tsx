@@ -10,6 +10,8 @@ interface GreenRoomPageProps {
     programs: Program[];
     setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
     updateProgram: (id: string, updates: Partial<Program>) => Promise<boolean>;
+    // Result ordering is an admin tool (the database rules reject it for green-room staff).
+    canManageOrders?: boolean;
 }
 
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -85,7 +87,7 @@ const getWinnerNode = (results: any[], targetRank: number) => {
     );
 };
 
-export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram }) => {
+export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram, canManageOrders = false }) => {
     const [judgePanels, setJudgePanels] = useState<string[]>([]);
     const [activeTab, setActiveTab] = useState<'PROGRAMS' | 'GALLERY' | 'STATUS'>('PROGRAMS');
     const [searchTerm, setSearchTerm] = useState('');
@@ -283,7 +285,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                         <button onClick={() => setActiveTab('PROGRAMS')} className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === 'PROGRAMS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Programs</button>
                         <button onClick={() => setActiveTab('STATUS')} className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === 'STATUS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Status</button>
                         <button onClick={() => setActiveTab('GALLERY')} className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap ${activeTab === 'GALLERY' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Gallery</button>
-                        <button onClick={async () => {
+                        {canManageOrders && <button onClick={async () => {
                             let maxOrder = 0;
                             (programs || []).forEach(p => {
                                 if (typeof p?.resultPublishedOrder === 'number') {
@@ -297,7 +299,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                                 await updateProgram(p.id, { resultPublishedOrder: maxOrder });
                             }
                             alert(`Fixed ${toUpdate.length} programs!`);
-                        }} className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap bg-amber-100 text-amber-700 hover:bg-amber-200">Fix Missing Orders</button>
+                        }} className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap bg-amber-100 text-amber-700 hover:bg-amber-200">Fix Missing Orders</button>}
                     </div>
                     {activeTab === 'PROGRAMS' && (
                         <div className="px-4 sm:px-5 py-2 bg-indigo-600 text-white rounded-xl text-center shadow-lg shadow-indigo-100 flex-shrink-0 flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-0">

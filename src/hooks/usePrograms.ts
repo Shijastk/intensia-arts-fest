@@ -1,8 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Program } from '../types';
-import { programService } from '../services/programService';
+import { programService, ProgramAccess } from '../services/programService';
 
-export const usePrograms = (festId: string | null) => {
+interface UseProgramsOptions {
+  // 'private': admins & green room (full data). 'public': score-free copy (public pages,
+  // team leaders). 'judge': public list + full data for the judge's own panel only.
+  access?: ProgramAccess;
+  judgePanel?: string;
+  // Team leaders change registrations through a Cloud Function, limited to their own team.
+  teamName?: string;
+}
+
+export const usePrograms = (festId: string | null, options: UseProgramsOptions = {}) => {
+  const { access = 'private', judgePanel, teamName } = options;
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,17 +23,17 @@ export const usePrograms = (festId: string | null) => {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
-    
+
     const unsubscribe = programService.subscribeToPrograms(festId, (data) => {
       setPrograms(data);
       setLoading(false);
       setError(null);
-    });
+    }, { access, judgePanel });
 
     return () => unsubscribe();
-  }, [festId]);
+  }, [festId, access, judgePanel]);
 
   const addProgram = async (programData: Omit<Program, 'id' | 'festId'>): Promise<boolean> => {
     if (!festId) return false;
@@ -39,7 +49,11 @@ export const usePrograms = (festId: string | null) => {
   const updateProgram = async (id: string, updates: Partial<Program>): Promise<boolean> => {
     if (!festId) return false;
     try {
-      await programService.updateProgram(festId, id, updates);
+      if (access === 'public' && teamName) {
+        await programService.updateOwnTeam(festId, id, teamName, updates);
+      } else {
+        await programService.updateProgram(festId, id, updates);
+      }
       return true;
     } catch (err: any) {
       console.error("Error updating program:", err);

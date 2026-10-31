@@ -547,22 +547,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     confirmText: 'Yes, Seed Defaults',
                     onConfirm: async () => {
                       const defaults: any[] = [
-                        { role: 'ADMIN', username: 'admin', password: 'admin123' },
-                        { role: 'GREEN_ROOM', username: 'greenroom', password: 'greenroom123' },
-                        { role: 'JUDGE', username: 'judge1', password: 'judge123', judgePanel: 'Stage 1' },
-                        { role: 'JUDGE', username: 'judge2', password: 'judge123', judgePanel: 'Stage 2' },
-                        { role: 'TEAM_LEADER', username: 'teamA', password: 'team123', teamName: 'Team A' },
-                        { role: 'TEAM_LEADER', username: 'teamB', password: 'team123', teamName: 'Team B' }
+                        { role: 'ADMIN', username: 'admin' },
+                        { role: 'GREEN_ROOM', username: 'greenroom' },
+                        { role: 'JUDGE', username: 'judge1', judgePanel: 'Stage 1' },
+                        { role: 'JUDGE', username: 'judge2', judgePanel: 'Stage 2' },
+                        { role: 'TEAM_LEADER', username: 'teamA', teamName: 'Team A' },
+                        { role: 'TEAM_LEADER', username: 'teamB', teamName: 'Team B' }
                       ];
-                      let addedCount = 0;
+                      // Every seeded account gets a random password, shown once here
+                      // (passwords are stored as hashes and cannot be displayed later).
+                      const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+                      const randomPassword = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => alphabet[b % alphabet.length]).join('');
+                      const created: string[] = [];
                       for (const d of defaults) {
                         if (!staffs?.find(s => s.username === d.username)) {
-                          await addStaff(d);
-                          addedCount++;
+                          const password = randomPassword();
+                          if (await addStaff({ ...d, password })) created.push(`${d.username} / ${password}`);
                         }
                       }
+                      const addedCount = created.length;
                       if (addedCount > 0) {
-                        alert(`Successfully seeded ${addedCount} new default credentials!`);
+                        alert(`Successfully seeded ${addedCount} new default credentials. Note these passwords now; they cannot be shown again:\n\n${created.join('\n')}`);
                       } else {
                         alert("All default credentials already exist.");
                       }
@@ -588,7 +593,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                           {staff.isDisabled && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px]">DISABLED</span>}
                         </h4>
                         <div className="flex gap-2 items-center mt-1">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase">Pass: <span className="font-mono bg-slate-100 px-1 rounded">{staff.password}</span></span>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Pass: <span className="font-mono bg-slate-100 px-1 rounded" title="Stored securely; edit the account to set a new password">••••••</span></span>
                           {(staff.stage || staff.panelName) && (
                             <>
                               <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
