@@ -98,3 +98,23 @@ describe('resolvePlacement (spacing as % of the page)', () => {
     expect(p.pad.left).toBe(48);
   });
 });
+
+describe('block position is independent of text alignment', () => {
+  it('right-aligned text positioned on the LEFT: spacing measured from the left edge', () => {
+    const p = resolvePlacement('posterBgs', { textAlign: 'right', blockPosition: 'left', contentSidePct: 10 });
+    expect(p.align).toBe('right');
+    expect(p.position).toBe('left');
+    expect(p.pad.left).toBe(108);
+    expect(p.pad.right).toBe(48);
+  });
+  it('left-aligned text positioned on the RIGHT: spacing measured from the right edge', () => {
+    const p = resolvePlacement('posterBgs', { textAlign: 'left', blockPosition: 'right', contentSidePct: 10 });
+    expect(p.position).toBe('right');
+    expect(p.pad.right).toBe(108);
+    expect(p.pad.left).toBe(48);
+  });
+  it('older configs without a position keep position = alignment', () => {
+    expect(resolvePlacement('posterBgs', { textAlign: 'right' }).position).toBe('right');
+    expect(resolvePlacement('certificateBgs', {}).position).toBe('center');
+  });
+});
