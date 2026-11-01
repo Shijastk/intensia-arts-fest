@@ -24,7 +24,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     const [filter, setFilter] = useState<ProgramStatus | 'ALL'>('ALL');
     const [sortBy, setSortBy] = useState<'name' | 'time' | 'category'>('name');
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null);
+    const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null);
     const [exportProgress, setExportProgress] = useState<{ current: number, total: number, label: string } | null>(null);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -71,6 +71,11 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         if (!newPublishedState && (program.status === ProgramStatus.JUDGING || program.status === ProgramStatus.COMPLETED)) {
             if (!await appDialog.confirm('Recalling this program will remove it from the judge\'s panel/Green Room and reset it to PENDING. Continue?', { variant: 'warning', title: 'Recall program', confirmText: 'Recall' })) return;
             updates.status = ProgramStatus.PENDING; updates.isAllocatedToJudge = false; updates.isResultPublished = false;
+        }
+        // A pending program is never with a judge; clear a leftover allocation from an earlier
+        // round, otherwise the Green Room hides it even though it was sent.
+        if (newPublishedState && program.status === ProgramStatus.PENDING && (program.isAllocatedToJudge || program.judgePanel)) {
+            updates.isAllocatedToJudge = false; updates.judgePanel = null as any;
         }
         if (updateProgram) { await updateProgram(id, updates); }
         else setPrograms(p => p.map(x => x.id === id ? { ...x, ...updates } : x));
