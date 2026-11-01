@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TemplateConfig } from '../../services/backgroundService';
-import { TEMPLATE_DEFAULTS, applyTextCase, contentPadding, fontStack, resolveTextRoles } from '../../services/exportService';
+import { TEMPLATE_DEFAULTS, applyTextCase, fontStack, resolvePlacement, resolveTextRoles } from '../../services/exportService';
 import { TemplateBackground } from './TemplateBackground';
 
 export interface WinnerDetails {
@@ -48,8 +48,6 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
   config = {}
 }) => {
   const c: TemplateConfig = config;
-  const top = contentTop ?? c.contentTop ?? D.contentTop!;
-  const side = contentLeft ?? c.contentLeft ?? D.contentLeft!;
   const align = textAlign ?? c.textAlign ?? D.textAlign!;
   const primary = textColor ?? c.textColor ?? D.textColor!;
   const accent = secondaryColor ?? c.secondaryColor ?? D.secondaryColor!;
@@ -60,7 +58,8 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
   const letterSpacing = c.letterSpacing ?? D.letterSpacing!;
   const lineHeight = c.lineHeight ?? D.lineHeight!;
   const alignItems = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
-  const pad = contentPadding(align, side);
+  // Spacing is a % of the page, so it scales with the poster size (portrait or square).
+  const { top, pad } = resolvePlacement('posterBgs', { ...c, textAlign: align, posterSize: size }, { contentTop, contentLeft });
   const roles = resolveTextRoles('posterBgs', c);
 
   // Copy before sorting (props must not be mutated); stable for tied places.

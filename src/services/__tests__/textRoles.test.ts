@@ -62,3 +62,39 @@ describe('custom font upload checks', () => {
     expect(isValidCustomFont({ id: 'a', family: 'Ok', dataUrl: 'data:font/woff2;base64,AA");}body{' })).toBe(false);
   });
 });
+
+import { resolvePlacement, sideSpacingLabel } from '../exportService';
+
+describe('resolvePlacement (spacing as % of the page)', () => {
+  it('old pixel configs render exactly as before', () => {
+    const p = resolvePlacement('posterBgs', { contentTop: 350, contentLeft: 96, textAlign: 'left' });
+    expect(Math.round(p.top)).toBe(350);
+    expect(Math.round(p.pad.left)).toBe(96);
+    expect(Math.round(p.pad.right)).toBe(48);
+    expect(p.topPct).toBeCloseTo(25.9, 1);
+    expect(p.sidePct).toBeCloseTo(8.9, 1);
+  });
+  it('percentages scale with the page: same % on portrait and square posters', () => {
+    const portrait = resolvePlacement('posterBgs', { contentTopPct: 20, contentSidePct: 10, textAlign: 'right', posterSize: 'portrait' });
+    const square = resolvePlacement('posterBgs', { contentTopPct: 20, contentSidePct: 10, textAlign: 'right', posterSize: 'square' });
+    expect(portrait.top).toBe(270);   // 20% of 1350
+    expect(square.top).toBe(216);     // 20% of 1080
+    expect(portrait.pad.right).toBe(108);
+    expect(square.pad.right).toBe(108);
+  });
+  it('the same % gives proportional spacing on an A4 certificate', () => {
+    const cert = resolvePlacement('certificateBgs', { contentTopPct: 20, contentSidePct: 10, textAlign: 'center' });
+    expect(cert.top).toBeCloseTo(224.6, 1);  // 20% of 1123
+    expect(cert.pad).toEqual({ left: 79.4, right: 79.4 });
+  });
+  it('balance keeps both sides equal whatever the alignment', () => {
+    const p = resolvePlacement('posterBgs', { contentSidePct: 12, textAlign: 'right', balanceSides: true });
+    expect(p.pad.left).toBe(p.pad.right);
+    expect(sideSpacingLabel('right', true)).toBe('Side Spacing (both sides)');
+  });
+  it('without balance, right-aligned text is spaced from the right edge', () => {
+    const p = resolvePlacement('posterBgs', { contentSidePct: 12, textAlign: 'right' });
+    expect(p.pad.right).toBeCloseTo(129.6, 1);
+    expect(p.pad.left).toBe(48);
+  });
+});

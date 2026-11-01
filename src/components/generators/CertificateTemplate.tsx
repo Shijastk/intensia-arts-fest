@@ -6,10 +6,10 @@ import {
   autoFitBlockFontSize,
   autoFitFontSize,
   applyTextCase,
-  contentPadding,
   fillPlaceholders,
   fontStack,
   parseRichText,
+  resolvePlacement,
   resolveTextRoles,
   stripRichMarkers,
 } from '../../services/exportService';
@@ -50,8 +50,6 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
   config = {}
 }) => {
   const c: TemplateConfig = config;
-  const contentTop = c.contentTop ?? D.contentTop!;
-  const contentLeft = c.contentLeft ?? D.contentLeft!;
   const textAlign = c.textAlign ?? D.textAlign!;
   const alignItems = textAlign === 'center' ? 'center' : textAlign === 'right' ? 'flex-end' : 'flex-start';
   const accent = c.secondaryColor ?? D.secondaryColor!;
@@ -66,7 +64,8 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
 
   const roles = resolveTextRoles('certificateBgs', c);
   const name = applyTextCase(participantName, roles.name.textCase);
-  const pad = contentPadding(textAlign, contentLeft);
+  // Spacing is a % of the page (top: height, sides: width).
+  const { top: contentTop, pad } = resolvePlacement('certificateBgs', c);
   const innerWidth = A4_PX.width - pad.left - pad.right;
 
   // Name: shrink with length (~0.68em per uppercase glyph + tracking), wrap to at most 2 lines.

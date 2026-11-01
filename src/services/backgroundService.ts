@@ -42,6 +42,14 @@ export interface TemplateConfig {
   titleCase?: TextCase;
   nameCase?: TextCase;
   teamCase?: TextCase;
+  /**
+   * Spacing relative to the page: top as % of the page height, side as % of the page width.
+   * When set they take priority over the older pixel values (contentTop / contentLeft).
+   */
+  contentTopPct?: number;
+  contentSidePct?: number;
+  /** Keep left and right spacing equal regardless of alignment. */
+  balanceSides?: boolean;
 }
 
 /** upper = JOHN DOE, title = John Doe, lower = john doe, none = as typed. */
