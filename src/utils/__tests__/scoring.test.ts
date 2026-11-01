@@ -139,3 +139,20 @@ describe('results helpers', () => {
     expect(zones).toEqual({ RED: 'A', BLUE: 'B' });
   });
 });
+
+describe('zone standings on the results page', () => {
+  it('labels zones by their settings name, and bare letters as "Zone X"', async () => {
+    const { zoneLabel } = await import('../resultsUtils');
+    expect(zoneLabel('A')).toBe('Zone A');
+    expect(zoneLabel('Kerala North')).toBe('Kerala North');
+  });
+
+  it('reuses the consolidation rules on one zone\'s programs only', () => {
+    const programs = [
+      program({ id: 'x', zone: 'Zone 1', teams: [team('a', 'Red', [p('R1', '1', { points: 5 })])] }),
+      program({ id: 'y', zone: 'Zone 2', teams: [team('b', 'Blue', [p('B1', '2', { points: 3 })])] })
+    ];
+    const zone1 = calculateConsolidatedResults(programs.filter(pr => getProgramZone(pr) === 'Zone 1'));
+    expect(zone1.sortedTeams).toEqual([{ name: 'RED', score: 5, position: 1 }]);
+  });
+});

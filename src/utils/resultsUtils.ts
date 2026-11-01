@@ -24,6 +24,9 @@ export const getProgramZone = (program: Pick<Program, 'zone' | 'category'>): str
   return match ? match[1].toUpperCase() : 'General';
 };
 
+/** Display name of a zone: the name given in Settings as-is; a bare letter from an old category becomes "Zone A". */
+export const zoneLabel = (zone: string): string => (/^[A-Z]$/.test(zone) ? `Zone ${zone}` : zone);
+
 /**
  * Places 1-3 of a program, including every tied entry (ranks are competition-style: 1, 1, 3).
  * Group programs report one entry per team; individual programs one per participant.

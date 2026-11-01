@@ -6,7 +6,7 @@ import { getBackgroundSettings, BackgroundSettings } from '../services/backgroun
 import { getBackgroundMap } from '../services/exportService';
 import { appDialog } from '../components/ui/AppDialog';
 import { calculateConsolidatedResults } from '../utils/consolidationCalc';
-import { getProgramWinners, getProgramZone, ProgramWinner } from '../utils/resultsUtils';
+import { getProgramWinners, getProgramZone, ProgramWinner, zoneLabel } from '../utils/resultsUtils';
 
 
 interface ResultsPageProps {
@@ -49,6 +49,23 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     }));
   }, [consolidated]);
 
+  const availableZones = useMemo(() => {
+    const zones = new Set<string>();
+    completedPrograms.forEach(p => zones.add(getProgramZone(p)));
+    return Array.from(zones).sort();
+  }, [completedPrograms]);
+
+  // Zone standings use the same consolidation rules as the overall standings, run on that
+  // zone's programs only. General programs have no zone table (they still count overall).
+  const zoneTeamScores = useMemo(() => availableZones
+    .filter(zone => zone !== 'General')
+    .map(zone => ({
+      zone,
+      data: calculateConsolidatedResults(programs.filter(p => getProgramZone(p) === zone))
+        .sortedTeams.map(t => ({ teamName: t.name, points: t.score }))
+    }))
+    .filter(z => z.data.length > 0), [programs, availableZones]);
+
   const latestPrograms = useMemo(() => completedPrograms.slice(0, 5), [completedPrograms]);
 
   // Shared with the admin "Download Poster" button and the public page (OffscreenRenderer):
@@ -70,12 +87,21 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
 
   const carouselItems = useMemo(() => {
     const items: any[] = [];
-    if (showOverallPoints && overallTeamScores.length > 0) {
-      items.push({ type: 'OVERALL', data: overallTeamScores });
+    if (showOverallPoints) {
+      // "All Zones" shows the festival standings followed by each zone; a selected zone shows only its own.
+      if (selectedZone === 'All' && overallTeamScores.length > 0) {
+        items.push({ type: 'OVERALL', data: overallTeamScores });
+      }
+      zoneTeamScores
+        .filter(z => selectedZone === 'All' || z.zone === selectedZone)
+        .forEach(z => items.push({ type: 'OVERALL', data: z.data, zone: z.zone }));
     }
     latestPrograms.forEach(p => items.push({ type: 'PROGRAM', data: p }));
     return items;
-  }, [latestPrograms, showOverallPoints, overallTeamScores]);
+  }, [latestPrograms, showOverallPoints, overallTeamScores, zoneTeamScores, selectedZone]);
+
+  // The slide list changes with the zone filter; start again from the first slide.
+  useEffect(() => { setActiveSlide(0); }, [selectedZone]);
 
   useEffect(() => {
     if (carouselItems.length === 0) return;
@@ -99,12 +125,6 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     }
     return filtered;
   }, [completedPrograms, searchQuery, selectedZone]);
-
-  const availableZones = useMemo(() => {
-    const zones = new Set<string>();
-    completedPrograms.forEach(p => zones.add(getProgramZone(p)));
-    return Array.from(zones).sort();
-  }, [completedPrograms]);
 
   const getWinnerNode = (results: ProgramWinner[], targetRank: number) => {
     // Every entry sharing this place is shown (ties use competition ranking: 1, 1, 3).
@@ -161,7 +181,7 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
             >
               <option value="All">All Zones</option>
               {availableZones.map(zone => (
-                <option key={zone} value={zone}>{zone === 'General' ? 'Gen' : `Zone ${zone}`}</option>
+                <option key={zone} value={zone}>{zone === 'General' ? 'Gen' : zoneLabel(zone)}</option>
               ))}
             </select>
           </div>
@@ -191,12 +211,15 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
               if (item.type === 'OVERALL') {
                 const topTeams = item.data.slice(0, 3);
                 return (
-                  <div key="overall" className="w-full flex flex-col lg:flex-row items-center justify-between bg-gradient-to-br from-slate-900 to-indigo-950 p-8 lg:p-12 rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] transition-all duration-700 animate-fade-in border border-indigo-500/30">
+                  <div key={`overall-${item.zone ?? 'all'}`} className="w-full flex flex-col lg:flex-row items-center justify-between bg-gradient-to-br from-slate-900 to-indigo-950 p-8 lg:p-12 rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.5)] transition-all duration-700 animate-fade-in border border-indigo-500/30">
                     <div className="flex-1 text-center lg:text-left mb-10 lg:mb-0 relative z-10 lg:pr-8">
                       <span className="inline-block px-4 py-1.5 bg-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-full mb-6 border border-amber-500/30">
                         Championship Standings
                       </span>
-                      <h3 className="text-4xl md:text-5xl font-black text-white leading-[1.1] tracking-tighter mb-4">Overall<br/>Leaderboard</h3>
+                      <h3 className="text-4xl md:text-5xl font-black text-white leading-[1.1] tracking-tighter mb-4">
+                        Overall<br/>Leaderboard
+                        {item.zone && <span className="block text-2xl md:text-3xl text-amber-400 mt-2">({zoneLabel(item.zone)})</span>}
+                      </h3>
                       <p className="text-indigo-300 font-bold uppercase tracking-widest text-[10px]">Top Performing Teams</p>
                     </div>
 
