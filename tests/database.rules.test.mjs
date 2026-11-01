@@ -227,3 +227,16 @@ test('10. legitimate workflows keep working', async () => {
   await assertSucceeds(update(ref(sa, 'users/owner2'), { isActive: false }));
   await assertSucceeds(get(ref(sa, 'fests/f2/programs')));
 });
+
+// Custom fonts for posters/certificates
+test('11. custom fonts: public read, admin-only write, validated', async () => {
+  const font = { family: 'Anek Malayalam', dataUrl: 'data:font/woff2;base64,AAAA' };
+  await assertSucceeds(set(ref(google('owner1'), 'fests/f1/customFonts/x1'), font));
+  await assertSucceeds(get(ref(anon(), 'fests/f1/customFonts')));
+  await assertFails(set(ref(anon(), 'fests/f1/customFonts/x2'), font));
+  await assertFails(set(ref(staff('f1', 'judge1'), 'fests/f1/customFonts/x2'), font));
+  await assertFails(set(ref(google('stranger'), 'fests/f1/customFonts/x2'), font));
+  await assertFails(set(ref(google('owner1'), 'fests/f1/customFonts/x3'), { family: 'Bad"};x{', dataUrl: font.dataUrl }));
+  await assertFails(set(ref(google('owner1'), 'fests/f1/customFonts/x4'), { family: 'Ok', dataUrl: 'javascript:alert(1)' }));
+  await assertFails(set(ref(google('owner1'), 'fests/f1/customFonts/x5'), { ...font, extra: 'nope' }));
+});

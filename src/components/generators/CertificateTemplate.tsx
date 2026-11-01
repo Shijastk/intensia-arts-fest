@@ -5,10 +5,12 @@ import {
   TEMPLATE_DEFAULTS,
   autoFitBlockFontSize,
   autoFitFontSize,
+  applyTextCase,
   contentPadding,
   fillPlaceholders,
   fontStack,
   parseRichText,
+  resolveTextRoles,
   stripRichMarkers,
 } from '../../services/exportService';
 import { TemplateBackground } from './TemplateBackground';
@@ -62,7 +64,8 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
   const bodyColor = c.textColor ?? '#374151';
   const strongColor = c.textColor ?? '#000000';
 
-  const name = (participantName || '').toUpperCase();
+  const roles = resolveTextRoles('certificateBgs', c);
+  const name = applyTextCase(participantName, roles.name.textCase);
   const pad = contentPadding(textAlign, contentLeft);
   const innerWidth = A4_PX.width - pad.left - pad.right;
 
@@ -110,7 +113,7 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
           className="mb-4 max-w-full"
           style={{
             color: accent,
-            fontFamily: fontStack(c.fontFamily ?? D.fontFamily),
+            fontFamily: fontStack(roles.name.font),
             fontWeight: c.fontWeight ?? D.fontWeight,
             fontSize: `${nameSize}px`,
             lineHeight: nameLineHeight,
@@ -128,7 +131,7 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
           className={`mb-10 ${detailsInset} max-w-full`}
           style={{ color: detailsColor, fontSize: `${bodySize}px`, lineHeight, letterSpacing: '0.025em' }}
         >
-          Chest No. {chestNo} &middot; {team}{category ? <> &middot; <span className="whitespace-nowrap">{category}</span></> : null}
+          Chest No. {chestNo} &middot; <span style={{ fontFamily: fontStack(roles.team.font) }}>{applyTextCase(team, roles.team.textCase)}</span>{category ? <> &middot; <span className="whitespace-nowrap">{category}</span></> : null}
         </p>
 
         {/* Participated Events Text */}

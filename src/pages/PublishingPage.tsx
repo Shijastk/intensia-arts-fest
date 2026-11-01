@@ -16,8 +16,13 @@ import {
   mergeTemplateConfig,
   pickTemplate,
   sideSpacingLabel,
+  TEXT_CASE_OPTIONS,
+  fontStack,
+  resolveTextRoles,
   validateUploadFile,
 } from '../services/exportService';
+import { CustomFont, FONT_ACCEPT, deleteCustomFont, loadCustomFonts, uploadCustomFont, validateFontFile } from '../services/customFontService';
+import type { TextCase } from '../services/backgroundService';
 import { CertificateTemplate } from '../components/generators/CertificateTemplate';
 import { PosterTemplate } from '../components/generators/PosterTemplate';
 import { StudentCardBatchTemplate } from '../components/generators/StudentCardBatchTemplate';
@@ -222,11 +227,33 @@ const RangeField = ({ label, value, min, max, step = 1, unit = '', onChange }: {
   </div>
 );
 
-const FontSelect = ({ label, value, onChange }: { label: string; value?: string; onChange: (v: string) => void }) => (
+const FontSelect = ({ label, value, onChange, customFonts = [] }: { label: string; value?: string; onChange: (v: string) => void; customFonts?: CustomFont[] }) => (
   <div>
     <label className={fieldLabel}><span>{label}</span></label>
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white" style={{ fontFamily: FONT_OPTIONS.find(f => f.family === value)?.stack }}>
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white" style={{ fontFamily: fontStack(value) }}>
       {FONT_OPTIONS.map(f => <option key={f.family} value={f.family} style={{ fontFamily: f.stack }}>{f.family}</option>)}
+      {customFonts.length > 0 && (
+        <optgroup label="Uploaded fonts">
+          {customFonts.map(f => <option key={f.id} value={f.family} style={{ fontFamily: fontStack(f.family) }}>{f.family}</option>)}
+        </optgroup>
+      )}
+    </select>
+  </div>
+);
+
+/** Font + letter case for one text role (event title, participant name, team name). */
+const FontCaseRow = ({ label, font, textCase, onFont, onCase, customFonts }: {
+  label: string; font: string; textCase: TextCase; onFont: (v: string) => void; onCase: (v: TextCase) => void; customFonts: CustomFont[];
+}) => (
+  <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
+    <FontSelect label={`${label} Font`} value={font} onChange={onFont} customFonts={customFonts} />
+    <select
+      aria-label={`${label} letter case`}
+      value={textCase}
+      onChange={(e) => onCase(e.target.value as TextCase)}
+      className="px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white"
+    >
+      {TEXT_CASE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   </div>
 );
@@ -249,6 +276,31 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
   const [previewScale, setPreviewScale] = useState(0.5);
   const [dragState, setDragState] = useState({ isDragging: false, startX: 0, startY: 0, initialBgX: 0, initialBgY: 0 });
   const update = (patch: Partial<TemplateConfig>) => setConfig(prev => ({ ...prev, ...patch }));
+  const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
+  const [fontBusy, setFontBusy] = useState(false);
+  useEffect(() => { loadCustomFonts(festId).then(setCustomFonts); }, [festId]);
+
+  const handleFontUpload = async (file?: File) => {
+    if (!file) return;
+    const problem = validateFontFile(file);
+    if (problem) { appDialog.alert(problem, { title: 'Font not uploaded', variant: 'warning' }); return; }
+    setFontBusy(true);
+    try {
+      const font = await uploadCustomFont(festId, file);
+      setCustomFonts(await loadCustomFonts(festId));
+      appDialog.alert(`"${font.family}" is ready. Choose it in any font list below.`, { title: 'Font uploaded', variant: 'success' });
+    } catch (e: any) {
+      appDialog.alert(e?.message || 'The font could not be uploaded.', { title: 'Font not uploaded', variant: 'danger' });
+    } finally {
+      setFontBusy(false);
+    }
+  };
+
+  const handleFontDelete = async (font: CustomFont) => {
+    if (!(await appDialog.confirm(`Remove "${font.family}"? Text using it will fall back to the default font.`, { title: 'Remove font', variant: 'danger', confirmText: 'Remove' }))) return;
+    await deleteCustomFont(festId, font.id);
+    setCustomFonts(await loadCustomFonts(festId));
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left click
@@ -407,8 +459,44 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                       </div>
                     </div>
 
-                    <FontSelect label={isCert ? 'Name Font' : 'Title Font'} value={config.fontFamily} onChange={(v) => update({ fontFamily: v })} />
-                    <FontSelect label="Body Font" value={config.bodyFontFamily} onChange={(v) => update({ bodyFontFamily: v })} />
+                    {(() => {
+                      const roles = resolveTextRoles(type, config);
+                      return (
+                        <>
+                          {!isCert && (
+                            <FontCaseRow label="Event Title" font={roles.title.font} textCase={roles.title.textCase} customFonts={customFonts}
+                              onFont={(v) => update({ titleFontFamily: v })} onCase={(v) => update({ titleCase: v })} />
+                          )}
+                          <FontCaseRow label={isCert ? 'Participant Name' : 'Winner Name'} font={roles.name.font} textCase={roles.name.textCase} customFonts={customFonts}
+                            onFont={(v) => update({ nameFontFamily: v })} onCase={(v) => update({ nameCase: v })} />
+                          <FontCaseRow label="Team Name" font={roles.team.font} textCase={roles.team.textCase} customFonts={customFonts}
+                            onFont={(v) => update({ teamFontFamily: v })} onCase={(v) => update({ teamCase: v })} />
+                          <FontSelect label={isCert ? 'Sentence Font' : 'Other Text Font'} value={config.bodyFontFamily} onChange={(v) => update({ bodyFontFamily: v })} customFonts={customFonts} />
+                        </>
+                      );
+                    })()}
+
+                    <div className="rounded-lg border border-dashed border-slate-300 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-slate-700 uppercase">Your Fonts</span>
+                        <label className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase cursor-pointer ${fontBusy ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-[#3B3BFA] hover:bg-indigo-100'}`}>
+                          {fontBusy ? 'Uploading…' : '+ Upload Font'}
+                          <input type="file" accept={FONT_ACCEPT} className="hidden" disabled={fontBusy}
+                            onChange={(e) => { handleFontUpload(e.target.files?.[0]); e.target.value = ''; }} />
+                        </label>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">.ttf, .otf, .woff or .woff2, max 1 MB. Only upload fonts you are licensed to use.</p>
+                      {customFonts.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {customFonts.map(f => (
+                            <li key={f.id} className="flex items-center justify-between text-xs">
+                              <span style={{ fontFamily: fontStack(f.family) }}>{f.family}</span>
+                              <button onClick={() => handleFontDelete(f)} className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase">Remove</button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                     <RangeField label={isCert ? 'Name Size' : 'Title Size'} value={config.titleFontSize ?? 48} min={20} max={120} unit="px" onChange={(v) => update({ titleFontSize: v })} />
                     <RangeField label={isCert ? 'Body Size' : 'Winner Name Size'} value={config.bodyFontSize ?? 18} min={10} max={60} unit="px" onChange={(v) => update({ bodyFontSize: v })} />
                     <RangeField label={isCert ? 'Name Weight' : 'Title Weight'} value={config.fontWeight ?? 700} min={400} max={900} step={100} onChange={(v) => update({ fontWeight: v })} />

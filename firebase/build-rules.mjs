@@ -79,6 +79,17 @@ const rules = {
         createdAt: { '.read': MEMBER },
         // Public: fest name, theme, categories, scoring config, poster backgrounds.
         settings: { '.read': true, '.write': ADMIN },
+        // Fonts uploaded for posters/certificates (public: public pages export winner posters).
+        customFonts: {
+          '.read': true,
+          '.write': ADMIN,
+          $fontId: {
+            '.validate': "newData.hasChildren(['family', 'dataUrl'])",
+            family: { '.validate': "newData.isString() && newData.val().matches(/^[A-Za-z0-9 _-]{1,60}$/)" },
+            dataUrl: { '.validate': "newData.isString() && newData.val().beginsWith('data:') && newData.val().length <= 1500000" },
+            $other: { '.validate': false }
+          }
+        },
         students: {
           '.read': MEMBER,
           '.write': ADMIN,

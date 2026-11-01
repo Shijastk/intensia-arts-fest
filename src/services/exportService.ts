@@ -9,7 +9,7 @@
 import { toJpeg, getFontEmbedCSS } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { Program, ProgramStatus } from '../types';
-import type { BackgroundSettings, BackgroundType, TemplateConfig } from './backgroundService';
+import type { BackgroundSettings, BackgroundType, TemplateConfig, TextCase } from './backgroundService';
 
 // ---------------------------------------------------------------------------
 // Sizes / render settings
@@ -43,6 +43,44 @@ export const FONT_OPTIONS: { family: string; stack: string; weights: number[] }[
   { family: 'Lora', stack: '"Lora", serif', weights: [400, 500, 600, 700] },
   { family: 'Great Vibes', stack: '"Great Vibes", cursive', weights: [400] },
 ];
+
+// ---------------------------------------------------------------------------
+// Letter case and per-role fonts (event title, participant/winner name, team)
+// ---------------------------------------------------------------------------
+
+export const TEXT_CASE_OPTIONS: { value: TextCase; label: string }[] = [
+  { value: 'upper', label: 'UPPERCASE' },
+  { value: 'title', label: 'Capitalize Each Word' },
+  { value: 'lower', label: 'lowercase' },
+  { value: 'none', label: 'As typed' },
+];
+
+export const applyTextCase = (text: string | null | undefined, mode: TextCase = 'none'): string => {
+  const value = String(text ?? '');
+  if (mode === 'upper') return value.toUpperCase();
+  if (mode === 'lower') return value.toLowerCase();
+  // "john O'NEIL-smith" -> "John O'neil-Smith": first letter of each word/hyphen part.
+  if (mode === 'title') return value.toLowerCase().replace(/(^|[\s\-\/(])(\p{L})/gu, (_m, sep, ch) => sep + ch.toUpperCase());
+  return value;
+};
+
+export interface TextRole { font: string; textCase: TextCase }
+
+/**
+ * Font + case for the three text roles. Fallbacks reproduce what each template rendered before
+ * these settings existed: poster title in the heading font, winner names and teams in the body
+ * font, all uppercase; certificate name in the heading font (uppercase), team as typed.
+ */
+export const resolveTextRoles = (type: BackgroundType, config: TemplateConfig): { title: TextRole; name: TextRole; team: TextRole } => {
+  const heading = config.fontFamily || 'Playfair Display';
+  const body = config.bodyFontFamily || 'Bricolage Grotesque';
+  const isCert = type === 'certificateBgs';
+  return {
+    title: { font: config.titleFontFamily || heading, textCase: config.titleCase || 'upper' },
+    name: { font: config.nameFontFamily || (isCert ? heading : body), textCase: config.nameCase || 'upper' },
+    team: { font: config.teamFontFamily || body, textCase: config.teamCase || (isCert ? 'none' : 'upper') },
+  };
+};
 
 export const fontStack = (family?: string): string => {
   const known = FONT_OPTIONS.find(f => f.family === family);
@@ -487,14 +525,18 @@ export const waitForImages = async (node: HTMLElement): Promise<void> => {
 export const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
 /** Fonts (and weights) a config needs. */
-export const fontsForConfig = (config: TemplateConfig): { family: string; weight: number }[] => {
+export const fontsForConfig = (config: TemplateConfig, type: BackgroundType = 'posterBgs'): { family: string; weight: number }[] => {
   const title = config.fontFamily || 'Playfair Display';
   const body = config.bodyFontFamily || 'Bricolage Grotesque';
+  const roles = resolveTextRoles(type, config);
   return [
     { family: title, weight: config.fontWeight || 700 },
     { family: body, weight: 400 },
     { family: body, weight: 700 },
     { family: body, weight: 900 },
+    ...[roles.title.font, roles.name.font, roles.team.font].flatMap(family => [
+      { family, weight: 400 }, { family, weight: config.fontWeight || 700 }, { family, weight: 900 }
+    ]),
   ];
 };
 
