@@ -15,6 +15,7 @@ import {
   loadImage,
   mergeTemplateConfig,
   pickTemplate,
+  sideSpacingLabel,
   validateUploadFile,
 } from '../services/exportService';
 import { CertificateTemplate } from '../components/generators/CertificateTemplate';
@@ -384,7 +385,7 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                   <h3 className={sectionTitle}>Positioning</h3>
                   <div className="space-y-4">
                     <RangeField label="Top Spacing" value={config.contentTop ?? 0} min={0} max={800} unit="px" onChange={(v) => update({ contentTop: v })} />
-                    <RangeField label="Side Spacing" value={config.contentLeft ?? 0} min={0} max={400} unit="px" onChange={(v) => update({ contentLeft: v })} />
+                    <RangeField label={sideSpacingLabel(config.textAlign)} value={config.contentLeft ?? 0} min={0} max={400} unit="px" onChange={(v) => update({ contentLeft: v })} />
                   </div>
                 </div>
 

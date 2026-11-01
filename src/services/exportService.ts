@@ -559,6 +559,37 @@ export const downloadDataUrl = (dataUrl: string, fileName: string) => {
 export const safeFileName = (s: string) => (s || 'export').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_');
 
 // ---------------------------------------------------------------------------
+// Text block placement (shared by every template, editor and export alike)
+// ---------------------------------------------------------------------------
+
+/** Margin kept on the side opposite the alignment edge, so text never touches the page edge. */
+export const OPPOSITE_EDGE_MARGIN = 48;
+
+/**
+ * Horizontal padding of the text block. "Side spacing" is the distance from the edge the text
+ * is aligned to: left-aligned text is spaced from the left edge, right-aligned text from the
+ * right edge, and the other side keeps only a small safe margin so the text can use the full
+ * width. Centred text is spaced equally on both sides.
+ * (Previously the spacing was applied to BOTH sides, which squeezed right-aligned text into a
+ * narrow column in the middle of the page.)
+ */
+export const contentPadding = (
+  align: 'left' | 'center' | 'right' | undefined,
+  spacing: number,
+  oppositeMargin = OPPOSITE_EDGE_MARGIN
+): { left: number; right: number } => {
+  const s = Math.max(0, Number(spacing) || 0);
+  const other = Math.min(oppositeMargin, s);
+  if (align === 'right') return { left: other, right: s };
+  if (align === 'left') return { left: s, right: other };
+  return { left: s, right: s };
+};
+
+/** Label for the spacing control, so it says which edge it measures from. */
+export const sideSpacingLabel = (align?: 'left' | 'center' | 'right') =>
+  align === 'right' ? 'Right Edge Spacing' : align === 'left' ? 'Left Edge Spacing' : 'Side Spacing (both sides)';
+
+// ---------------------------------------------------------------------------
 // Background scaling (shared by every template, editor and export alike)
 // ---------------------------------------------------------------------------
 
