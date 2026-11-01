@@ -156,3 +156,19 @@ describe('zone standings on the results page', () => {
     expect(zone1.sortedTeams).toEqual([{ name: 'RED', score: 5, position: 1 }]);
   });
 });
+
+describe('results zones follow the Settings zone list', () => {
+  it('groups programs of a deleted zone under General', async () => {
+    const { getResultZone } = await import('../resultsUtils');
+    const settingsZones = ['North Zone', 'South Zone'];
+    expect(getResultZone({ zone: 'North Zone', category: 'Senior' }, settingsZones)).toBe('North Zone');
+    expect(getResultZone({ zone: 'East Zone', category: 'Senior' }, settingsZones)).toBe('General'); // deleted
+    expect(getResultZone({ zone: 'East Zone', category: 'Senior' }, [])).toBe('East Zone'); // no zones configured
+    expect(getResultZone({ category: 'A Zone Stage' } as any, ['Zone A'])).toBe('Zone A'); // old category wording
+  });
+
+  it('orders zones as in Settings, General last', async () => {
+    const { sortZones } = await import('../resultsUtils');
+    expect(sortZones(['General', 'South Zone', 'North Zone'], ['North Zone', 'South Zone'])).toEqual(['North Zone', 'South Zone', 'General']);
+  });
+});

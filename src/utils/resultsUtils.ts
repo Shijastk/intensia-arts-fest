@@ -28,6 +28,25 @@ export const getProgramZone = (program: Pick<Program, 'zone' | 'category'>): str
 export const zoneLabel = (zone: string): string => (/^[A-Z]$/.test(zone) ? `Zone ${zone}` : zone);
 
 /**
+ * Zone used by the results filters. Only zones in the Settings list count: a program whose zone
+ * was deleted (or renamed) in Settings is grouped under General. With no zones configured in
+ * Settings the program's own zone is used, as before.
+ */
+export const getResultZone = (program: Pick<Program, 'zone' | 'category'>, settingsZones: string[] = []): string => {
+  const zone = getProgramZone(program);
+  if (settingsZones.length === 0 || zone === 'General') return zone;
+  if (settingsZones.includes(zone)) return zone;
+  const named = settingsZones.find(z => z === zoneLabel(zone)); // old "A zone" category vs "Zone A" in Settings
+  return named ?? 'General';
+};
+
+/** Zones in Settings order, then any others alphabetically, General last. */
+export const sortZones = (zones: string[], settingsZones: string[] = []): string[] => {
+  const rank = (z: string) => (z === 'General' ? Infinity : settingsZones.includes(z) ? settingsZones.indexOf(z) : settingsZones.length);
+  return [...zones].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+};
+
+/**
  * Places 1-3 of a program, including every tied entry (ranks are competition-style: 1, 1, 3).
  * Group programs report one entry per team; individual programs one per participant.
  */
