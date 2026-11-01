@@ -10,6 +10,8 @@ import {
   fontStack,
   flexAlign,
   parseRichText,
+  resolveCertificateFestText,
+  type FestDetails,
   resolvePlacement,
   resolveTextRoles,
   stripRichMarkers,
@@ -27,6 +29,8 @@ interface CertificateTemplateProps {
   bgPositionY?: number;
   bgScale?: number;
   festName?: string;
+  /** Fest venue / dates from Settings; a value typed in the design overrides them. */
+  fest?: FestDetails;
   position?: string;
   grade?: string;
   /** Merged template config (exportService.pickTemplate / mergeTemplateConfig). Missing fields use today's defaults. */
@@ -46,6 +50,7 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
   bgPositionY,
   bgScale,
   festName = "ARTS FEST",
+  fest,
   position,
   grade,
   config = {}
@@ -83,8 +88,7 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
     festName,
     position,
     grade,
-    date: c.festDates ?? D.festDates,
-    venue: c.festVenue ?? D.festVenue,
+    ...resolveCertificateFestText(c, fest),
   });
   // Centred layouts keep the original inner insets (details px-12, body px-24); left/right aligned
   // text lines up exactly with the name on the aligned edge, so the insets are dropped there.

@@ -146,6 +146,10 @@ export interface Settings {
   showOverallLeaderboardInPublic?: boolean;
   festName?: string;
   festSlogan?: string;
+  /** School / place printed on certificates ({venue}). */
+  festVenue?: string;
+  /** Fest dates printed on certificates ({date}). */
+  festDates?: string;
   theme?: 'emerald' | 'purple' | 'blue' | 'crimson';
   stages?: string[];          // schedule venues/stages saved from the Schedule Manager
 }

@@ -190,7 +190,13 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
       return updateProgram(targetProgram.id, { teams: newTeams });
     });
 
-    await Promise.all(updatePromises);
+    const results = await Promise.all(updatePromises);
+    const failed = results.filter(ok => !ok).length;
+    if (failed > 0) {
+      // The reason was already shown; keep what was typed so it can be retried.
+      setAlertMessage(`${failed} of ${results.length} program registrations were not saved. Please try again.`);
+      return;
+    }
 
     setParticipantName('');
     setChestNo('');
@@ -215,7 +221,7 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
       return t;
     });
 
-    await updateProgram(program.id, { teams: updatedTeams });
+    if (!(await updateProgram(program.id, { teams: updatedTeams }))) return; // error already shown
     setAlertMessage(`Removal request sent to Admin for ${removalRequest.name}.`);
     setRemovalRequest(null);
   };

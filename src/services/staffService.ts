@@ -3,12 +3,13 @@ import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase';
 import { Staff } from '../types';
 import { appDialog } from '../components/ui/AppDialog';
+import { describeError } from '../utils/errorReporting';
 
 // Staff accounts are created and changed only by the manageStaff Cloud Function, which
 // checks that the caller is the fest admin and stores passwords as bcrypt hashes.
 const manageStaff = httpsCallable<Record<string, unknown>, { id: string }>(functions, 'manageStaff');
 
-const errorMessage = (error: any) => error?.message || 'The staff account could not be saved.';
+const errorMessage = (error: any) => (error ? describeError(error) : 'The staff account could not be saved.');
 
 export const staffService = {
   async getAllStaffs(festId: string): Promise<Staff[]> {

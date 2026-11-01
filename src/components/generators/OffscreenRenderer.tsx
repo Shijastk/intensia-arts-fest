@@ -25,6 +25,7 @@ import {
 } from '../../services/exportService';
 import { getProgramWinners } from '../../utils/resultsUtils';
 import { loadCustomFonts } from '../../services/customFontService';
+import { settingsService } from '../../services/settingsService';
 import { CertificateTemplate } from './CertificateTemplate';
 import { PosterTemplate } from './PosterTemplate';
 
@@ -58,16 +59,27 @@ export const prepareTemplate = async (
   backgrounds?: BackgroundSettings | null
 ): Promise<PickedTemplate> => {
   // Uploaded fonts must be registered before the template renders and fonts are awaited.
-  const [bgs] = await Promise.all([backgrounds ?? getBackgroundSettings(festId), loadCustomFonts(festId)]);
-  const picked = pickTemplate(bgs, type);
+  const [bgs, , fest] = await Promise.all([
+    backgrounds ?? getBackgroundSettings(festId),
+    loadCustomFonts(festId),
+    type === 'certificateBgs' ? settingsService.getFestDetails(festId) : Promise.resolve(undefined)
+  ]);
+  const picked = { ...pickTemplate(bgs, type), fest };
   if (!picked.url) return picked;
   const dataUrl = await toDataUrl(picked.url);
   await loadImage(dataUrl);
   return { ...picked, url: dataUrl };
 };
 
+// Fest name, venue and dates come from the fest's Settings (see resolveCertificateFestText).
 const certificateElement = (data: CertificateData, template: PickedTemplate) => (
-  <CertificateTemplate backgroundUrl={template.url} {...data} config={template.config} />
+  <CertificateTemplate
+    backgroundUrl={template.url}
+    {...data}
+    festName={template.fest?.festName?.trim() || data.festName}
+    fest={template.fest}
+    config={template.config}
+  />
 );
 
 /** Renders one certificate to a JPEG data URL. Pass the same fontCSS holder across a batch. */

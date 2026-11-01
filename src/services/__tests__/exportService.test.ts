@@ -14,7 +14,9 @@ import {
   autoFitBlockFontSize,
   autoFitFontSize,
   buildCertificateData,
+  certificateFestName,
   cleanFestName,
+  resolveCertificateFestText,
   computeBackgroundBox,
   fillPlaceholders,
   mergeTemplateConfig,
@@ -88,8 +90,9 @@ describe('mergeTemplateConfig', () => {
     expect(c).toMatchObject({ contentTop: 200, contentLeft: 0, textAlign: 'center', secondaryColor: '#dc2626', bgPositionX: 20, bgPositionY: 70 });
     expect(c.textColor).toBeUndefined();
     expect(c.bodyTemplate).toBe(DEFAULT_CERT_BODY_TEMPLATE);
-    expect(c.festVenue).toBe(LEGACY_CERT_VENUE);
-    expect(c.festDates).toBe(LEGACY_CERT_DATES);
+    // No hard-coded venue/dates any more: they come from the fest's Settings.
+    expect(c.festVenue).toBeUndefined();
+    expect(c.festDates).toBeUndefined();
   });
 
   it('new certificate config (configVersion 2) is honoured', () => {
@@ -216,6 +219,18 @@ describe('participant aggregation', () => {
     expect(cleanFestName('kerala-arts-fest-2026')).toBe('KERALA ARTS FEST');
     expect(cleanFestName('single')).toBe('SINGLE');
     expect(cleanFestName(undefined)).toBe('ARTS FEST');
+  });
+
+  it('certificate fest name / venue / dates come from Settings', () => {
+    const fest = { festName: 'Intensia Arts Fest', festVenue: 'GHSS Kalady', festDates: '5-7 Dec 2026' };
+    expect(certificateFestName(fest, 'kerala-arts-fest-2026')).toBe('Intensia Arts Fest');
+    expect(certificateFestName({}, 'kerala-arts-fest-2026')).toBe('KERALA ARTS FEST');
+    expect(resolveCertificateFestText({}, fest)).toEqual({ venue: 'GHSS Kalady', date: '5-7 Dec 2026' });
+    // Old designs saved the hard-coded school; it no longer overrides Settings.
+    expect(resolveCertificateFestText({ festVenue: LEGACY_CERT_VENUE, festDates: LEGACY_CERT_DATES }, fest)).toEqual({ venue: 'GHSS Kalady', date: '5-7 Dec 2026' });
+    // A value typed in the design still wins.
+    expect(resolveCertificateFestText({ festVenue: 'Town Hall' }, fest).venue).toBe('Town Hall');
+    expect(resolveCertificateFestText({}, {})).toEqual({ venue: '', date: '' });
   });
 });
 

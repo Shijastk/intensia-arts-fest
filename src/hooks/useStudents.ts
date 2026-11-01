@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { GlobalStudent } from '../types';
 import { studentService } from '../services/studentService';
+import { reportError } from '../utils/errorReporting';
 
 export const useStudents = (festId: string | null) => {
   const [students, setStudents] = useState<GlobalStudent[]>([]);
@@ -29,8 +30,7 @@ export const useStudents = (festId: string | null) => {
       await studentService.addStudent(festId, studentData);
       return true;
     } catch (err: any) {
-      console.error("Error adding student:", err);
-      return false;
+      return reportError('Student not added', err);
     }
   };
 
@@ -40,8 +40,7 @@ export const useStudents = (festId: string | null) => {
       await studentService.addBulkStudents(festId, studentsData);
       return true;
     } catch (err: any) {
-      console.error("Error bulk adding students:", err);
-      return false;
+      return reportError('Students not added', err);
     }
   };
 
@@ -51,8 +50,7 @@ export const useStudents = (festId: string | null) => {
       await studentService.deleteStudent(festId, id);
       return true;
     } catch (err: any) {
-      console.error("Error deleting student:", err);
-      return false;
+      return reportError('Student not deleted', err, { studentId: id });
     }
   };
 

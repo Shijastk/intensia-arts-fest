@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, LayoutTemplate } from 'lucide-react';
 import { uploadImageToImgBB } from '../services/imageUploadService';
+import { describeError, reportError } from '../utils/errorReporting';
+import { useSettings } from '../hooks/useSettings';
 import { getBackgroundSettings, saveBackground, deleteBackground, BackgroundSettings, BackgroundType, saveBackgroundConfig, setActiveBackground, TemplateConfig } from '../services/backgroundService';
 import {
   BG_SCALE_MAX,
   BG_SCALE_MIN,
   CURRENT_CONFIG_VERSION,
   DEFAULT_CERT_BODY_TEMPLATE,
+  LEGACY_CERT_DATES,
+  LEGACY_CERT_VENUE,
+  certificateFestName,
   FONT_OPTIONS,
   PLACEHOLDER_KEYS,
   UPLOAD_ACCEPT,
@@ -58,10 +63,10 @@ interface PublishingPageProps {
 }
 
 export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
-  const [backgrounds, setBackgrounds] = useState<BackgroundSettings>({ 
-    certificateBgs: {}, 
-    posterBgs: {}, 
-    studentCardBgs: {} 
+  const [backgrounds, setBackgrounds] = useState<BackgroundSettings>({
+    certificateBgs: {},
+    posterBgs: {},
+    studentCardBgs: {}
   });
   const [loadingBgs, setLoadingBgs] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -102,7 +107,7 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
     try {
       await markActive(type, id);
     } catch (error: any) {
-      appDialog.alert(`Failed to select this background: ${error.message || 'Unknown error'}`, { variant: 'danger' });
+      appDialog.alert(`Failed to select this background: ${describeError(error)}`, { variant: 'danger' });
     }
   };
 
@@ -116,17 +121,17 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
       const url = await uploadImageToImgBB(file, festId);
       const id = Date.now().toString();
       const isFirst = Object.keys(backgrounds[type] || {}).length === 0 || !backgrounds.active?.[type];
-      
+
       await saveBackground(festId, type, id, url);
-      setBackgrounds(prev => ({ 
-        ...prev, 
-        [type]: { ...(prev[type] || {}), [id]: url } 
+      setBackgrounds(prev => ({
+        ...prev,
+        [type]: { ...(prev[type] || {}), [id]: url }
       }));
       // The first upload of a type becomes the export background automatically.
       if (isFirst) await markActive(type, id);
     } catch (error: any) {
       console.error("Upload error:", error);
-      appDialog.alert(`Failed to upload image: ${error.message || 'Unknown error'}`);
+      appDialog.alert(`Failed to upload image: ${describeError(error)}`, { title: 'Upload failed', variant: 'danger' });
     } finally {
       setUploading(false);
     }
@@ -145,7 +150,7 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
       setBackgrounds(prev => ({ ...prev, [type]: { ...(prev[type] || {}), [id]: url } }));
     } catch (error: any) {
       console.error("Upload error:", error);
-      appDialog.alert(`Failed to replace image: ${error.message || 'Unknown error'}`);
+      appDialog.alert(`Failed to replace image: ${describeError(error)}`, { title: 'Upload failed', variant: 'danger' });
     } finally {
       setUploading(false);
     }
@@ -153,7 +158,12 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
 
   const handleDeleteBg = async (type: BackgroundType, id: string) => {
     if (await appDialog.confirm("Are you sure you want to delete this background?", { variant: 'danger', title: 'Delete background', confirmText: 'Delete' })) {
-      await deleteBackground(festId, type, id);
+      try {
+        await deleteBackground(festId, type, id);
+      } catch (err) {
+        reportError('Background not deleted', err, { type, id });
+        return;
+      }
       setBackgrounds(prev => {
         const newBgs = { ...(prev[type] as Record<string, string>) };
         delete newBgs[id];
@@ -178,10 +188,10 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
           </div>
         ) : (
           <div className="p-6 sm:p-8">
-            <BackgroundsTab 
-              backgrounds={backgrounds} 
-              uploading={uploading} 
-              onUpload={handleUploadBg} 
+            <BackgroundsTab
+              backgrounds={backgrounds}
+              uploading={uploading}
+              onUpload={handleUploadBg}
               onReplace={handleReplaceBg}
               onDeleteBg={handleDeleteBg}
               onSetActive={handleSetActive}
@@ -192,7 +202,7 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
       </div>
 
       {customizationModal?.isOpen && (
-        <CustomizationModal 
+        <CustomizationModal
           type={customizationModal.type}
           bgId={customizationModal.bgId}
           bgUrl={customizationModal.bgUrl}
@@ -270,6 +280,9 @@ interface CustomizationModalProps {
 }
 
 const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose, onSaveComplete }: CustomizationModalProps) => {
+  // Fest name / venue / dates from Settings, shown in the preview and as the default values.
+  const { settings: festSettings } = useSettings(festId);
+  const fest = { festName: festSettings?.festName, festVenue: festSettings?.festVenue, festDates: festSettings?.festDates };
   // Saved configs may predate newer fields: always merge over the per-type defaults.
   const [config, setConfig] = useState<TemplateConfig>(() => mergeTemplateConfig(type, initialConfig));
   const [saving, setSaving] = useState(false);
@@ -299,7 +312,12 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
 
   const handleFontDelete = async (font: CustomFont) => {
     if (!(await appDialog.confirm(`Remove "${font.family}"? Text using it will fall back to the default font.`, { title: 'Remove font', variant: 'danger', confirmText: 'Remove' }))) return;
-    await deleteCustomFont(festId, font.id);
+    try {
+      await deleteCustomFont(festId, font.id);
+    } catch (err) {
+      reportError('Font not removed', err, { family: font.family });
+      return;
+    }
     setCustomFonts(await loadCustomFonts(festId));
   };
 
@@ -572,13 +590,17 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
             {isCert && (
               <div className="pt-4 border-t border-slate-100 space-y-3">
                 <h3 className={sectionTitle}>Certificate Text</h3>
+                <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                  Festival name, venue and dates come from <span className="text-slate-700">Settings</span>. Type below only to use something different on this design.
+                  {(!fest.festVenue || !fest.festDates) && <span className="block text-amber-600 mt-1">Venue or dates are not set in Settings yet.</span>}
+                </p>
                 <div>
-                  <label className={fieldLabel}><span>Venue</span></label>
-                  <input type="text" value={config.festVenue ?? ''} onChange={(e) => update({ festVenue: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700" />
+                  <label className={fieldLabel}><span>Venue (optional override)</span></label>
+                  <input type="text" value={config.festVenue && config.festVenue !== LEGACY_CERT_VENUE ? config.festVenue : ''} placeholder={fest.festVenue ? `Settings: ${fest.festVenue}` : 'Not set in Settings'} onChange={(e) => update({ festVenue: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700" />
                 </div>
                 <div>
-                  <label className={fieldLabel}><span>Dates</span></label>
-                  <input type="text" value={config.festDates ?? ''} onChange={(e) => update({ festDates: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700" />
+                  <label className={fieldLabel}><span>Dates (optional override)</span></label>
+                  <input type="text" value={config.festDates && config.festDates !== LEGACY_CERT_DATES ? config.festDates : ''} placeholder={fest.festDates ? `Settings: ${fest.festDates}` : 'Not set in Settings'} onChange={(e) => update({ festDates: e.target.value })} className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700" />
                 </div>
                 <div>
                   <label className={fieldLabel}><span>Sentence</span>
@@ -652,7 +674,8 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                   <CertificateTemplate
                     backgroundUrl={bgUrl}
                     {...dummyParticipant}
-                    festName="ARTS FEST"
+                    festName={certificateFestName(fest, festId)}
+                    fest={fest}
                     position="1st Place"
                     grade="A"
                     config={config}

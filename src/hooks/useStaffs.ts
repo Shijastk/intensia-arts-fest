@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Staff, User } from '../types';
 import { staffService } from '../services/staffService';
 import { ref, onValue } from 'firebase/database';
-import { db } from '../config/firebase';
+import { auth, db } from '../config/firebase';
+import { reportLoadError } from '../utils/errorReporting';
 
 export const useStaffs = (festId: string | null, currentUser?: User | null) => {
   const [staffs, setStaffs] = useState<Staff[]>([]);
@@ -34,7 +35,7 @@ export const useStaffs = (festId: string | null, currentUser?: User | null) => {
         setStaffs([]);
       }
     }, (error) => {
-      console.error('Firebase Subscription Error (Staff):', error);
+      reportLoadError('staff accounts', error, !!auth.currentUser);
       setStaffs([]);
     });
 
