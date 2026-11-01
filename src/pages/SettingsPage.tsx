@@ -5,13 +5,14 @@ import { appDialog } from '../components/ui/AppDialog';
 import {
   getDefaultCustomScore,
   AVAILABLE_GRADES,
-  INDIVIDUAL_GRADE_POINTS,
-  INDIVIDUAL_RANK_POINTS,
-  GROUP_GRADE_POINTS,
-  GROUP_RANK_POINTS,
   collectScoreInputs,
   rankProgramResults,
+  scoreConfigFor,
+  type FestDefaultScores,
 } from '../utils/pointsCalculator';
+import { DefaultScoringEditor } from '../components/DefaultScoringEditor';
+import { programService } from '../services/programService';
+import { reportError } from '../utils/errorReporting';
 
 interface SettingsPageProps {
   settings: Settings;
@@ -27,8 +28,8 @@ const GRADE_LABEL: Record<string, string> = {
   'C': 'C',
 };
 
-const emptyCustomForm = (isGroup: boolean) => {
-  const def = getDefaultCustomScore(isGroup);
+const emptyCustomForm = (isGroup: boolean, defaults?: FestDefaultScores) => {
+  const def = getDefaultCustomScore(isGroup, defaults);
   return {
     gradePoints: {
       'A+': String(def.gradePoints['A+']),
@@ -95,7 +96,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
   const handleProgramSelect = useCallback((programId: string) => {
     setSelectedProgramId(programId);
     setCustomSaveMsg('');
-    if (!programId) { setCustomForm(emptyCustomForm(false)); return; }
+    if (!programId) { setCustomForm(emptyCustomForm(false, settings?.defaultScores)); return; }
     const prog = programs.find(p => p.id === programId);
     const existing = settings?.customScores?.[programId];
     if (existing) {
@@ -114,9 +115,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
         },
       });
     } else {
-      setCustomForm(emptyCustomForm(prog?.isGroup ?? false));
+      setCustomForm(emptyCustomForm(prog?.isGroup ?? false, settings?.defaultScores));
     }
-  }, [programs, settings?.customScores]);
+  }, [programs, settings?.customScores, settings?.defaultScores]);
 
   // ── Zone helpers ──────────────────────────────────────────────────────────
   const handleAddZone = () => {
@@ -245,15 +246,49 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
   const recalculateProgramPoints = async (programId: string, customConfig?: CustomProgramScore): Promise<boolean> => {
     const program = programs.find(p => p.id === programId);
     if (!program || program.status !== ProgramStatus.COMPLETED || !updateProgram) return true;
-    const teams = rankProgramResults(program, collectScoreInputs(program.teams), customConfig);
+    const config = customConfig ?? scoreConfigFor({ defaultScores: settings?.defaultScores }, programId, !!program.isGroup);
+    const teams = rankProgramResults(program, collectScoreInputs(program.teams), config);
     return updateProgram(programId, { teams });
+  };
+
+  // Saving new default points: completed programs that use them (no custom score) are
+  // re-ranked with the new table in ONE write, after the admin confirms.
+  const handleSaveDefaultScores = async (next: { individual: CustomProgramScore; group: CustomProgramScore }, changed: ('individual' | 'group')[]) => {
+    const affected = programs.filter(p =>
+      p.status === ProgramStatus.COMPLETED &&
+      !settings?.customScores?.[p.id] &&
+      changed.includes(p.isGroup ? 'group' : 'individual')
+    );
+    const published = affected.filter(p => p.isResultPublished).length;
+    const message = affected.length === 0
+      ? 'Save the new default points? No completed program uses them yet.'
+      : `Save the new default points? The points of ${affected.length} completed program${affected.length === 1 ? '' : 's'} will be recalculated${published ? ` (${published} with published results)` : ''}. Team totals and champions will change accordingly.`;
+    if (!(await appDialog.confirm(message, { title: 'Change default points', variant: 'warning', confirmText: 'Save' }))) return false;
+
+    if (!(await updateSettings({ defaultScores: next }))) return false; // error already shown
+    if (affected.length === 0) {
+      appDialog.alert('Default points saved.', { title: 'Saved', variant: 'success' });
+      return true;
+    }
+    try {
+      await programService.batchUpdatePrograms(programs[0]?.festId, affected.map(p => ({
+        id: p.id,
+        updates: { teams: rankProgramResults(p, collectScoreInputs(p.teams), p.isGroup ? next.group : next.individual) }
+      })));
+      appDialog.alert(`Default points saved and ${affected.length} program${affected.length === 1 ? '' : 's'} recalculated.`, { title: 'Saved', variant: 'success' });
+      return true;
+    } catch (err) {
+      reportError('Results not recalculated', err);
+      appDialog.alert('The new default points were saved, but existing results still use the old points. Open each completed program and save its results again, or try saving the defaults again.', { title: 'Recalculation needed', variant: 'warning' });
+      return false;
+    }
   };
 
   const handleRemoveCustomScore = async (programId: string) => {
     const updated = { ...(settings?.customScores || {}) };
     delete updated[programId];
     if (await updateSettings({ customScores: updated })) await recalculateProgramPoints(programId, undefined);
-    if (selectedProgramId === programId) { setSelectedProgramId(''); setCustomForm(emptyCustomForm(false)); }
+    if (selectedProgramId === programId) { setSelectedProgramId(''); setCustomForm(emptyCustomForm(false, settings?.defaultScores)); }
   };
 
   const existingCustomScorePrograms = Object.keys(settings?.customScores || {});
@@ -689,7 +724,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
             </div>
             {selectedProgram && (
               <p className="text-[11px] text-slate-500 mt-1.5">
-                Default max: {selectedProgram.isGroup ? '20 pts (10 Grade + 10 Rank)' : '10 pts (5 Grade + 5 Rank)'}
+                {(() => {
+                  // The fest's current default table (Default Scoring below), not fixed numbers.
+                  const d = getDefaultCustomScore(!!selectedProgram.isGroup, settings?.defaultScores);
+                  const grade = Math.max(d.gradePoints['A+'], d.gradePoints['A'], d.gradePoints['B'], d.gradePoints['C']);
+                  return `Default max: ${grade + d.rankPoints[1]} pts (${grade} Grade + ${d.rankPoints[1]} Rank)`;
+                })()}
               </p>
             )}
           </div>
@@ -783,94 +823,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
         </div>
       </section>
 
-      {/* ── Default Scoring Reference (read-only, bottom) ── */}
-      <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <div>
-            <h2 className="text-xs font-black uppercase tracking-widest text-slate-900">Default Scoring Reference</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">Global point values used when no custom override is set.</p>
-          </div>
-          <span className="text-[9px] bg-slate-200 text-slate-500 px-2 py-1 rounded-full font-black uppercase tracking-wider">Read-only</span>
-        </div>
-        <div className="p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            {/* Individual */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-2.5 bg-teal-50 border-b border-teal-100 flex items-center justify-between">
-                <p className="text-[10px] font-black uppercase tracking-widest text-teal-700">Individual</p>
-                <span className="text-xs font-black text-teal-600">Max 10 pts</span>
-              </div>
-              <table className="w-full text-xs">
-                <tbody>
-                  {[
-                    { label: 'Grade A+', val: INDIVIDUAL_GRADE_POINTS['A+'] },
-                    { label: 'Grade A',  val: INDIVIDUAL_GRADE_POINTS['A']  },
-                    { label: 'Grade B',  val: INDIVIDUAL_GRADE_POINTS['B']  },
-                    { label: 'Grade C',  val: INDIVIDUAL_GRADE_POINTS['C']  },
-                  ].map((row, i) => (
-                    <tr key={i} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-2 text-slate-500 font-medium">{row.label}</td>
-                      <td className="px-4 py-2 text-right font-black text-slate-800">{row.val} pts</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 border-slate-100">
-                    <td className="px-4 py-2 text-slate-500 font-medium">🥇 1st Place</td>
-                    <td className="px-4 py-2 text-right font-black text-slate-800">+{INDIVIDUAL_RANK_POINTS[1]} pts</td>
-                  </tr>
-                  <tr className="border-t border-slate-100">
-                    <td className="px-4 py-2 text-slate-500 font-medium">🥈 2nd Place</td>
-                    <td className="px-4 py-2 text-right font-black text-slate-800">+{INDIVIDUAL_RANK_POINTS[2]} pts</td>
-                  </tr>
-                  <tr className="border-t border-slate-100">
-                    <td className="px-4 py-2 text-slate-500 font-medium">🥉 3rd Place</td>
-                    <td className="px-4 py-2 text-right font-black text-slate-800">+{INDIVIDUAL_RANK_POINTS[3]} pts</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Group */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
-                <p className="text-[10px] font-black uppercase tracking-widest text-purple-700">Group</p>
-                <span className="text-xs font-black text-purple-600">Max 20 pts</span>
-              </div>
-              <table className="w-full text-xs">
-                <tbody>
-                  {[
-                    { label: 'Grade A+', val: GROUP_GRADE_POINTS['A+'] },
-                    { label: 'Grade A',  val: GROUP_GRADE_POINTS['A']  },
-                    { label: 'Grade B',  val: GROUP_GRADE_POINTS['B']  },
-                    { label: 'Grade C',  val: GROUP_GRADE_POINTS['C']  },
-                  ].map((row, i) => (
-                    <tr key={i} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-2 text-slate-500 font-medium">{row.label}</td>
-                      <td className="px-4 py-2 text-right font-black text-slate-800">{row.val} pts</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 border-slate-100">
-                    <td className="px-4 py-2 text-slate-500 font-medium">🥇 1st Place</td>
-                    <td className="px-4 py-2 text-right font-black text-slate-800">+{GROUP_RANK_POINTS[1]} pts</td>
-                  </tr>
-                  <tr className="border-t border-slate-100">
-                    <td className="px-4 py-2 text-slate-500 font-medium">🥈 2nd Place</td>
-                    <td className="px-4 py-2 text-right font-black text-slate-800">+{GROUP_RANK_POINTS[2]} pts</td>
-                  </tr>
-                  <tr className="border-t border-slate-100">
-                    <td className="px-4 py-2 text-slate-500 font-medium">🥉 3rd Place</td>
-                    <td className="px-4 py-2 text-right font-black text-slate-800">+{GROUP_RANK_POINTS[3]} pts</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-          </div>
-          <p className="text-[11px] text-slate-400 italic mt-3">
-            Use <span className="font-bold text-slate-600">Custom Program Scores</span> above to override these for any specific program.
-          </p>
-        </div>
-      </section>
+      {/* ── Default Scoring (editable) ── */}
+      <DefaultScoringEditor defaults={settings?.defaultScores} onSave={handleSaveDefaultScores} />
 
       {/* Custom Alert Modal */}
       {alertModal.isOpen && (

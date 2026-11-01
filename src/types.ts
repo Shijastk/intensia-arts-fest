@@ -143,6 +143,8 @@ export interface Settings {
   maxStudentsPerTeam: number;
   maxNonGeneralPerStudent: number;
   customScores?: Record<string, CustomProgramScore>; // keyed by program id
+  /** Fest-wide default point tables (Settings → Default Scoring). Missing = standard table. */
+  defaultScores?: { individual?: CustomProgramScore; group?: CustomProgramScore };
   showOverallLeaderboardInPublic?: boolean;
   festName?: string;
   festSlogan?: string;

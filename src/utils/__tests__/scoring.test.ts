@@ -172,3 +172,27 @@ describe('results zones follow the Settings zone list', () => {
     expect(sortZones(['General', 'South Zone', 'North Zone'], ['North Zone', 'South Zone'])).toEqual(['North Zone', 'South Zone', 'General']);
   });
 });
+
+describe('fest default scoring (Settings → Default Scoring)', () => {
+  it('uses the edited defaults, a custom score still wins, nothing set = standard', async () => {
+    const { scoreConfigFor, getDefaultCustomScore, getStandardScore, maxPoints } = await import('../pointsCalculator');
+    const individual = { gradePoints: { 'A+': 8, 'A': 6, 'B': 4, 'C': 2, 'No Grade': 0 }, rankPoints: { 1: 7, 2: 4, 3: 2 } };
+    const custom = { gradePoints: { 'A+': 1, 'A': 1, 'B': 1, 'C': 1, 'No Grade': 0 }, rankPoints: { 1: 1, 2: 1, 3: 1 } };
+    const settings = { defaultScores: { individual }, customScores: { special: custom } };
+    expect(scoreConfigFor(settings, 'p1', false)).toBe(individual);
+    expect(scoreConfigFor(settings, 'special', false)).toBe(custom);
+    expect(scoreConfigFor(settings, 'p1', true)).toBeUndefined(); // group not edited -> standard constants
+    expect(getDefaultCustomScore(true, settings.defaultScores)).toEqual(getStandardScore(true));
+    expect(maxPoints(individual)).toBe(15);
+    expect(maxPoints(getStandardScore(false))).toBe(10);
+  });
+
+  it('ranks a program with the edited table', async () => {
+    const { scoreConfigFor } = await import('../pointsCalculator');
+    const individual = { gradePoints: { 'A+': 8, 'A': 6, 'B': 4, 'C': 2, 'No Grade': 0 }, rankPoints: { 1: 7, 2: 4, 3: 2 } };
+    const prog = program({ teams: [team('a', 'Red', [p('A', '1')]), team('b', 'Blue', [p('B', '2')])] });
+    const teams = rankProgramResults(prog, { '1': { score: 90, grade: 'A+' }, '2': { score: 60, grade: 'B' } }, scoreConfigFor({ defaultScores: { individual } }, prog.id, false));
+    expect(teams[0].participants[0].points).toBe(8 + 7);
+    expect(teams[1].participants[0].points).toBe(4 + 4);
+  });
+});
