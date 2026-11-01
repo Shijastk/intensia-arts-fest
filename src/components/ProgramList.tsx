@@ -27,9 +27,6 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null);
     const [cancelProgramId, setCancelProgramId] = useState<string | null>(null);
-    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-    const [deleteStatus, setDeleteStatus] = useState<'idle' | 'deleting' | 'success' | 'error'>('idle');
-    const [deleteMessage, setDeleteMessage] = useState('');
     const [exportProgress, setExportProgress] = useState<{ current: number, total: number, label: string } | null>(null);
     const [exportItem, setExportItem] = useState<any>(null);
     const [isExporting, setIsExporting] = useState(false);
@@ -57,10 +54,16 @@ export const ProgramList: React.FC<ProgramListProps> = ({
             return (a.category || '').localeCompare(b.category || '');
         }), [programs, filter, searchTerm, sortBy]);
 
-    const handleDeleteRequest = (id: string) => {
+    // The user has already confirmed in ProgramAccordion's "Delete Program" dialog, so delete
+    // straight away. (The second confirmation modal this used to open was lost in 39e28ff,
+    // which left the delete button doing nothing.)
+    const handleDeleteRequest = async (id: string) => {
         const program = programs.find(p => p.id === id);
         if (program?.isAllocatedToJudge || program?.status === ProgramStatus.JUDGING) return alert('Cannot delete: This program has been allocated to a Judge Panel. You cannot delete an active judging program.');
-        setDeleteConfirmId(id); setDeleteStatus('idle');
+        const programName = program?.name || 'this program';
+        if (deleteProgram) {
+            if (!(await deleteProgram(id))) alert(`Failed to delete "${programName}" from the database. Please try again.`);
+        } else setPrograms(p => p.filter(x => x.id !== id));
     };
 
     const handleStatusUpdate = async (id: string, newStatus: ProgramStatus) => {
@@ -73,15 +76,6 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         } else setPrograms(p => p.map(x => x.id === id ? { ...x, status: newStatus } : x));
     };
 
-    const handleDeleteConfirm = async () => {
-        if (!deleteConfirmId) return;
-        const program = programs.find(p => p.id === deleteConfirmId); const programName = program?.name || 'this program';
-        setDeleteStatus('deleting');
-        if (deleteProgram) {
-            if (await deleteProgram(deleteConfirmId)) { setDeleteStatus('success'); setDeleteMessage(`Program "${programName}" has been deleted successfully!`); setTimeout(() => { setDeleteConfirmId(null); setDeleteStatus('idle'); }, 2000); }
-            else { setDeleteStatus('error'); setDeleteMessage('Failed to delete program from database. Please try again.'); }
-        } else { setPrograms(p => p.filter(x => x.id !== deleteConfirmId)); setDeleteStatus('success'); setDeleteMessage(`Program "${programName}" has been removed!`); setTimeout(() => { setDeleteConfirmId(null); setDeleteStatus('idle'); }, 2000); }
-    };
 
     const handlePublish = async (id: string) => {
         const program = programs.find(p => p.id === id); if (!program) return;
