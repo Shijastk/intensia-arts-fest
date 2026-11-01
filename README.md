@@ -7,6 +7,7 @@ A comprehensive, real-time festival management platform built with React, TypeSc
 ![TypeScript](https://img.shields.io/badge/typescript-5.x-blue.svg)
 ![React](https://img.shields.io/badge/react-18.x-61dafb.svg)
 
+
 ---
 
 ## ✨ Features
