@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Program } from '../types';
 import { calculateConsolidatedResults } from '../utils/consolidationCalc';
+import { getProgramZone, zoneLabel } from '../utils/resultsUtils';
 
 interface ConsolidationViewProps {
   programs: Program[];
@@ -9,9 +10,18 @@ interface ConsolidationViewProps {
 export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }) => {
   
   const [includeUnpublished, setIncludeUnpublished] = useState(false);
+  const [selectedZone, setSelectedZone] = useState('All');
 
-  // Using the shared, bug-free utility function
-  const stats = useMemo(() => calculateConsolidatedResults(programs, includeUnpublished), [programs, includeUnpublished]);
+  const zones = useMemo(() => Array.from(new Set(programs.map(p => getProgramZone(p)))).sort(), [programs]);
+
+  // A zone report is the same consolidation run on that zone's programs only.
+  const stats = useMemo(() => calculateConsolidatedResults(
+    selectedZone === 'All' ? programs : programs.filter(p => getProgramZone(p) === selectedZone),
+    includeUnpublished
+  ), [programs, includeUnpublished, selectedZone]);
+
+  // " (North Zone)" after each heading when a zone is selected.
+  const zoneSuffix = selectedZone === 'All' ? '' : ` (${selectedZone === 'General' ? 'General' : zoneLabel(selectedZone)})`;
 
   const handlePrint = () => {
     window.print();
@@ -24,9 +34,19 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b-2 border-black pb-4 mb-6 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-wider">Final Result Consolidation</h1>
-          <p className="text-sm font-semibold text-gray-600 mt-1">Live Dynamic Calculation Report</p>
+          <p className="text-sm font-semibold text-gray-600 mt-1">Live Dynamic Calculation Report{zoneSuffix && ` · ${zoneSuffix.slice(2, -1)}`}</p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-3">
+          <select
+            value={selectedZone}
+            onChange={(e) => setSelectedZone(e.target.value)}
+            className="print:hidden bg-gray-100 px-3 py-1.5 rounded border border-gray-300 text-xs font-bold uppercase text-gray-800 cursor-pointer"
+          >
+            <option value="All">All Zones</option>
+            {zones.map(zone => (
+              <option key={zone} value={zone}>{zone === 'General' ? 'General' : zoneLabel(zone)}</option>
+            ))}
+          </select>
           <label className="print:hidden flex items-center gap-2 cursor-pointer bg-gray-100 px-3 py-1.5 rounded border border-gray-300">
             <input 
               type="checkbox" 
@@ -50,7 +70,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
         
         {/* Team Standings */}
         <div className="border-b-2 md:border-b-0 md:border-r-2 border-black p-5">
-          <h2 className="text-sm font-bold uppercase border-b border-black pb-2 mb-3">Overall Team Standings</h2>
+          <h2 className="text-sm font-bold uppercase border-b border-black pb-2 mb-3">Overall Team Standings{zoneSuffix}</h2>
           <table className="w-full text-sm text-left">
             <tbody>
               {stats.sortedTeams.map((team, idx) => (
@@ -68,7 +88,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
 
         {/* Kala Prathibha */}
         <div className="border-b-2 md:border-b-0 md:border-r-2 border-black p-5 bg-gray-50">
-          <h2 className="text-sm font-bold uppercase border-b border-black pb-2 mb-3">Kala Prathibha (Stage)</h2>
+          <h2 className="text-sm font-bold uppercase border-b border-black pb-2 mb-3">Kala Prathibha (Stage){zoneSuffix}</h2>
           {stats.kalaPrathibha && stats.kalaPrathibha.individualPoints > 0 ? (
             <div className="text-center mt-4">
               <h3 className="text-2xl font-black uppercase mb-1">{stats.kalaPrathibha.name}</h3>
@@ -85,7 +105,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
 
         {/* Sarga Prathibha */}
         <div className="p-5 bg-gray-50">
-          <h2 className="text-sm font-bold uppercase border-b border-black pb-2 mb-3">Sarga Prathibha (Off-Stage)</h2>
+          <h2 className="text-sm font-bold uppercase border-b border-black pb-2 mb-3">Sarga Prathibha (Off-Stage){zoneSuffix}</h2>
           {stats.sargaPrathibha && stats.sargaPrathibha.offStagePoints > 0 ? (
             <div className="text-center mt-4">
               <h3 className="text-2xl font-black uppercase mb-1">{stats.sargaPrathibha.name}</h3>
@@ -103,7 +123,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
 
       {/* TOP 15 CANDIDATES TABLE */}
       <div className="mb-10 page-break-inside-avoid">
-        <h2 className="text-lg font-black uppercase mb-3 bg-black text-white inline-block px-4 py-1">Top 15 Candidates</h2>
+        <h2 className="text-lg font-black uppercase mb-3 bg-black text-white inline-block px-4 py-1">Top 15 Candidates{zoneSuffix}</h2>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse border-2 border-black text-sm text-left">
             <thead className="bg-gray-200">
@@ -134,7 +154,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
 
       {/* DETAILED PERFORMANCE TABLE */}
       <div className="page-break-before-always">
-        <h2 className="text-lg font-black uppercase mb-3 bg-black text-white inline-block px-4 py-1">Detailed Performance Log</h2>
+        <h2 className="text-lg font-black uppercase mb-3 bg-black text-white inline-block px-4 py-1">Detailed Performance Log{zoneSuffix}</h2>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse border-2 border-black text-sm text-left">
             <thead className="bg-gray-200">
