@@ -45,7 +45,8 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
   const overallTeamScores = useMemo(() => {
     return consolidated.sortedTeams.map(t => ({
       teamName: t.name,
-      points: t.score
+      points: t.score,
+      position: t.position
     }));
   }, [consolidated]);
 
@@ -62,11 +63,15 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     .map(zone => ({
       zone,
       data: calculateConsolidatedResults(programs.filter(p => getProgramZone(p) === zone))
-        .sortedTeams.map(t => ({ teamName: t.name, points: t.score }))
+        .sortedTeams.map(t => ({ teamName: t.name, points: t.score, position: t.position }))
     }))
     .filter(z => z.data.length > 0), [programs, availableZones]);
 
-  const latestPrograms = useMemo(() => completedPrograms.slice(0, 5), [completedPrograms]);
+  // Latest announcements follow the zone filter too.
+  const latestPrograms = useMemo(
+    () => completedPrograms.filter(p => selectedZone === 'All' || getProgramZone(p) === selectedZone).slice(0, 5),
+    [completedPrograms, selectedZone]
+  );
 
   // Shared with the admin "Download Poster" button and the public page (OffscreenRenderer):
   // same template selection, winners (all ties), fonts and render settings.
@@ -226,18 +231,18 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                     <div className="flex-1 w-full flex flex-col gap-4 relative z-10">
                       {topTeams.map((team: any, i: number) => (
                         <div key={i} className={`flex items-center justify-between p-4 md:p-5 rounded-2xl transition-transform hover:-translate-x-2 ${
-                          i === 0 ? 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-xl shadow-amber-900/20 text-white' : 
-                          i === 1 ? 'bg-white/10 backdrop-blur-md border border-white/10 text-white' : 
+                          team.position === 1 ? 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-xl shadow-amber-900/20 text-white' : 
+                          team.position === 2 ? 'bg-white/10 backdrop-blur-md border border-white/10 text-white' : 
                           'bg-white/5 backdrop-blur-md border border-white/5 text-white'
                         }`}>
                            <div className="flex items-center gap-4 sm:gap-6">
-                             <span className="text-3xl md:text-4xl filter drop-shadow-md">{i === 0 ? '👑' : i === 1 ? '🥈' : '🥉'}</span>
+                             <span className="text-3xl md:text-4xl filter drop-shadow-md">{team.position === 1 ? '👑' : team.position === 2 ? '🥈' : '🥉'}</span>
                              <div className="text-left">
-                               <p className={`font-black uppercase tracking-tight leading-none mb-1 ${i === 0 ? 'text-2xl' : 'text-lg'}`}>{team.teamName}</p>
-                               <p className={`text-[9px] md:text-[10px] font-bold uppercase tracking-widest ${i === 0 ? 'text-amber-200' : 'text-indigo-300'}`}>Total Points</p>
+                               <p className={`font-black uppercase tracking-tight leading-none mb-1 ${team.position === 1 ? 'text-2xl' : 'text-lg'}`}>{team.teamName}</p>
+                               <p className={`text-[9px] md:text-[10px] font-bold uppercase tracking-widest ${team.position === 1 ? 'text-amber-200' : 'text-indigo-300'}`}>Total Points</p>
                              </div>
                            </div>
-                           <span className={`font-black tracking-tighter ${i === 0 ? 'text-4xl' : 'text-2xl'}`}>{team.points}</span>
+                           <span className={`font-black tracking-tighter ${team.position === 1 ? 'text-4xl' : 'text-2xl'}`}>{team.points}</span>
                         </div>
                       ))}
                     </div>
