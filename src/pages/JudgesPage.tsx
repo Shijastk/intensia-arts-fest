@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Program, ProgramStatus, Settings } from '../types';
-import { getGradeFromScore, rankProgramResults } from '../utils/pointsCalculator';
+import { getGradeFromScore, rankProgramResults, scoreConfigFor } from '../utils/pointsCalculator';
 import { appDialog } from '../components/ui/AppDialog';
 import { compareScheduleTimes, compareScheduleTimesDesc, formatDateTime } from '../utils/timeUtils';
 
@@ -126,7 +126,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
 
         // Ranking, ties, absentees and points are computed by the shared helper (also used by
         // the admin "Edit Results" screen) so both always produce the same results.
-        const updatedTeams = rankProgramResults(selectedProgram, scores, settings?.customScores?.[selectedProgram.id]);
+        const updatedTeams = rankProgramResults(selectedProgram, scores, scoreConfigFor(settings, selectedProgram.id, !!selectedProgram.isGroup));
 
         if (updateProgram) {
             const success = await updateProgram(selectedProgram.id, {

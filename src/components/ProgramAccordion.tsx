@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Program, ProgramStatus, CustomProgramScore, Team, Participant, Staff } from '../types';
-import { collectScoreInputs, getGradeFromScore, rankProgramResults } from '../utils/pointsCalculator';
+import { collectScoreInputs, getGradeFromScore, rankProgramResults, scoreConfigFor, type FestDefaultScores } from '../utils/pointsCalculator';
 
 const GRADE_OPTIONS = ['A+', 'A', 'B', 'C'];
 import { AdminRegistrationModal } from './AdminRegistrationModal';
@@ -18,6 +18,8 @@ interface ProgramAccordionProps {
   onRequestCancel: (id: string) => void;
   onUpdateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
   customScores?: Record<string, CustomProgramScore>;
+  /** Fest default point tables (Settings → Default Scoring). */
+  defaultScores?: FestDefaultScores;
   allPrograms?: Program[];
   staffs?: Staff[];
   onPrintCertificate?: (programId: string) => void;
@@ -34,6 +36,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   onRequestCancel,
   onUpdateProgram,
   customScores,
+  defaultScores,
   allPrograms = [],
   staffs = [],
   onPrintCertificate,
@@ -177,7 +180,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   const currentTeams = () => (isEditingScores ? editedTeams : (program.teams || []));
   // A completed program is re-ranked after a removal so nobody keeps a stale rank or points.
   const finalizeTeams = (teams: Team[]) => program.status === ProgramStatus.COMPLETED
-    ? rankProgramResults({ ...program, teams }, collectScoreInputs(teams), customScores?.[program.id])
+    ? rankProgramResults({ ...program, teams }, collectScoreInputs(teams), scoreConfigFor({ customScores, defaultScores }, program.id, !!program.isGroup))
     : teams;
 
   const saveScores = async () => {
@@ -187,7 +190,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     }
 
     // Same ranking as the judge submission (per sub-team for group programs, absentees unranked).
-    const finalizedTeams = rankProgramResults({ ...program, teams: editedTeams }, collectScoreInputs(editedTeams), customScores?.[program.id]);
+    const finalizedTeams = rankProgramResults({ ...program, teams: editedTeams }, collectScoreInputs(editedTeams), scoreConfigFor({ customScores, defaultScores }, program.id, !!program.isGroup));
 
     const success = await onUpdateProgram(program.id, { teams: finalizedTeams });
     if (success) {

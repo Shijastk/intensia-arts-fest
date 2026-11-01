@@ -413,7 +413,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
             </div>
 
-            <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} staffs={staffs} />
+            <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} defaultScores={settings?.defaultScores} staffs={staffs} />
           </div>
         )}
 

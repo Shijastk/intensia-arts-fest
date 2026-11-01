@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Program, ProgramStatus, ParticipantSummary, CustomProgramScore, Staff } from '../types';
+import type { FestDefaultScores } from '../utils/pointsCalculator';
 import { ProgramAccordion } from './ProgramAccordion';
 import { aggregateParticipants, buildCertificateData, cleanFestName, safeFileName, toParticipantSummary } from '../services/exportService';
 import { exportCertificatesPdf, exportPosterJpeg } from './generators/OffscreenRenderer';
@@ -13,11 +14,12 @@ interface ProgramListProps {
     updateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
     onEdit: (program: Program) => void;
     customScores?: Record<string, CustomProgramScore>;
+    defaultScores?: FestDefaultScores;
     staffs?: Staff[];
 }
 
 export const ProgramList: React.FC<ProgramListProps> = ({ 
-    programs, setPrograms, deleteProgram, updateProgram, onEdit, customScores, staffs
+    programs, setPrograms, deleteProgram, updateProgram, onEdit, customScores, defaultScores, staffs
 }) => {
     const [filter, setFilter] = useState<ProgramStatus | 'ALL'>('ALL');
     const [sortBy, setSortBy] = useState<'name' | 'time' | 'category'>('name');
@@ -151,7 +153,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
             <select value={filter} onChange={e => setFilter(e.target.value as any)} className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide text-slate-700 outline-none cursor-pointer"><option value="ALL">All States</option>{Object.values(ProgramStatus).map(s => <option key={s} value={s}>{s}</option>)}</select>
           </div>
         </div>
-        <div className="space-y-3">{filteredPrograms.map(prog => <ProgramAccordion key={prog.id} program={prog} onUpdateStatus={handleStatusUpdate} onDelete={handleDeleteRequest} onEdit={onEdit} onSelectParticipant={setSelectedParticipantName} onPublish={handlePublish} onPublishResult={handlePublishResult} onRequestCancel={(id) => handleStatusUpdate(id, ProgramStatus.CANCELLED)} onUpdateProgram={updateProgram} customScores={customScores} staffs={staffs} allPrograms={programs} onPrintCertificate={handlePrintProgramCertificates} onDownloadPoster={handleDownloadProgramPoster} />)}</div>
+        <div className="space-y-3">{filteredPrograms.map(prog => <ProgramAccordion key={prog.id} program={prog} onUpdateStatus={handleStatusUpdate} onDelete={handleDeleteRequest} onEdit={onEdit} onSelectParticipant={setSelectedParticipantName} onPublish={handlePublish} onPublishResult={handlePublishResult} onRequestCancel={(id) => handleStatusUpdate(id, ProgramStatus.CANCELLED)} onUpdateProgram={updateProgram} customScores={customScores} defaultScores={defaultScores} staffs={staffs} allPrograms={programs} onPrintCertificate={handlePrintProgramCertificates} onDownloadPoster={handleDownloadProgramPoster} />)}</div>
       </div>
       {exportProgress && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">

@@ -1,8 +1,9 @@
 /**
  * Points Calculator for Arts Fest
- * Based on standard scoring: Individual (Max 10) | Group (Max 20)
+ * Standard scoring: Individual (Max 10) | Group (Max 20)
  * Total Points = Grade Points + Rank Points
- * Custom overrides can be provided per-program via CustomProgramScore.
+ * A fest can change the defaults (Settings → Default Scoring) and override them per program
+ * (CustomProgramScore); scoreConfigFor() picks the table for a program.
  */
 import { CustomProgramScore, Participant, Program, Team } from '../types';
 
@@ -190,11 +191,8 @@ export const rankProgramResults = (
     });
 };
 
-/**
- * Returns a default CustomProgramScore template based on whether the program is a group or individual.
- * Useful as a starting template when creating a new custom score override.
- */
-export const getDefaultCustomScore = (isGroup: boolean): CustomProgramScore => ({
+/** The standard point table (the values the app has always used). */
+export const getStandardScore = (isGroup: boolean): CustomProgramScore => ({
     gradePoints: isGroup
         ? { 'A+': 10, 'A': 10, 'B': 6, 'C': 2, 'No Grade': 0 }
         : { 'A+': 5, 'A': 5, 'B': 3, 'C': 1, 'No Grade': 0 },
@@ -202,3 +200,28 @@ export const getDefaultCustomScore = (isGroup: boolean): CustomProgramScore => (
         ? { 1: 10, 2: 6, 3: 2 }
         : { 1: 5, 2: 3, 3: 1 },
 });
+
+export interface FestDefaultScores { individual?: CustomProgramScore; group?: CustomProgramScore }
+
+/**
+ * Default point table for a fest: the one edited in Settings → Default Scoring, else the
+ * standard table. Also the starting values for a new per-program custom score.
+ */
+export const getDefaultCustomScore = (isGroup: boolean, defaults?: FestDefaultScores): CustomProgramScore =>
+    (isGroup ? defaults?.group : defaults?.individual) ?? getStandardScore(isGroup);
+
+/**
+ * Point table to use for one program: its custom override, else the fest's edited defaults.
+ * Returns undefined when neither exists, so calculatePoints uses the standard constants.
+ * Every place that scores a program must go through this so the numbers always agree.
+ */
+export const scoreConfigFor = (
+    settings: { customScores?: Record<string, CustomProgramScore>; defaultScores?: FestDefaultScores } | undefined,
+    programId: string,
+    isGroup: boolean
+): CustomProgramScore | undefined =>
+    settings?.customScores?.[programId] ?? (isGroup ? settings?.defaultScores?.group : settings?.defaultScores?.individual);
+
+/** Highest points one entry can earn with this table (best grade + 1st place). */
+export const maxPoints = (table: CustomProgramScore) =>
+    Math.max(table.gradePoints['A+'] || 0, table.gradePoints['A'] || 0, table.gradePoints['B'] || 0, table.gradePoints['C'] || 0) + (table.rankPoints[1] || 0);
