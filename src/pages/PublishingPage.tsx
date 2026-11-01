@@ -495,8 +495,8 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                       </div>
                       <p className="text-[10px] text-slate-500 mt-1">Where the text block sits. Text Alignment lines the text up inside it, e.g. right-aligned text on the left side.</p>
                       <div className="mt-3">
-                        <RangeField label="Text Block Width" value={config.blockWidthPct ?? 100} min={20} max={100} unit="%" onChange={(v) => update({ blockWidthPct: v })} />
-                        <p className="text-[10px] text-slate-500 mt-1">Make the block narrower to move long text (like a certificate sentence) to one side.</p>
+                        <RangeField label="Max Text Width" value={resolvePlacement(type, config).widthPct} min={20} max={100} unit="%" onChange={(v) => update({ blockWidthPct: v })} />
+                        <p className="text-[10px] text-slate-500 mt-1">The text block is always as wide as its content needs. This only limits very long text (e.g. a certificate sentence) so it stays on one side.</p>
                       </div>
                     </div>
 

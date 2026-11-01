@@ -665,7 +665,11 @@ export const resolvePlacement = (
   const pad = balanced
     ? { left: side, right: side }
     : contentPadding(position, side, (OPPOSITE_EDGE_PCT / 100) * size.width);
-  return { size, top, pad, topPct: round1(topPct), sidePct: round1(sidePct), balanced, align, position };
+  // The block is as wide as its content needs (dynamic) and is placed at `position`; widthPct is
+  // only an optional MAXIMUM (default 100%) so very long text, like a certificate sentence, can be
+  // kept to one side.
+  const widthPct = Math.min(100, Math.max(20, config.blockWidthPct ?? 100));
+  return { size, top, pad, topPct: round1(topPct), sidePct: round1(sidePct), balanced, align, position, widthPct };
 };
 
 /** CSS flex alignment for left / center / right. */

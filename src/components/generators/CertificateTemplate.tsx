@@ -66,9 +66,8 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
   const roles = resolveTextRoles('certificateBgs', c);
   const name = applyTextCase(participantName, roles.name.textCase);
   // Spacing is a % of the page (top: height, sides: width).
-  const { top: contentTop, pad, position: blockPos } = resolvePlacement('certificateBgs', c);
-  const blockWidthPct = Math.min(100, Math.max(20, c.blockWidthPct ?? 100));
-  const innerWidth = ((A4_PX.width - pad.left - pad.right) * blockWidthPct) / 100;
+  const { top: contentTop, pad, position: blockPos, widthPct } = resolvePlacement('certificateBgs', c);
+  const innerWidth = ((A4_PX.width - pad.left - pad.right) * widthPct) / 100;
 
   // Name: shrink with length (~0.68em per uppercase glyph + tracking), wrap to at most 2 lines.
   const nameCharsAtBase = Math.max(8, Math.floor(innerWidth / (titleSize * (0.68 + letterSpacing))));
@@ -110,7 +109,7 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
         style={{ paddingTop: `${contentTop}px`, paddingLeft: `${pad.left}px`, paddingRight: `${pad.right}px`, alignItems: flexAlign(blockPos) }}
       >
         {/* The block sits at its page position; its lines are aligned inside it. */}
-        <div className="flex flex-col" style={{ width: 'fit-content', maxWidth: `${blockWidthPct}%`, alignItems, textAlign }}>
+        <div className="flex flex-col" style={{ width: 'fit-content', maxWidth: `${widthPct}%`, alignItems, textAlign }}>
         {/* Name */}
         <h1
           className="mb-4 max-w-full"

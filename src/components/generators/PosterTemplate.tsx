@@ -59,8 +59,7 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
   const lineHeight = c.lineHeight ?? D.lineHeight!;
   const alignItems = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
   // Spacing is a % of the page, so it scales with the poster size (portrait or square).
-  const { top, pad, position } = resolvePlacement('posterBgs', { ...c, textAlign: align, posterSize: size }, { contentTop, contentLeft });
-  const blockWidthPct = Math.min(100, Math.max(20, c.blockWidthPct ?? 100));
+  const { top, pad, position, widthPct } = resolvePlacement('posterBgs', { ...c, textAlign: align, posterSize: size }, { contentTop, contentLeft });
   const roles = resolveTextRoles('posterBgs', c);
 
   // Copy before sorting (props must not be mutated); stable for tied places.
@@ -84,7 +83,7 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
           alignItems: flexAlign(position)
         }}
       >
-        <div className="flex flex-col" style={{ width: 'fit-content', maxWidth: `${blockWidthPct}%`, alignItems, textAlign: align }}>
+        <div className="flex flex-col" style={{ width: 'fit-content', maxWidth: `${widthPct}%`, alignItems, textAlign: align }}>
         {/* Event Title */}
         <h1
           className="mb-8 break-words max-w-full"
