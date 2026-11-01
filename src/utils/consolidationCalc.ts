@@ -12,6 +12,13 @@ export interface CandidateStat {
   thirds: number;
 }
 
+/** Adds a competition-style position (1, 1, 3) to an already-sorted list. */
+export const withPositions = <T,>(sorted: T[], value: (item: T) => number): (T & { position: number })[] =>
+  sorted.map((item, i) => ({ ...item, position: 0 })).map((item, i, arr) => {
+    item.position = i > 0 && value(sorted[i]) === value(sorted[i - 1]) ? arr[i - 1].position : i + 1;
+    return item;
+  });
+
 export const calculateConsolidatedResults = (programs: Program[], includeUnpublished: boolean = false) => {
   const teamScores: Record<string, number> = {};
   const candidatesMap = new Map<string, CandidateStat>();
@@ -35,18 +42,24 @@ export const calculateConsolidatedResults = (programs: Program[], includeUnpubli
     const isGeneral = isGeneralProgram(prog.category);
     const isOff = isOffStage(prog.category);
 
-    prog.teams.forEach(team => {
+    // RTDB drops empty arrays, so teams/participants may be missing.
+    (prog.teams || []).filter(Boolean).forEach(team => {
       const tName = (team.teamName || 'UNKNOWN').toUpperCase().trim();
       if (!teamScores[tName]) teamScores[tName] = 0;
 
       // Group programs contribute their group result to Team Overall Score.
       // A Group program remains Group based on prog.isGroup, regardless of participant count.
       if (isGrp) {
-        const teamEventPts = team.points ?? (team.participants[0]?.points || 0);
+        const teamEventPts = team.points ?? ((team.participants || [])[0]?.points || 0);
         teamScores[tName] += teamEventPts;
       }
 
-      team.participants.forEach(p => {
+      (team.participants || []).filter(Boolean).forEach(p => {
+        const pts = p.points || 0;
+
+        // Every individual program (General included) counts towards the team's overall score.
+        if (!isGrp) teamScores[tName] += pts;
+
         const chest = p.chestNumber;
         if (!chest) return;
 
@@ -65,14 +78,12 @@ export const calculateConsolidatedResults = (programs: Program[], includeUnpubli
         }
 
         const cand = candidatesMap.get(chest)!;
-        const pts = p.points || 0;
         const rank = p.rank || team.rank || 0;
 
         // Individual score MUST contain only Non-General Individual programs.
         // General programs are deliberately excluded even when isGroup === false.
         if (!isGrp && !isGeneral) {
           cand.totalPoints += pts;
-          teamScores[tName] += pts;
           cand.individualPoints += pts;
           if (isOff) cand.offStagePoints += pts;
 
@@ -87,11 +98,17 @@ export const calculateConsolidatedResults = (programs: Program[], includeUnpubli
 
   const allCandidates = Array.from(candidatesMap.values());
 
-  const kalaPrathibha = [...allCandidates].sort((a, b) => b.individualPoints - a.individualPoints)[0];
-  const sargaPrathibha = [...allCandidates].filter(c => c.offStagePoints > 0).sort((a, b) => b.offStagePoints - a.offStagePoints)[0];
-  const sortedCandidates = [...allCandidates].sort((a, b) => b.totalPoints - a.totalPoints);
+  // Ties are broken by number of 1st, then 2nd, then 3rd places, then name (deterministic).
+  const tieBreak = (a: CandidateStat, b: CandidateStat) =>
+    b.firsts - a.firsts || b.seconds - a.seconds || b.thirds - a.thirds || a.name.localeCompare(b.name);
+  const kalaPrathibha = [...allCandidates].filter(c => c.individualPoints > 0).sort((a, b) => b.individualPoints - a.individualPoints || tieBreak(a, b))[0];
+  const sargaPrathibha = [...allCandidates].filter(c => c.offStagePoints > 0).sort((a, b) => b.offStagePoints - a.offStagePoints || tieBreak(a, b))[0];
+  const sortedCandidates = [...allCandidates].sort((a, b) => b.totalPoints - a.totalPoints || tieBreak(a, b));
   const top15 = sortedCandidates.slice(0, 15);
-  const sortedTeams = Object.entries(teamScores).map(([name, score]) => ({ name, score })).sort((a, b) => b.score - a.score);
+  const sortedTeams = withPositions(
+    Object.entries(teamScores).map(([name, score]) => ({ name, score })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)),
+    t => t.score
+  );
 
-  return { sortedTeams, kalaPrathibha, sargaPrathibha, top15, allCandidates: sortedCandidates };
+  return { sortedTeams, kalaPrathibha, sargaPrathibha, top15: withPositions(top15, c => c.totalPoints), allCandidates: sortedCandidates };
 };

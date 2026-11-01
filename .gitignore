@@ -22,3 +22,26 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets and environment files (never commit)
+.env
+.env.*
+!.env.example
+*.env
+
+# Exported user / database data (contains personal data)
+accounts.json
+db_users.json
+*-export.json
+*backup*.json
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+
+# Firebase local tooling
+.firebase/
+firebase-debug.log
+database-debug.log
+ui-debug.log
+functions/lib/
+functions/node_modules/
+functions/.secret.local

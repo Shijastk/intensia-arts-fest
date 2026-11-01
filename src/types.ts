@@ -98,6 +98,9 @@ export interface User {
   displayName: string;
   teamName?: string;
   judgePanel?: string;
+  staffId?: string;
+  // Derived from the verified superAdmin custom claim; only used to show UI controls.
+  isSuperAdmin?: boolean;
 }
 
 export const STORAGE_KEYS = {
@@ -111,7 +114,7 @@ export interface Staff {
   festId: string;
   role: 'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER' | 'ADMIN';
   username: string;
-  password?: string;
+  password?: string; // Write-only: sent to the manageStaff function, never stored in the profile
   panelName?: string; // For Judges or Team Leaders
   stage?: string;     // For Green Room or Judges
   judgePanel?: string; // Additional property to fix TS error
@@ -144,4 +147,5 @@ export interface Settings {
   festName?: string;
   festSlogan?: string;
   theme?: 'emerald' | 'purple' | 'blue' | 'crimson';
+  stages?: string[];          // schedule venues/stages saved from the Schedule Manager
 }

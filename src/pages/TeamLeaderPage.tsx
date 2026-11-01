@@ -203,11 +203,11 @@ export const TeamLeaderPage: React.FC<TeamLeaderPageProps> = ({
     const program = programs.find(p => p.id === removalRequest.programId);
     if (!program) return;
 
-    const updatedTeams = program.teams.map(t => {
+    const updatedTeams = (program.teams || []).map(t => {
       if (t.teamName.toLowerCase() === teamName.toLowerCase()) {
         return {
           ...t,
-          participants: t.participants.map(p => 
+          participants: (t.participants || []).map(p => 
             p.chestNumber === removalRequest.chestNumber ? { ...p, removalRequested: true } : p
           )
         };

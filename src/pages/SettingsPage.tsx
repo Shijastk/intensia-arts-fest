@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Settings, Program, CustomProgramScore } from '../types';
+import { Settings, Program, CustomProgramScore, ProgramStatus } from '../types';
 import { Toast } from '../components/ui/Toast';
 import {
   getDefaultCustomScore,
@@ -8,12 +8,15 @@ import {
   INDIVIDUAL_RANK_POINTS,
   GROUP_GRADE_POINTS,
   GROUP_RANK_POINTS,
+  collectScoreInputs,
+  rankProgramResults,
 } from '../utils/pointsCalculator';
 
 interface SettingsPageProps {
   settings: Settings;
   updateSettings: (updates: Partial<Settings>) => Promise<boolean>;
   programs?: Program[];
+  updateProgram?: (id: string, updates: Partial<Program>) => Promise<boolean>;
 }
 
 const GRADE_LABEL: Record<string, string> = {
@@ -43,7 +46,7 @@ const emptyCustomForm = (isGroup: boolean) => {
 
 // Replaced Chip with full div for categories to support reordering
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSettings, programs = [] }) => {
+export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSettings, programs = [], updateProgram }) => {
   // ── General settings ──────────────────────────────────────────────────────
   const [categories, setCategories] = useState<string[]>(settings?.categories || []);
   const [newCategory, setNewCategory] = useState('');
@@ -215,15 +218,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
     };
     const updatedCustomScores = { ...(settings?.customScores || {}), [selectedProgramId]: parsed };
     const success = await updateSettings({ customScores: updatedCustomScores });
+    const recalculated = success ? await recalculateProgramPoints(selectedProgramId, parsed) : true;
     setIsSavingCustom(false);
-    setCustomSaveMsg(success ? 'Custom score saved!' : 'Failed to save.');
+    setCustomSaveMsg(!success ? 'Failed to save.' : recalculated ? 'Custom score saved!' : 'Saved, but existing results could not be recalculated.');
     if (success) setTimeout(() => setCustomSaveMsg(''), 3000);
+  };
+
+  // Points are stored on each result when it is scored, so a completed program must be
+  // re-ranked with the new point table, otherwise totals keep using the old values.
+  const recalculateProgramPoints = async (programId: string, customConfig?: CustomProgramScore): Promise<boolean> => {
+    const program = programs.find(p => p.id === programId);
+    if (!program || program.status !== ProgramStatus.COMPLETED || !updateProgram) return true;
+    const teams = rankProgramResults(program, collectScoreInputs(program.teams), customConfig);
+    return updateProgram(programId, { teams });
   };
 
   const handleRemoveCustomScore = async (programId: string) => {
     const updated = { ...(settings?.customScores || {}) };
     delete updated[programId];
-    await updateSettings({ customScores: updated });
+    if (await updateSettings({ customScores: updated })) await recalculateProgramPoints(programId, undefined);
     if (selectedProgramId === programId) { setSelectedProgramId(''); setCustomForm(emptyCustomForm(false)); }
   };
 

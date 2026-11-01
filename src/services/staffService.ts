@@ -1,6 +1,14 @@
-import { ref, get, set, remove, update } from 'firebase/database';
-import { db } from '../config/firebase';
+import { ref, get } from 'firebase/database';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../config/firebase';
 import { Staff } from '../types';
+import { appDialog } from '../components/ui/AppDialog';
+
+// Staff accounts are created and changed only by the manageStaff Cloud Function, which
+// checks that the caller is the fest admin and stores passwords as bcrypt hashes.
+const manageStaff = httpsCallable<Record<string, unknown>, { id: string }>(functions, 'manageStaff');
+
+const errorMessage = (error: any) => error?.message || 'The staff account could not be saved.';
 
 export const staffService = {
   async getAllStaffs(festId: string): Promise<Staff[]> {
@@ -19,31 +27,33 @@ export const staffService = {
 
   async addStaff(festId: string, staff: Omit<Staff, 'id'>): Promise<boolean> {
     try {
-      const id = `staff_${Date.now()}`;
-      await set(ref(db, `fests/${festId}/staff/${id}`), { ...staff, id, festId });
+      await manageStaff({ festId, action: 'create', staff });
       return true;
     } catch (error) {
       console.error("Error adding staff:", error);
+      appDialog.alert(errorMessage(error), { variant: 'danger', title: 'Staff account not saved' });
       return false;
     }
   },
 
   async updateStaff(festId: string, id: string, updates: Partial<Staff>): Promise<boolean> {
     try {
-      await update(ref(db, `fests/${festId}/staff/${id}`), updates);
+      await manageStaff({ festId, action: 'update', staffId: id, staff: updates });
       return true;
     } catch (error) {
       console.error("Error updating staff:", error);
+      appDialog.alert(errorMessage(error), { variant: 'danger', title: 'Staff account not saved' });
       return false;
     }
   },
 
   async deleteStaff(festId: string, id: string): Promise<boolean> {
     try {
-      await remove(ref(db, `fests/${festId}/staff/${id}`));
+      await manageStaff({ festId, action: 'delete', staffId: id });
       return true;
     } catch (error) {
       console.error("Error deleting staff:", error);
+      appDialog.alert(errorMessage(error), { variant: 'danger', title: 'Staff account not saved' });
       return false;
     }
   }

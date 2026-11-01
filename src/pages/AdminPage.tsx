@@ -10,10 +10,10 @@ import { ScheduleManager } from '../components/ScheduleManager';
 import { BulkUploadModal } from '../components/BulkUploadModal';
 import { CATEGORIES, ZONES } from '../constants/categories';
 import { PublishingPage } from './PublishingPage';
-import { jsPDF } from 'jspdf';
-import { toJpeg } from 'html-to-image';
-import { getBackgroundSettings } from '../services/backgroundService';
-import { CertificateTemplate } from '../components/generators/CertificateTemplate';
+import { aggregateParticipants, buildCertificateData, cleanFestName, safeFileName } from '../services/exportService';
+import { exportCertificatesPdf } from '../components/generators/OffscreenRenderer';
+import { appDialog } from '../components/ui/AppDialog';
+import { parseScheduleTime, toStoredTime, addMinutes } from '../utils/timeUtils';
 
 interface AdminPageProps {
   programs: Program[];
@@ -58,14 +58,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     if (isUpdatingSettings) return;
     
     if (eligibleForGR.length === 0) {
-      setModalConfig({
-        isOpen: true,
-        title: 'Notice',
-        message: 'No pending events with performers found.',
-        confirmVariant: 'primary',
-        confirmText: 'OK',
-        onConfirm: () => setModalConfig(prev => ({ ...prev, isOpen: false }))
-      });
+      appDialog.alert('No pending events with performers found.', { title: 'Notice' });
       return;
     }
 
@@ -101,7 +94,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [isGroup, setIsGroup] = useState(false);
   
   // Individual certificate state
-  const [certExportItem, setCertExportItem] = useState<any>(null);
   const [isCertExporting, setIsCertExporting] = useState(false);
   
   // Staff Modal State
@@ -110,17 +102,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   
   // Custom Confirmation Modal State for Staff Deletion
   const [staffDeleteId, setStaffDeleteId] = useState<string | null>(null);
-  const [modalConfig, setModalConfig] = useState<{
-    isOpen: boolean;
+  // Confirmations use the shared AppDialog (same styled modal); this keeps the old call shape.
+  const setModalConfig = (config: {
+    isOpen?: boolean;
     title?: string;
     message: string;
     confirmText?: string;
     confirmVariant?: 'danger' | 'warning' | 'primary';
-    onConfirm?: () => void;
-  }>({
-    isOpen: false,
-    message: ''
-  });
+    onConfirm?: () => void | Promise<void>;
+  }) => {
+    appDialog.confirm(config.message, { title: config.title || 'Confirmation', variant: config.confirmVariant || 'primary', confirmText: config.confirmText })
+      .then(async ok => { if (ok && config.onConfirm) await config.onConfirm(); });
+  };
 
   const pendingRequests = useMemo(() => {
     const reqs: { programId: string; programName: string; teamName: string; participantChest: string; participantName: string }[] = [];
@@ -139,14 +132,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const handleRequestAction = async (programId: string, teamName: string, chestNo: string, action: 'approve' | 'reject') => {
     const program = programs.find(p => p.id === programId);
     if (!program) return;
-    const updatedTeams = program.teams.map(t => {
+    const updatedTeams = (program.teams || []).map(t => {
       if (t.teamName === teamName) {
         if (action === 'approve') {
-          return { ...t, participants: t.participants.filter(p => p.chestNumber !== chestNo) };
+          return { ...t, participants: (t.participants || []).filter(p => p.chestNumber !== chestNo) };
         } else {
           return {
             ...t,
-            participants: t.participants.map(p => {
+            participants: (t.participants || []).map(p => {
               if (p.chestNumber === chestNo) {
                 const { removalRequested, ...rest } = p as any;
                 return rest;
@@ -171,12 +164,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
     if (names.length === 0) return;
 
+    const savedDuration = Number(formData.get('duration')) || 30;
+    // A new duration on a scheduled program moves its end time with it (start + duration).
+    const scheduledStart = parseScheduleTime(editingProgram?.startTime);
+    const durationChanged = !!editingProgram && savedDuration !== (editingProgram.duration || 30);
+
     const baseProgramData = {
       category: formData.get('category') as string,
-      zone: formData.get('zone') as string,
-      duration: Number(formData.get('duration')) || 30,
-      startTime: editingProgram?.startTime, 
-      endTime: editingProgram?.endTime,
+      // The zone field only exists when zones are configured; keep the stored zone otherwise.
+      zone: formData.has('zone') ? (formData.get('zone') as string) : (editingProgram?.zone || ''),
+      duration: savedDuration,
+      startTime: editingProgram?.startTime,
+      endTime: durationChanged && scheduledStart ? toStoredTime(addMinutes(scheduledStart, savedDuration)) : editingProgram?.endTime,
       venue: editingProgram?.venue,
       isGroup,
       participantsCount: Number(formData.get('participantsCount')) || 0,
@@ -210,7 +209,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       setEditingProgram(null);
       setIsGroup(false);
     } else {
-      alert("Failed to save some programs. Please check console or try again.");
+      appDialog.alert("Failed to save some programs. Please check console or try again.");
     }
   };
 
@@ -223,7 +222,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           const updatePromises = programs.map(async (p) => {
             if (!p.teams) return;
             let changed = false;
-            const updatedTeams = p.teams.map(t => {
+            const updatedTeams = (p.teams || []).map(t => {
               if (t.teamName.toLowerCase() === oldTeamName.toLowerCase()) {
                 changed = true;
                 return { ...t, teamName: newTeamName };
@@ -417,7 +416,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} />}
+        {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} festId={programs[0]?.festId} settings={settings} updateSettings={updateSettings} />}
         
         {activeTab === 'results' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -427,74 +426,37 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
         {activeTab === 'performers' && <ParticipantList programs={programs} onPrintCertificate={async (p) => {
           if (isCertExporting) return;
-          setIsCertExporting(true);
           const festId = programs[0]?.festId;
-          if (!festId) { setIsCertExporting(false); return; }
-
-          const backgrounds = await getBackgroundSettings(festId);
-          const bgId = Object.keys(backgrounds?.certificateBgs || {})[0];
-          const bgUrlOriginal = bgId ? backgrounds!.certificateBgs[bgId] : undefined;
-          const config = bgId ? backgrounds!.configs?.[bgId] : (backgrounds?.configs?.['blank'] || {
-            bgPositionX: 50, bgPositionY: 50, bgScale: 100
-          });
-
-          if (!backgrounds) { alert('Unable to fetch configurations.'); setIsCertExporting(false); return; }
-
-          // Convert bg to base64
-          let bgUrl = bgUrlOriginal;
-          if (bgUrlOriginal) {
-            try {
-              const response = await fetch(bgUrlOriginal);
-              const blob = await response.blob();
-              bgUrl = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-              });
-            } catch { /* use original */ }
+          if (!festId) return;
+          // Same aggregation as the bulk export: real categories, non-cancelled programs,
+          // position/grade from published results.
+          const participant = aggregateParticipants(programs).find(a => a.chestNumber === p.chestNumber)
+            || { name: p.name, chestNumber: p.chestNumber, teamName: p.teamName, programs: [] };
+          setIsCertExporting(true);
+          try {
+            await exportCertificatesPdf({
+              festId,
+              items: [buildCertificateData(participant, cleanFestName(festId))],
+              fileName: `${safeFileName(p.name)}_Certificate.pdf`,
+            });
+          } catch (e: any) {
+            console.error('Certificate export failed:', e);
+            appDialog.alert(`Could not generate the certificate: ${e?.message || 'Unknown error'}`, { title: 'Export failed', variant: 'danger' });
+          } finally {
+            setIsCertExporting(false);
           }
-
-          const rawFestId = festId;
-          const festParts = rawFestId.split('-');
-          const cleanFestName = (festParts.length > 1 ? festParts.slice(0, -1).join(' ') : rawFestId).toUpperCase();
-
-          const pData = {
-            participantName: p.name,
-            chestNo: p.chestNumber,
-            team: p.teamName,
-            category: cleanFestName,
-            events: p.programNames,
-            festName: cleanFestName
-          };
-
-          setCertExportItem({ data: pData, bgUrl, config });
-          await new Promise(resolve => setTimeout(resolve, 150));
-
-          const element = document.getElementById('admin-cert-render-container');
-          if (element) {
-            try {
-              const pdf = new jsPDF('p', 'px', [794, 1123]);
-              const imgData = await toJpeg(element, { quality: 0.8, pixelRatio: 1.5, style: { transform: 'scale(1)', transformOrigin: 'top left' } });
-              pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
-              pdf.save(`${p.name}_Certificate.pdf`);
-            } catch (e) { console.error('Error:', e); }
-          }
-
-          setCertExportItem(null);
-          setIsCertExporting(false);
         }} deleteParticipant={async (chestNo) => {
-          if (!window.confirm(`Are you SURE you want to completely delete participant (Chest No: ${chestNo}) from the entire festival? This will remove them from ALL programs. This action cannot be undone.`)) return;
+          if (!await appDialog.confirm(`Are you SURE you want to completely delete participant (Chest No: ${chestNo}) from the entire festival? This will remove them from ALL programs. This action cannot be undone.`, { variant: 'danger', title: 'Delete participant', confirmText: 'Delete' })) return;
           
           const updatePromises = programs.map(async (p) => {
             if (!p.teams) return;
             let changed = false;
-            const updatedTeams = p.teams.map(t => {
+            const updatedTeams = (p.teams || []).map(t => {
               const initialLen = t.participants?.length || 0;
               const newParticipants = (t.participants || []).filter(pt => pt.chestNumber !== chestNo);
               if (newParticipants.length !== initialLen) changed = true;
               return { ...t, participants: newParticipants };
-            }).filter(t => t.participants && t.participants.length > 0);
+            }).filter(t => t.participants && (t.participants || []).length > 0);
             
             if (changed) {
               await updateProgram(p.id, { teams: updatedTeams });
@@ -502,7 +464,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           });
           
           await Promise.all(updatePromises);
-          alert('Participant completely deleted from all programs.');
+          appDialog.alert('Participant completely deleted from all programs.', { variant: 'success', title: 'Participant deleted' });
         }} />}
                  
         {activeTab === 'requests' && (
@@ -547,24 +509,29 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     confirmText: 'Yes, Seed Defaults',
                     onConfirm: async () => {
                       const defaults: any[] = [
-                        { role: 'ADMIN', username: 'admin', password: 'admin123' },
-                        { role: 'GREEN_ROOM', username: 'greenroom', password: 'greenroom123' },
-                        { role: 'JUDGE', username: 'judge1', password: 'judge123', judgePanel: 'Stage 1' },
-                        { role: 'JUDGE', username: 'judge2', password: 'judge123', judgePanel: 'Stage 2' },
-                        { role: 'TEAM_LEADER', username: 'teamA', password: 'team123', teamName: 'Team A' },
-                        { role: 'TEAM_LEADER', username: 'teamB', password: 'team123', teamName: 'Team B' }
+                        { role: 'ADMIN', username: 'admin' },
+                        { role: 'GREEN_ROOM', username: 'greenroom' },
+                        { role: 'JUDGE', username: 'judge1', judgePanel: 'Stage 1' },
+                        { role: 'JUDGE', username: 'judge2', judgePanel: 'Stage 2' },
+                        { role: 'TEAM_LEADER', username: 'teamA', teamName: 'Team A' },
+                        { role: 'TEAM_LEADER', username: 'teamB', teamName: 'Team B' }
                       ];
-                      let addedCount = 0;
+                      // Every seeded account gets a random password, shown once here
+                      // (passwords are stored as hashes and cannot be displayed later).
+                      const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+                      const randomPassword = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => alphabet[b % alphabet.length]).join('');
+                      const created: string[] = [];
                       for (const d of defaults) {
                         if (!staffs?.find(s => s.username === d.username)) {
-                          await addStaff(d);
-                          addedCount++;
+                          const password = randomPassword();
+                          if (await addStaff({ ...d, password })) created.push(`${d.username} / ${password}`);
                         }
                       }
+                      const addedCount = created.length;
                       if (addedCount > 0) {
-                        alert(`Successfully seeded ${addedCount} new default credentials!`);
+                        appDialog.alert(`Successfully seeded ${addedCount} new default credentials. Note these passwords now; they cannot be shown again:\n\n${created.join('\n')}`, { variant: 'success', title: 'Default staff created' });
                       } else {
-                        alert("All default credentials already exist.");
+                        appDialog.alert("All default credentials already exist.");
                       }
                     }
                   });
@@ -588,7 +555,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                           {staff.isDisabled && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px]">DISABLED</span>}
                         </h4>
                         <div className="flex gap-2 items-center mt-1">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase">Pass: <span className="font-mono bg-slate-100 px-1 rounded">{staff.password}</span></span>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase">Pass: <span className="font-mono bg-slate-100 px-1 rounded" title="Stored securely; edit the account to set a new password">••••••</span></span>
                           {(staff.stage || staff.panelName) && (
                             <>
                               <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
@@ -610,17 +577,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       
                       {staff.role === 'TEAM_LEADER' && staff.teamName && (
                         <button onClick={async () => {
-                          if (!window.confirm(`Are you SURE you want to completely wipe out ALL participants and entries for Team "${staff.teamName}" from EVERY program? This action CANNOT be undone.`)) return;
+                          if (!await appDialog.confirm(`Are you SURE you want to completely wipe out ALL participants and entries for Team "${staff.teamName}" from EVERY program? This action CANNOT be undone.`, { variant: 'danger', title: 'Wipe team', confirmText: 'Wipe team' })) return;
                           
                           const updatePromises = programs.map(async (p) => {
                             if (!p.teams) return;
-                            const newTeams = p.teams.filter(t => t.teamName.toLowerCase() !== staff.teamName!.toLowerCase());
-                            if (newTeams.length !== p.teams.length) {
+                            const newTeams = (p.teams || []).filter(t => t.teamName.toLowerCase() !== staff.teamName!.toLowerCase());
+                            if (newTeams.length !== (p.teams || []).length) {
                               await updateProgram(p.id, { teams: newTeams });
                             }
                           });
                           await Promise.all(updatePromises);
-                          alert(`Team "${staff.teamName}" data wiped from all programs.`);
+                          appDialog.alert(`Team "${staff.teamName}" data wiped from all programs.`, { variant: 'success', title: 'Team wiped' });
                         }} className="flex-1 sm:flex-none px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-bold transition-all" title="Delete Team from all Programs">Wipe Team</button>
                       )}
                       
@@ -650,68 +617,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         editingStaff={editingStaff}
       />
 
-      {/* Styled Modern Custom Modal */}
-      {modalConfig.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 transform transition-all">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                modalConfig.confirmVariant === 'danger' ? 'bg-rose-100 text-rose-600' :
-                modalConfig.confirmVariant === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'
-              }`}>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-slate-900">{modalConfig.title || 'Confirmation'}</h4>
-              </div>
-            </div>
-            <p className="text-xs text-slate-600 mb-5 leading-relaxed pl-1">{modalConfig.message}</p>
-                         
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
-                className="px-3.5 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (modalConfig.onConfirm) await modalConfig.onConfirm();
-                  setModalConfig(prev => ({ ...prev, isOpen: false }));
-                }}
-                className={`px-3.5 py-1.5 text-xs font-bold text-white rounded-lg transition-colors cursor-pointer shadow-sm ${
-                  modalConfig.confirmVariant === 'danger'
-                    ? 'bg-rose-600 hover:bg-rose-700'
-                    : modalConfig.confirmVariant === 'warning'
-                    ? 'bg-amber-600 hover:bg-amber-700'
-                    : 'bg-indigo-600 hover:bg-indigo-700'
-                }`}
-              >
-                {modalConfig.confirmText || 'Confirm'}
-              </button>
-            </div>
+      {isCertExporting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl flex items-center gap-4">
+            <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="font-black text-slate-900 uppercase tracking-widest text-sm">Generating certificate...</span>
           </div>
         </div>
       )}
-      {/* Hidden Rendering Container for individual cert export */}
-      <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none', opacity: 0 }}>
-        {certExportItem && (
-          <div id="admin-cert-render-container" className="bg-white">
-            <CertificateTemplate 
-              backgroundUrl={certExportItem.bgUrl} 
-              {...certExportItem.data} 
-              bgPositionX={certExportItem.config?.bgPositionX}
-              bgPositionY={certExportItem.config?.bgPositionY}
-              bgScale={certExportItem.config?.bgScale}
-              festName={certExportItem.data.festName}
-            />
-          </div>
-        )}
-      </div>
     </div>
   );
 };

@@ -4,7 +4,10 @@ import { Link } from "react-router-dom";
 import { MasonryGridGallery } from "../components/MasonryGridGallery";
 import stageAbstractImg from "../images/stage-abstract.png";
 import { useSettings } from "../hooks/useSettings";
-import { getBackgroundSettings } from "../services/backgroundService";
+import { getBackgroundSettings, BackgroundSettings } from "../services/backgroundService";
+import { pickTemplate } from "../services/exportService";
+import { getProgramWinners } from "../utils/resultsUtils";
+import { appDialog } from "../components/ui/AppDialog";
 
 interface PublicPageProps {
   programs: Program[];
@@ -149,30 +152,38 @@ export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({
 
   const t = themeConfig[settings?.theme || 'emerald'] || themeConfig['emerald'];
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
-  const [posterBgs, setPosterBgs] = useState<Record<string, string>>({});
+  const [backgrounds, setBackgrounds] = useState<BackgroundSettings | null>(null);
+  const [generatingPosterId, setGeneratingPosterId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!festId) return;
-    getBackgroundSettings(festId).then(bgs => {
-      if (bgs?.posterBgs) setPosterBgs(bgs.posterBgs);
-    });
+    getBackgroundSettings(festId).then(bgs => setBackgrounds(bgs)).catch(() => setBackgrounds(null));
   }, [festId]);
 
-  const downloadPoster = async (url: string, index: number) => {
+  // Thumbnail = the poster background used for exports (active → newest).
+  const posterBgUrl = useMemo(() => pickTemplate(backgrounds, 'posterBgs').url, [backgrounds]);
+
+  // Programs with published results and at least one ranked winner, newest first.
+  const posterPrograms = useMemo(() => {
+    const order = (p: Program) => typeof p.resultPublishedOrder === 'number' ? p.resultPublishedOrder : -1;
+    return [...(programs || [])]
+      .filter(p => p.status === ProgramStatus.COMPLETED && p.isResultPublished && getProgramWinners(p).length > 0)
+      .sort((a, b) => order(b) - order(a));
+  }, [programs]);
+
+  // Renders the real winner poster (same PosterTemplate + export path as the Results page).
+  const downloadPoster = async (program: Program) => {
+    if (!festId || generatingPosterId) return;
+    setGeneratingPosterId(program.id);
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `${displayFestName.replace(/\s+/g, '_')}_Poster_${index + 1}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-    } catch (e) {
-      // Fallback: open in new tab
-      window.open(url, '_blank');
+      // Loaded on demand so the public bundle does not carry jsPDF/html-to-image up front.
+      const { exportPosterJpeg } = await import('../components/generators/OffscreenRenderer');
+      await exportPosterJpeg({ festId, program, backgrounds });
+    } catch (e: any) {
+      console.error('Poster generation failed', e);
+      appDialog.alert(`Could not generate the poster: ${e?.message || 'Unknown error'}`, { variant: 'danger', title: 'Poster failed' });
+    } finally {
+      setGeneratingPosterId(null);
     }
   };
 
@@ -365,7 +376,7 @@ export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({
       </div>
 
       {/* Event Posters Section - shown only when poster backgrounds exist */}
-      {Object.keys(posterBgs).length > 0 && (
+      {posterBgUrl && posterPrograms.length > 0 && (
         <div className="py-24 bg-white relative z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
@@ -377,17 +388,21 @@ export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-              {Object.entries(posterBgs).map(([id, url], index) => (
+              {posterPrograms.map((program) => (
                 <div
-                  key={id}
-                  onClick={() => downloadPoster(url as string, index)}
-                  className="group relative rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-white cursor-pointer hover:-translate-y-2 transition-all duration-500 aspect-[3/4]"
+                  key={program.id}
+                  onClick={() => downloadPoster(program)}
+                  className={`group relative rounded-[2rem] overflow-hidden shadow-xl shadow-slate-200/50 border border-white cursor-pointer hover:-translate-y-2 transition-all duration-500 aspect-[3/4] ${generatingPosterId === program.id ? 'opacity-60 cursor-wait' : ''}`}
                 >
                   <img
-                    src={url as string}
-                    alt={`${displayFestName} Poster ${index + 1}`}
+                    src={posterBgUrl}
+                    alt={`${program.name} winner poster`}
                     className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
                   />
+                  <div className="absolute inset-x-0 top-0 p-4 bg-gradient-to-b from-slate-900/70 to-transparent">
+                    <p className="text-white text-sm font-black uppercase leading-tight line-clamp-2">{program.name}</p>
+                    <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mt-1 truncate">{program.category}</p>
+                  </div>
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-end p-6">
                     <div className={`w-12 h-12 bg-gradient-to-br ${t.btnGradient} rounded-2xl flex items-center justify-center mb-3 shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300`}>
@@ -396,7 +411,7 @@ export const PublicPage: React.FC<PublicPageProps & { festId?: string }> = ({
                       </svg>
                     </div>
                     <span className="text-white text-xs font-black uppercase tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75">
-                      Download Poster
+                      {generatingPosterId === program.id ? 'Generating...' : 'Download Poster'}
                     </span>
                   </div>
                 </div>

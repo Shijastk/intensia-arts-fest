@@ -26,7 +26,8 @@ export const StaffCredentialModal: React.FC<StaffCredentialModalProps> = ({
     if (editingStaff) {
       setRole(editingStaff.role);
       setUsername(editingStaff.username);
-      setPassword(editingStaff.password || '');
+      // Passwords are stored as hashes and cannot be shown; leave blank to keep the current one.
+      setPassword('');
       // Determine what to show based on role
       setSpecificName(
         editingStaff.role === 'JUDGE' ? (editingStaff.judgePanel || editingStaff.panelName || editingStaff.stage || '') :
@@ -68,7 +69,9 @@ export const StaffCredentialModal: React.FC<StaffCredentialModalProps> = ({
   };
 
   const generateCredentials = () => {
-    const randomPass = Math.random().toString(36).slice(-6);
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    const randomPass = Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
     setPassword(randomPass);
     if (!username) {
       setUsername(`${role.toLowerCase()}_${Math.floor(100 + Math.random() * 900)}`);
@@ -110,7 +113,7 @@ export const StaffCredentialModal: React.FC<StaffCredentialModalProps> = ({
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Password</label>
-              <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" required />
+              <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingStaff ? 'Leave blank to keep' : ''} minLength={4} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600" required={!editingStaff} />
             </div>
           </div>
           

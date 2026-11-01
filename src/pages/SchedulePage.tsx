@@ -1,38 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Program, ProgramStatus } from '../types';
 import { Link } from 'react-router-dom';
+import { compareScheduleTimes, formatDateTime } from '../utils/timeUtils';
 
-const parseTime = (timeStr?: string) => {
-    if (!timeStr) return 999999;
-    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-    if (!match) return 999999;
-    let hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    const ampm = match[3]?.toUpperCase();
-    if (ampm === 'PM' && hours < 12) hours += 12;
-    if (ampm === 'AM' && hours === 12) hours = 0;
-    return hours * 60 + minutes;
-};
-
-const formatDisplayTime = (timeStr?: string) => {
-    if (!timeStr) return 'TBA';
-    const d = new Date(timeStr);
-    if (isNaN(d.getTime())) return timeStr;
-    
-    const datePart = d.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        timeZone: 'Asia/Kolkata' 
-    });
-    const timePart = d.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true, 
-        timeZone: 'Asia/Kolkata' 
-    });
-    
-    return `${datePart} - ${timePart}`;
-};
+// Times are shown in the viewer's local zone. All parsing/formatting lives in utils/timeUtils so
+// every stored format (UTC ISO, zone-less local ISO, legacy 'YYYY-MM-DD HH:mm', AM/PM) works.
+const formatDisplayTime = (timeStr?: string) => formatDateTime(timeStr, 'TBA');
 
 interface SchedulePageProps {
     programs: Program[];
@@ -74,7 +47,7 @@ export const SchedulePage: React.FC<SchedulePageProps & { festId?: string }> = (
         return filtered.sort((a, b) => {
             if (a.status === ProgramStatus.JUDGING && b.status !== ProgramStatus.JUDGING) return -1;
             if (a.status !== ProgramStatus.JUDGING && b.status === ProgramStatus.JUDGING) return 1;
-            return parseTime(a.startTime) - parseTime(b.startTime);
+            return compareScheduleTimes(a.startTime, b.startTime);
         });
     }, [programs, searchQuery, selectedVenue]);
 

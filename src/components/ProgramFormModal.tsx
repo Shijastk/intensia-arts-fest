@@ -78,6 +78,8 @@ export const ProgramFormModal: React.FC<ProgramFormModalProps> = ({
                     <select name="zone" defaultValue={editingProgram?.zone || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600">
                       <option value="">— No Zone —</option>
                       {zones.map(z => <option key={z} value={z}>{z}</option>)}
+                      {/* Keep a zone that was renamed/removed in Settings instead of silently clearing it */}
+                      {editingProgram?.zone && !zones.includes(editingProgram.zone) && <option value={editingProgram.zone}>{editingProgram.zone} (not in zone list)</option>}
                     </select>
                   </div>
                 </div>

@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { ref, get, remove, update } from 'firebase/database';
-import { db, auth } from '../config/firebase';
+import { db, auth, functions, googleProvider } from '../config/firebase';
 import { Shield, Trash2, Power, PowerOff, Layout, ExternalLink, LogOut, Download } from 'lucide-react';
-import { signInAnonymously, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { downloadFestBackup } from '../utils/supremeAdminBackup';
-
-const ALLOWED_EMAILS = [
-  'shijastk.work@gmail.com',
-  'tkshibily@gmail.com',
-  'shijasmuhammed573@gmail.com',
-  'muzzammil2007anu@gmail.com'
-];
+import { appDialog } from '../components/ui/AppDialog';
 
 export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string) => void }) => {
   const navigate = useNavigate();
-  const [passkey, setPasskey] = useState('');
+  const [authChecking, setAuthChecking] = useState(true);
+  const [migrating, setMigrating] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [fests, setFests] = useState<any>({});
@@ -23,41 +19,63 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
   const [errorMsg, setErrorMsg] = useState('');
   const [backupFestId, setBackupFestId] = useState<string | null>(null);
 
+  // Super Admin access requires a Google sign-in whose ID token carries the superAdmin
+  // custom claim. The claim can only be set server-side (functions/scripts/set-super-admin.mjs)
+  // and the database rules check it on every request, so nothing in the browser can fake it.
+  const checkSuperAdmin = async (): Promise<boolean> => {
+    const user = auth.currentUser;
+    if (!user) return false;
+    const token = await user.getIdTokenResult(true);
+    return token.signInProvider === 'google.com' && token.claims.superAdmin === true;
+  };
+
   useEffect(() => {
-    const isSupreme = sessionStorage.getItem('supreme_admin_auth');
-    if (isSupreme === 'true') {
-      setIsAuthenticated(true);
-      if (auth.currentUser) {
-        fetchData();
-      } else {
-        signInAnonymously(auth)
-          .then(() => fetchData())
-          .catch((err: any) => {
-            setErrorMsg('Firebase authentication failed. Please ensure Anonymous Authentication is enabled in Firebase Console.');
-            console.error('Supreme Admin anonymous authentication failed:', err);
-            setLoading(false);
-          });
+    const unsubscribe = onAuthStateChanged(auth, async () => {
+      try {
+        const ok = await checkSuperAdmin();
+        setIsAuthenticated(ok);
+        if (ok) fetchData(); else setLoading(false);
+      } catch (err) {
+        console.error('Super Admin session check failed:', err);
+        setIsAuthenticated(false);
+        setLoading(false);
+      } finally {
+        setAuthChecking(false);
       }
-    }
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passkey === 'supreme@2026') {
-      try {
-        // Temporary emergency mode: Google authentication is disabled for Supreme Admin.
-        // Firebase Anonymous Auth keeps the database rules requiring auth != null working.
-        if (!auth.currentUser) {
-          await signInAnonymously(auth);
-        }
-        sessionStorage.setItem('supreme_admin_auth', 'true');
-        setIsAuthenticated(true);
-        fetchData();
-      } catch (err: any) {
-        alert('Supreme Admin Login Failed: ' + err.message);
+    setErrorMsg('');
+    try {
+      await signInWithPopup(auth, googleProvider);
+      if (!(await checkSuperAdmin())) {
+        await signOut(auth);
+        appDialog.alert('This Google account is not authorised for Supreme Admin access.');
+        return;
       }
-    } else {
-      alert('Invalid passkey');
+      setIsAuthenticated(true);
+      fetchData();
+    } catch (err: any) {
+      appDialog.alert('Supreme Admin Login Failed: ' + err.message);
+    }
+  };
+
+  const handleMigration = async () => {
+    if (migrating) return;
+    if (!await appDialog.confirm('Run the security migration? It hashes every remaining plaintext staff password (staff keep their current passwords) and rebuilds the public results copy. It is safe to run more than once.', { variant: 'warning', title: 'Run security migration', confirmText: 'Run migration' })) return;
+    setMigrating(true);
+    try {
+      const migrate = httpsCallable(functions, 'migrateSecurity', { timeout: 540000 });
+      const { data } = await migrate({});
+      appDialog.alert('Migration finished:\n' + JSON.stringify(data, null, 2), { variant: 'success', title: 'Migration finished' });
+      fetchData();
+    } catch (err: any) {
+      appDialog.alert('Migration failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setMigrating(false);
     }
   };
 
@@ -72,14 +90,14 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
       if (usersSnap.exists()) usersData = usersSnap.val();
     } catch (err: any) {
       console.warn("Permission denied on users node", err);
-      fetchError = "Firebase Rules blocked reading the 'users' list. You MUST update Firebase Console Rules to see all users and make changes. Showing fest creators only as a fallback.";
+      fetchError = "The database rejected reading the 'users' list. This account may be missing the superAdmin claim.";
     }
     try {
       const festsSnap = await get(ref(db, 'fests'));
       if (festsSnap.exists()) festsData = festsSnap.val();
     } catch (err: any) {
       console.warn("Permission denied on fests node", err);
-      fetchError = "Firebase Rules blocked reading BOTH users and fests. Please update the rules in Firebase Console.";
+      fetchError = "The database rejected reading users and fests. This account may be missing the superAdmin claim.";
     }
     if (fetchError) setErrorMsg(fetchError);
     setFests(festsData);
@@ -103,31 +121,31 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
       await downloadFestBackup(festId, festName);
     } catch (error: any) {
       console.error('Fest backup export failed:', error);
-      alert(`Backup export failed: ${error?.message || 'Unknown error'}`);
+      appDialog.alert(`Backup export failed: ${error?.message || 'Unknown error'}`);
     } finally {
       setBackupFestId(null);
     }
   };
 
   const handleDeactivate = async (uid: string, currentStatus: boolean) => {
-    if (window.confirm(`Are you sure you want to ${currentStatus === false ? 'activate' : 'deactivate'} this user?`)) {
+    if (await appDialog.confirm(`Are you sure you want to ${currentStatus === false ? 'activate' : 'deactivate'} this user?`, { variant: currentStatus === false ? 'primary' : 'danger', title: currentStatus === false ? 'Activate user' : 'Deactivate user', confirmText: currentStatus === false ? 'Activate' : 'Deactivate' })) {
       try {
         await update(ref(db, `users/${uid}`), { isActive: currentStatus === false ? true : false });
         fetchData();
       } catch (error: any) {
-        alert("Action failed! Your Firebase Database rules are blocking writes. Please update the rules in Firebase Console first.");
+        appDialog.alert("Action failed! Your Firebase Database rules are blocking writes. Please update the rules in Firebase Console first.");
         console.error('Error updating status', error);
       }
     }
   };
 
   const handleDelete = async (uid: string, festId: string) => {
-    if (window.confirm('Are you SURE you want to completely DELETE this user? If they have a fest, it will be orphaned unless you delete it manually.')) {
+    if (await appDialog.confirm('Are you SURE you want to completely DELETE this user? If they have a fest, it will be orphaned unless you delete it manually.', { variant: 'danger', title: 'Delete user', confirmText: 'Delete user' })) {
       try {
         await remove(ref(db, `users/${uid}`));
         fetchData();
       } catch (error: any) {
-        alert("Action failed! Your Firebase Database rules are blocking deletes. Please update the rules in Firebase Console first.");
+        appDialog.alert("Action failed! Your Firebase Database rules are blocking deletes. Please update the rules in Firebase Console first.");
         console.error('Error deleting user', error);
       }
     }
@@ -139,8 +157,7 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
         <form onSubmit={handleLogin} className="bg-gray-800 p-8 rounded-xl shadow-xl w-full max-w-md border border-gray-700">
           <div className="flex justify-center mb-6"><Shield className="h-16 w-16 text-indigo-500" /></div>
           <h2 className="text-2xl font-bold text-white text-center mb-6">Supreme Admin Access</h2>
-          <input type="password" value={passkey} onChange={(e) => setPasskey(e.target.value)} placeholder="Enter Passkey" className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 mb-4 border border-gray-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
-          <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition-colors">Access System</button>
+          <button type="submit" disabled={authChecking} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg transition-colors">{authChecking ? 'Checking session...' : 'Sign in with Google'}</button>
         </form>
       </div>
     );
@@ -153,13 +170,14 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
           <div className="flex items-center gap-3"><Shield className="h-8 w-8 text-indigo-500" /><h1 className="text-3xl font-bold">Supreme Admin Dashboard</h1></div>
           <div className="flex gap-4">
             <button onClick={fetchData} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors border border-gray-700">Refresh Data</button>
-            <button onClick={async () => { await signOut(auth); sessionStorage.removeItem('supreme_admin_auth'); setIsAuthenticated(false); setPasskey(''); }} className="flex items-center gap-2 px-4 py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded-lg text-sm transition-colors border border-red-900"><LogOut className="h-4 w-4" />Logout</button>
+            <button onClick={handleMigration} disabled={migrating} className="px-4 py-2 bg-amber-900/40 hover:bg-amber-800/50 text-amber-200 disabled:opacity-50 rounded-lg text-sm transition-colors border border-amber-800">{migrating ? 'Migrating...' : 'Run Security Migration'}</button>
+            <button onClick={async () => { await signOut(auth); setIsAuthenticated(false); }} className="flex items-center gap-2 px-4 py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded-lg text-sm transition-colors border border-red-900"><LogOut className="h-4 w-4" />Logout</button>
           </div>
         </div>
         {loading ? (
           <div className="text-center py-12 text-gray-400">Loading system data...</div>
         ) : errorMsg ? (
-          <div className="p-8 bg-red-900/50 border border-red-500 rounded-xl text-red-200"><h3 className="font-bold text-lg mb-2">Database Error</h3><p>{errorMsg}</p><p className="mt-4 text-sm text-red-300">This usually happens if Firebase Database Rules are denying read access to the 'users' node for unauthenticated users.</p></div>
+          <div className="p-8 bg-red-900/50 border border-red-500 rounded-xl text-red-200"><h3 className="font-bold text-lg mb-2">Database Error</h3><p>{errorMsg}</p><p className="mt-4 text-sm text-red-300">Make sure this account has the superAdmin claim (sign out and in again after it is granted).</p></div>
         ) : (
           <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">

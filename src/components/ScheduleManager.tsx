@@ -1,8 +1,10 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Program } from '../types';
-import { detectClashes, ClashDetail } from '../utils/scheduleCalculator';
+import { Program, Settings } from '../types';
+import { detectBatchClashes, ClashDetail, calculateCascadingTimes, resolveTimeEdit, ScheduleUpdate, cascadeFromEdit, CascadeMode, CascadeResult, getStagePrograms } from '../utils/scheduleCalculator';
+import { parseScheduleTime, compareScheduleTimes, formatTime, formatDate, toDateTimeLocalValue } from '../utils/timeUtils';
+import { programService } from '../services/programService';
 import { 
   DndContext, 
   useDraggable, 
@@ -11,37 +13,23 @@ import {
   DragStartEvent,
   DragOverlay,
   TouchSensor, 
-  PointerSensor, 
+  MouseSensor, 
   useSensor, 
   useSensors,
   closestCorners
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { appDialog } from './ui/AppDialog';
 
-const parseToValidDate = (timeStr?: string): Date | null => {
-  if (!timeStr) return null;
-  let d = new Date(timeStr);
-  if (!isNaN(d.getTime())) return d;
-  
-  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-  if (match) {
-    let hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    const ampm = match[3]?.toUpperCase();
-    if (ampm === 'PM' && hours < 12) hours += 12;
-    if (ampm === 'AM' && hours === 12) hours = 0;
-    
-    d = new Date();
-    d.setHours(hours, minutes, 0, 0);
-    return d;
-  }
-  return null;
-};
+const DEFAULT_STAGES = ['Main Stage', 'Stage 2', 'Stage 3'];
 
 interface ScheduleManagerProps {
   programs: Program[];
   updateProgram: (id: string, updates: Partial<Program>) => Promise<boolean>;
+  festId?: string;
+  settings?: Partial<Settings>;
+  updateSettings?: (updates: Partial<Settings>) => Promise<boolean>;
 }
 
 // -------------------------------------------------------------
@@ -103,7 +91,7 @@ const SortableProgramCard = ({ program, formatTime, onUnschedule, onEditTime }: 
       className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-indigo-300 transition-colors relative overflow-hidden group cursor-grab active:cursor-grabbing"
     >
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"></div>
-      <h4 className="text-xs font-black text-slate-900 ml-1.5 uppercase">{program.name}</h4>
+      <h4 className="text-xs font-black text-slate-900 ml-1.5 uppercase pr-20 lg:pr-12">{program.name}</h4>
       <div className="flex justify-between items-center mt-2 ml-1.5 text-[9px] font-bold text-slate-600 uppercase">
         <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-1 rounded border border-slate-100">
           {formatTime(program.startTime)} - {formatTime(program.endTime)}
@@ -113,7 +101,7 @@ const SortableProgramCard = ({ program, formatTime, onUnschedule, onEditTime }: 
       <button 
         onClick={(e) => { e.stopPropagation(); onEditTime(program); }} 
         onPointerDown={(e) => e.stopPropagation()}
-        className="absolute top-1.5 right-8 opacity-0 group-hover:opacity-100 text-indigo-500 hover:text-indigo-700 bg-indigo-50 rounded p-1 transition-all no-print-btn" 
+        className="absolute top-1 right-10 lg:top-1.5 lg:right-8 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-indigo-500 hover:text-indigo-700 bg-indigo-50 rounded p-2 lg:p-1 transition-all no-print-btn" 
         title="Edit Time"
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -121,7 +109,7 @@ const SortableProgramCard = ({ program, formatTime, onUnschedule, onEditTime }: 
       <button 
         onClick={(e) => { e.stopPropagation(); onUnschedule(program.id); }} 
         onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking unschedule
-        className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 text-rose-500 hover:text-rose-700 bg-rose-50 rounded p-1 transition-all no-print-btn" 
+        className="absolute top-1 right-1 lg:top-1.5 lg:right-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-rose-500 hover:text-rose-700 bg-rose-50 rounded p-2 lg:p-1 transition-all no-print-btn" 
         title="Unschedule"
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -130,26 +118,26 @@ const SortableProgramCard = ({ program, formatTime, onUnschedule, onEditTime }: 
   );
 };
 
-const DroppableVenue = ({ venue, programs, updateProgram, formatTime, onEditTime }: any) => {
+const DroppableVenue = ({ venue, programs, onUnschedule, formatTime, onEditTime }: any) => {
   const { isOver, setNodeRef } = useDroppable({
     id: venue,
     data: { type: 'Venue', venue }
   });
 
   return (
-    <div ref={setNodeRef} className={`w-80 flex-shrink-0 flex flex-col rounded-xl transition-all duration-300 border ${isOver ? 'border-indigo-500 shadow-lg' : 'border-slate-200 shadow-sm'}`}>
+    <div ref={setNodeRef} className={`w-[calc(100vw-6.5rem)] sm:w-80 flex-shrink-0 flex flex-col rounded-xl transition-all duration-300 border ${isOver ? 'border-indigo-500 shadow-lg' : 'border-slate-200 shadow-sm'}`}>
       <div className={`bg-slate-50 text-slate-800 text-xs font-black uppercase tracking-widest py-3 px-4 rounded-t-xl border-b border-slate-200 flex justify-between items-center ${isOver ? 'bg-indigo-50 text-indigo-900 border-indigo-200' : ''}`}>
         {venue}
         <span className={`px-2 py-0.5 rounded text-[9px] ${isOver ? 'bg-indigo-200 text-indigo-800' : 'bg-slate-200 text-slate-600'}`}>{programs.length}</span>
       </div>
-      <div className={`bg-white rounded-b-xl p-3 flex-1 min-h-[500px] flex flex-col gap-2 relative ${isOver ? 'bg-indigo-50/10' : ''}`}>
+      <div className={`bg-white rounded-b-xl p-3 flex-1 min-h-[300px] sm:min-h-[500px] flex flex-col gap-2 relative ${isOver ? 'bg-indigo-50/10' : ''}`}>
         <SortableContext items={programs.map((p: any) => p.id)} strategy={verticalListSortingStrategy}>
           {programs.map((p: any) => (
             <SortableProgramCard 
               key={p.id} 
               program={p} 
               formatTime={formatTime} 
-              onUnschedule={(id: string) => updateProgram(id, { startTime: '', endTime: '', venue: '' })} 
+              onUnschedule={onUnschedule} 
               onEditTime={onEditTime}
             />
           ))}
@@ -169,34 +157,53 @@ const DroppableVenue = ({ venue, programs, updateProgram, formatTime, onEditTime
 // MAIN COMPONENT
 // -------------------------------------------------------------
 
-export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, updateProgram }) => {
-  const [clashWarning, setClashWarning] = useState<{ targetId: string, clashes: ClashDetail[], pendingUpdate: Partial<Program>, updatesToSave: {id: string, updates: Partial<Program>}[] } | null>(null);
+export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, updateProgram, festId, settings, updateSettings }) => {
+  const [clashWarning, setClashWarning] = useState<{ clashes: ClashDetail[], updatesToSave: ScheduleUpdate[] } | null>(null);
   const [activeDragProgram, setActiveDragProgram] = useState<Program | null>(null);
   const [manualAssignProgram, setManualAssignProgram] = useState<Program | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Custom Stages Feature
+
+  // Custom Stages Feature (persisted in fest settings.stages; local state is the fallback/optimistic copy)
   const [customStages, setCustomStages] = useState<string[]>([]);
   const [newStageName, setNewStageName] = useState('');
-  
+
   // Time Edit Feature
   const [timeEditProgram, setTimeEditProgram] = useState<Program | null>(null);
 
+  // Cascading time change: preview of the whole stage before anything is saved.
+  const [cascadePreview, setCascadePreview] = useState<{
+    program: Program;
+    editedUpdates: Partial<Program>;
+    mode: CascadeMode;
+    result: CascadeResult;
+    clashes: ClashDetail[];
+  } | null>(null);
+  const [isSavingCascade, setIsSavingCascade] = useState(false);
+  const previewListRef = useRef<HTMLDivElement>(null);
+  // On small screens the edited program is often below the fold: bring it into view.
+  useEffect(() => {
+    previewListRef.current?.querySelector('[data-preview-row="edited"]')?.scrollIntoView({ block: 'center' });
+  }, [cascadePreview?.program.id]);
+
   // Baseline Time for new venues
   const [pendingBaselineDrop, setPendingBaselineDrop] = useState<{
+    venueProgramsBefore: Program[],
     newOrderedVenuePrograms: Program[],
     targetVenue: string,
     activeId: string,
-    activeProgram: Program
   } | null>(null);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // MouseSensor + TouchSensor (not PointerSensor): a pointer sensor also fires for touch and
+  // hijacks vertical scrolling on phones. Touch drags start after a 250ms long-press.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
   );
+
+  const resolvedFestId = festId || programs[0]?.festId;
 
   const unscheduledPrograms = useMemo(() => {
     let list = programs.filter(p => !p.startTime);
@@ -206,54 +213,93 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
     }
     return list;
   }, [programs, searchTerm]);
-  const scheduledPrograms = useMemo(() => programs.filter(p => !!p.startTime).sort((a,b) => {
-    const da = parseToValidDate(a.startTime);
-    const db = parseToValidDate(b.startTime);
-    return (da?.getTime() || 0) - (db?.getTime() || 0);
-  }), [programs]);
+  const scheduledPrograms = useMemo(
+    () => programs.filter(p => !!p.startTime).sort((a, b) => compareScheduleTimes(a.startTime, b.startTime)),
+    [programs]
+  );
 
+  // RTDB may hand arrays back as objects with numeric keys; accept both.
+  const savedStages = useMemo(() => {
+    const raw: unknown = settings?.stages;
+    const list = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? Object.values(raw as Record<string, unknown>) : [];
+    return list.filter((s): s is string => typeof s === 'string' && !!s.trim());
+  }, [settings?.stages]);
+
+  // Union of (defaults when nothing is saved) + saved stages + locally added + venues in use.
   const uniqueVenues = useMemo(() => {
-    const v = new Set(scheduledPrograms.map(p => p.venue).filter(Boolean) as string[]);
-    customStages.forEach(stage => v.add(stage));
-    if (v.size === 0) return ['Main Stage', 'Stage 2', 'Stage 3'];
+    const v = new Set<string>();
+    (savedStages.length > 0 ? savedStages : DEFAULT_STAGES).forEach(s => v.add(s));
+    customStages.forEach(s => v.add(s));
+    scheduledPrograms.forEach(p => { if (p.venue) v.add(p.venue); });
     return Array.from(v);
-  }, [scheduledPrograms, customStages]);
+  }, [savedStages, customStages, scheduledPrograms]);
 
-  const handleAddStage = () => {
-    if (newStageName.trim() && !uniqueVenues.includes(newStageName.trim())) {
-      setCustomStages(prev => [...prev, newStageName.trim()]);
-      setNewStageName('');
+  const persistStages = async (added: string[]) => {
+    const next = Array.from(new Set([...uniqueVenues, ...added]));
+    setCustomStages(prev => Array.from(new Set([...prev, ...added])));
+    if (!updateSettings) return;
+    try {
+      const ok = await updateSettings({ stages: next });
+      if (ok === false) throw new Error('updateSettings returned false');
+    } catch (err) {
+      console.error('Failed to save stages:', err);
+      appDialog.alert('The stage was added on this screen but could not be saved. It may disappear after a reload.', { title: 'Stage not saved', variant: 'danger' });
     }
   };
 
-  const handleAutoGenerateStages = () => {
-    const num = parseInt(window.prompt("How many stages do you want to generate?", "3") || "0", 10);
-    if (!isNaN(num) && num > 0) {
-      const newStages = Array.from({ length: num }, (_, i) => `Stage ${i + 1}`);
-      setCustomStages(prev => {
-        const set = new Set([...prev, ...newStages]);
-        return Array.from(set);
-      });
+  const handleAddStage = async () => {
+    const name = newStageName.trim();
+    if (name && !uniqueVenues.includes(name)) {
+      setNewStageName('');
+      await persistStages([name]);
     }
+  };
+
+  const handleAutoGenerateStages = async () => {
+    const num = parseInt((await appDialog.prompt("How many stages do you want to generate?", "3", { title: "Generate stages", confirmText: "Generate" })) || "0", 10);
+    if (!isNaN(num) && num > 0) {
+      await persistStages(Array.from({ length: num }, (_, i) => `Stage ${i + 1}`));
+    }
+  };
+
+  /** Save all updates with ONE multi-path write. */
+  const saveBatch = async (batchUpdates: ScheduleUpdate[]): Promise<boolean> => {
+    if (batchUpdates.length === 0) return true;
+    try {
+      if (!resolvedFestId) throw new Error('No fest id available');
+      await programService.batchUpdatePrograms(resolvedFestId, batchUpdates);
+      return true;
+    } catch (err) {
+      console.error('Schedule save failed:', err);
+      appDialog.alert('The schedule change could not be saved. Nothing was changed - please try again.', { title: 'Save failed', variant: 'danger' });
+      return false;
+    }
+  };
+
+  /** Check every changed program for venue overlaps / participant clashes, then save or warn. */
+  const processBatchUpdates = async (batchUpdates: ScheduleUpdate[]) => {
+    if (batchUpdates.length === 0) return;
+    const clashes = detectBatchClashes(batchUpdates, programs);
+    if (clashes.length > 0) {
+      setClashWarning({ clashes, updatesToSave: batchUpdates });
+      return; // Pause until the user decides
+    }
+    await saveBatch(batchUpdates);
+  };
+
+  const scheduleIntoVenue = async (venueProgramsBefore: Program[], newOrderedVenuePrograms: Program[], targetVenue: string, activeId: string) => {
+    const batchUpdates = calculateCascadingTimes({ before: venueProgramsBefore, after: newOrderedVenuePrograms, movedId: activeId, venue: targetVenue });
+    if (!batchUpdates) {
+      // Empty venue: ask for the first start time
+      setPendingBaselineDrop({ venueProgramsBefore, newOrderedVenuePrograms, targetVenue, activeId });
+      return;
+    }
+    await processBatchUpdates(batchUpdates);
   };
 
   const handleManualAdd = async (program: Program, targetVenue: string) => {
-    const currentVenuePrograms = scheduledPrograms.filter(p => p.venue === targetVenue);
-    const newOrderedVenuePrograms = [...currentVenuePrograms, program];
-    
-    const batchUpdates = calculateCascadingTimes(newOrderedVenuePrograms, targetVenue);
-    
-    if (!batchUpdates) {
-      setPendingBaselineDrop({
-        newOrderedVenuePrograms,
-        targetVenue,
-        activeId: program.id,
-        activeProgram: program
-      });
-      return;
-    }
-
-    await processBatchUpdates(batchUpdates, program.id, program, targetVenue);
+    const currentVenuePrograms = scheduledPrograms.filter(p => p.venue === targetVenue && p.id !== program.id);
+    await scheduleIntoVenue(currentVenuePrograms, [...currentVenuePrograms, program], targetVenue, program.id);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -262,141 +308,91 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
     if (program) setActiveDragProgram(program);
   };
 
-  const calculateCascadingTimes = (orderedPrograms: Program[], targetVenue: string, explicitStartTime?: Date) => {
-    let currentTime = explicitStartTime;
-    if (!currentTime) {
-      const firstScheduled = orderedPrograms.find(p => p.startTime);
-      if (firstScheduled) {
-        currentTime = parseToValidDate(firstScheduled.startTime!);
-        if (!currentTime) return null;
-      } else {
-        return null; // Need baseline time from user
-      }
-    }
-
-    const updates: { id: string, updates: Partial<Program> }[] = [];
-
-    orderedPrograms.forEach(p => {
-      const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-      const localStart = (new Date(currentTime!.getTime() - tzoffset)).toISOString().slice(0, -1);
-      
-      const endObj = new Date(currentTime!.getTime() + (p.duration || 30) * 60 * 1000);
-      const localEnd = (new Date(endObj.getTime() - tzoffset)).toISOString().slice(0, -1);
-      
-      updates.push({
-        id: p.id,
-        updates: { startTime: localStart, endTime: localEnd, venue: targetVenue }
-      });
-
-      currentTime = endObj; // Next program starts exactly when this ends
-    });
-
-    return updates;
-  };
-
-  const processBatchUpdates = async (batchUpdates: { id: string, updates: Partial<Program> }[], activeId: string, activeProgram: Program, targetVenue: string) => {
-    // Check clashes ONLY for the actively dragged item to avoid spamming the user
-    const targetUpdate = batchUpdates.find(u => u.id === activeId);
-    if (targetUpdate) {
-      // Temporarily mock the program state for clash calculation
-      const tempPrograms = programs.map(p => {
-        const up = batchUpdates.find(b => b.id === p.id);
-        return up ? { ...p, ...up.updates } : p;
-      });
-      
-      const clashes = detectClashes(
-        {...activeProgram, ...targetUpdate.updates}, 
-        targetUpdate.updates.startTime!, 
-        targetVenue, 
-        tempPrograms
-      );
-
-      if (clashes.length > 0) {
-        setClashWarning({ 
-          targetId: activeId, 
-          clashes, 
-          pendingUpdate: targetUpdate.updates,
-          updatesToSave: batchUpdates // Need to save ALL if they approve
-        });
-        return; // Pause execution
-      }
-    }
-
-    // No clashes (or ignored), save all updates
-    const updatePromises = batchUpdates.map(u => updateProgram(u.id, u.updates));
-    await Promise.all(updatePromises);
-  };
-
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveDragProgram(null);
     const { active, over } = event;
-    if (!over) return;
+    if (!over || active.id === over.id) return; // dropped on itself: nothing to do
 
     const activeId = active.id as string;
     const activeProgram = programs.find(p => p.id === activeId);
     if (!activeProgram) return;
 
+    const overType = over.data.current?.type;
     let targetVenue = '';
-    let newOrderedVenuePrograms: Program[] = [];
-
-    // Case 1: Dropped over an empty Venue column
-    if (over.data.current?.type === 'Venue') {
+    if (overType === 'Venue') {
+      // Dropped on a venue column (empty area): append to the end
       targetVenue = over.id as string;
-      const currentVenuePrograms = scheduledPrograms.filter(p => p.venue === targetVenue && p.id !== activeId);
-      newOrderedVenuePrograms = [...currentVenuePrograms, activeProgram];
-    } 
-    // Case 2: Dropped over an existing SortableProgram
-    else if (over.data.current?.type === 'SortableProgram') {
-      const overProgram = over.data.current.program as Program;
-      targetVenue = overProgram.venue as string;
-      
-      const currentVenuePrograms = scheduledPrograms.filter(p => p.venue === targetVenue);
-      const activeIndex = currentVenuePrograms.findIndex(p => p.id === activeId);
-      const overIndex = currentVenuePrograms.findIndex(p => p.id === overProgram.id);
-
-      if (activeIndex !== -1) {
-        // Re-ordering within the SAME venue
-        newOrderedVenuePrograms = arrayMove(currentVenuePrograms, activeIndex, overIndex);
-      } else {
-        // Moving from Unscheduled OR from a DIFFERENT venue
-        const otherPrograms = currentVenuePrograms.filter(p => p.id !== activeId);
-        otherPrograms.splice(overIndex, 0, activeProgram); // Insert at new position
-        newOrderedVenuePrograms = otherPrograms;
-      }
+    } else if (overType === 'SortableProgram') {
+      targetVenue = (over.data.current!.program as Program).venue as string;
     } else {
       return; // Dropped somewhere else
     }
 
-    // Recalculate times for the entire affected venue
-    const batchUpdates = calculateCascadingTimes(newOrderedVenuePrograms, targetVenue);
-    
-    if (!batchUpdates) {
-      // Need baseline!
-      setPendingBaselineDrop({
-        newOrderedVenuePrograms,
-        targetVenue,
-        activeId,
-        activeProgram
-      });
-      return;
+    const currentVenuePrograms = scheduledPrograms.filter(p => p.venue === targetVenue);
+    let newOrderedVenuePrograms: Program[];
+    if (overType === 'Venue') {
+      newOrderedVenuePrograms = [...currentVenuePrograms.filter(p => p.id !== activeId), activeProgram];
+    } else {
+      const overId = (over.data.current!.program as Program).id;
+      const activeIndex = currentVenuePrograms.findIndex(p => p.id === activeId);
+      const overIndex = currentVenuePrograms.findIndex(p => p.id === overId);
+      if (overIndex === -1) return;
+      if (activeIndex !== -1) {
+        // Re-ordering within the SAME venue
+        newOrderedVenuePrograms = arrayMove(currentVenuePrograms, activeIndex, overIndex);
+      } else {
+        // Moving from Unscheduled OR from a DIFFERENT venue: insert at the drop position
+        newOrderedVenuePrograms = [...currentVenuePrograms];
+        newOrderedVenuePrograms.splice(overIndex, 0, activeProgram);
+      }
     }
 
-    await processBatchUpdates(batchUpdates, activeId, activeProgram, targetVenue);
+    // If the order did not change, calculateCascadingTimes returns [] and nothing is written.
+    await scheduleIntoVenue(currentVenuePrograms, newOrderedVenuePrograms, targetVenue, activeId);
   };
 
   const handleIgnoreWarningAndSave = async () => {
     if (!clashWarning) return;
-    const updatePromises = clashWarning.updatesToSave.map(u => updateProgram(u.id, u.updates));
-    await Promise.all(updatePromises);
+    const toSave = clashWarning.updatesToSave;
     setClashWarning(null);
+    await saveBatch(toSave);
   };
 
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr) return '';
-    const d = new Date(timeStr);
-    return isNaN(d.getTime()) ? timeStr : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const handleUnschedule = (id: string) => saveBatch([{ id, updates: { startTime: '', endTime: '', venue: '' } }]);
+
+  const handleSaveTimeEdit = async () => {
+    if (!timeEditProgram) return;
+    const result = resolveTimeEdit(timeEditProgram, {
+      start: (document.getElementById('timeEditStart') as HTMLInputElement).value,
+      end: (document.getElementById('timeEditEnd') as HTMLInputElement).value,
+      duration: (document.getElementById('timeEditDuration') as HTMLInputElement).value,
+    });
+    if ('error' in result) {
+      appDialog.alert(result.error, { title: 'Check the time', variant: 'warning' });
+      return;
+    }
+    // Later programs on the same stage move with it; show the proposed stage before saving.
+    setTimeEditProgram(null);
+    setCascadePreview(buildCascadePreview(timeEditProgram, result.updates, 'keepBreaks'));
   };
-  
+
+  const buildCascadePreview = (program: Program, editedUpdates: Partial<Program>, mode: CascadeMode) => {
+    const result = cascadeFromEdit({ stagePrograms: getStagePrograms(programs, program.venue || ''), editedId: program.id, editedUpdates, mode });
+    return { program, editedUpdates, mode, result, clashes: detectBatchClashes(result.updates, programs) };
+  };
+
+  const handleConfirmCascade = async () => {
+    if (!cascadePreview || isSavingCascade) return;
+    setIsSavingCascade(true);
+    // One multi-path write: either every affected program moves or none does.
+    const ok = await saveBatch(cascadePreview.result.updates);
+    setIsSavingCascade(false);
+    if (!ok) return; // saveBatch already explained the failure; the preview stays open
+    const count = cascadePreview.result.updates.length;
+    setCascadePreview(null);
+    appDialog.alert(`${count} program${count === 1 ? '' : 's'} on ${cascadePreview.program.venue} updated.`, { variant: 'success', title: 'Schedule updated' });
+  };
+
   const downloadPDF = async () => {
     setIsExporting(true);
     try {
@@ -449,7 +445,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
       doc.save(`Intensia_Schedule_${new Date().toISOString().slice(0,10)}.pdf`);
     } catch (error) {
       console.error("PDF generation failed:", error);
-      alert("Failed to generate PDF. Check console for details.");
+      appDialog.alert("Failed to generate PDF. Check console for details.");
     } finally {
       setIsExporting(false);
     }
@@ -479,11 +475,11 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
       `}</style>
       
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex flex-col lg:flex-row gap-4 p-4 font-sans bg-slate-50 min-h-screen">
+        <div className="flex flex-col lg:flex-row gap-4 p-2 sm:p-4 font-sans bg-slate-50 min-h-screen">
           
           {/* Sidebar: Unscheduled List */}
           <div className="w-full lg:w-[320px] shrink-0">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col max-h-[85vh]">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col max-h-[45vh] lg:max-h-[85vh]">
               <div className="flex justify-between items-center mb-3 shrink-0">
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Unscheduled</h3>
                 <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-black border border-slate-200">{unscheduledPrograms.length}</span>
@@ -495,7 +491,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                   placeholder="Search programs..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-indigo-600 transition-colors"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-base sm:text-xs font-bold outline-none focus:border-indigo-600 transition-colors"
                 />
               </div>
               
@@ -518,28 +514,28 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
           </div>
 
           {/* Main Area: Timeline View */}
-          <div className="flex-1 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden max-h-[85vh]">
+          <div className="flex-1 min-w-0 bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:overflow-hidden lg:max-h-[85vh]">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 shrink-0">
-              <div>
+              <div className="w-full sm:w-auto">
                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Schedule Timeline</h3>
-                <div className="flex items-center gap-2 mt-1.5">
+                <div className="flex flex-wrap items-center gap-2 mt-1.5">
                   <input 
                     type="text"
                     value={newStageName}
                     onChange={(e) => setNewStageName(e.target.value)}
                     placeholder="New stage name..."
-                    className="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-slate-700 outline-none w-32"
+                    className="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-base sm:text-[10px] font-bold text-slate-700 outline-none flex-1 min-w-[8rem] sm:flex-none sm:w-32"
                   />
                   <button onClick={handleAddStage} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-black uppercase transition-all">
                     + Add Stage
                   </button>
-                  <button onClick={handleAutoGenerateStages} className="px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded text-[10px] font-black uppercase transition-all whitespace-nowrap ml-1">
+                  <button onClick={handleAutoGenerateStages} className="px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded text-[10px] font-black uppercase transition-all whitespace-nowrap sm:ml-1">
                     Auto Create Stages
                   </button>
                 </div>
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center shadow-sm">
                   {scheduledPrograms.length} Scheduled
                 </span>
@@ -558,14 +554,14 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
               </div>
             </div>
 
-            <div id="printable-timeline" className="flex-1 overflow-x-auto custom-scrollbar pb-2" ref={timelineRef}>
+            <div id="printable-timeline" className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar pb-2 max-h-[75vh] lg:max-h-none" ref={timelineRef}>
               <div className="flex gap-4 min-w-max p-1">
                 {uniqueVenues.map(venue => (
                   <DroppableVenue 
                     key={venue} 
                     venue={venue} 
                     programs={scheduledPrograms.filter(p => p.venue === venue)} 
-                    updateProgram={updateProgram}
+                    onUnschedule={handleUnschedule}
                     formatTime={formatTime}
                     onEditTime={setTimeEditProgram}
                   />
@@ -586,12 +582,14 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                   <button onClick={() => setClashWarning(null)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
                 </div>
                 <div className="p-5">
-                  <p className="text-[11px] text-slate-600 font-bold mb-4 uppercase tracking-wider">The following participants have overlapping schedules:</p>
+                  <p className="text-[11px] text-slate-600 font-bold mb-4 uppercase tracking-wider">The following schedule conflicts were found:</p>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {clashWarning.clashes.map((c, i) => (
                       <div key={i} className="flex flex-col bg-slate-50 p-2.5 rounded border border-slate-200">
-                        <span className="text-[10px] font-black text-slate-800 uppercase">{c.participantName} (Chest: {c.chestNumber})</span>
-                        <span className="text-[9px] text-slate-500 uppercase font-bold mt-1">Conflicts with <strong className="text-rose-500">{c.conflictingProgramName}</strong></span>
+                        <span className="text-[10px] font-black text-slate-800 uppercase">
+                          {c.type === 'venue' ? `Stage overlap${c.venue ? ` on ${c.venue}` : ''}` : `${c.participantName} (Chest: ${c.chestNumber})`}
+                        </span>
+                        <span className="text-[9px] text-slate-500 uppercase font-bold mt-1">{c.programName ? `${c.programName} conflicts` : 'Conflicts'} with <strong className="text-rose-500">{c.conflictingProgramName}</strong></span>
                       </div>
                     ))}
                   </div>
@@ -661,12 +659,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                       <input 
                         type="datetime-local" 
                         id="timeEditStart"
-                        defaultValue={(() => {
-                          const d = parseToValidDate(timeEditProgram.startTime);
-                          if (!d) return '';
-                          return new Date(d.getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-                        })()}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                        defaultValue={toDateTimeLocalValue(timeEditProgram.startTime)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-base sm:text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
                       />
                     </div>
                     <div>
@@ -674,12 +668,8 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                       <input 
                         type="datetime-local" 
                         id="timeEditEnd"
-                        defaultValue={(() => {
-                          const d = parseToValidDate(timeEditProgram.endTime);
-                          if (!d) return '';
-                          return new Date(d.getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-                        })()}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                        defaultValue={toDateTimeLocalValue(timeEditProgram.endTime)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-base sm:text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
                       />
                     </div>
                     <div>
@@ -688,10 +678,13 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                         type="number" 
                         id="timeEditDuration"
                         defaultValue={timeEditProgram.duration || 30}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-base sm:text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
                         min="1"
                       />
                     </div>
+                    <p className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 leading-relaxed">
+                      Programs after this one on {timeEditProgram.venue} will move with it. You will see the new timetable before anything is saved.
+                    </p>
                   </div>
                 </div>
                 <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
@@ -702,34 +695,110 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                     Cancel
                   </button>
                   <button 
-                    onClick={async () => {
-                      const startInput = (document.getElementById('timeEditStart') as HTMLInputElement).value;
-                      const endInput = (document.getElementById('timeEditEnd') as HTMLInputElement).value;
-                      const durationInput = (document.getElementById('timeEditDuration') as HTMLInputElement).value;
-                      
-                      const updates: Partial<Program> = {};
-                      if (startInput && endInput) {
-                        updates.startTime = new Date(startInput).toISOString();
-                        updates.endTime = new Date(endInput).toISOString();
-                      }
-                      if (durationInput) {
-                        updates.duration = parseInt(durationInput, 10);
-                      }
-                      
-                      if (Object.keys(updates).length > 0) {
-                        await updateProgram(timeEditProgram.id, updates);
-                      }
-                      setTimeEditProgram(null);
-                    }}
+                    onClick={handleSaveTimeEdit}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-black uppercase tracking-wider transition-all"
                   >
-                    Save Time
+                    Preview Changes
                   </button>
                 </div>
               </div>
             </div>
           )}
           
+          {/* Cascade Preview Modal */}
+          {cascadePreview && (() => {
+            const { program, result, clashes, mode } = cascadePreview;
+            const affected = result.rows.filter(r => r.changed).length;
+            const sameDay = (a: string, b: string) => formatDate(a) === formatDate(b);
+            return (
+              <div className="fixed inset-0 z-[260] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm sm:p-4 animate-fadeIn" role="dialog" aria-modal="true" aria-label="Preview schedule change">
+                <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-lg shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-start gap-3 bg-slate-50">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-black text-slate-900 uppercase">Preview New Timetable</h4>
+                      <p className="text-[11px] font-bold text-slate-500 mt-1 truncate">{program.venue} · {affected} program{affected === 1 ? '' : 's'} will change</p>
+                    </div>
+                    <button onClick={() => setCascadePreview(null)} className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1" aria-label="Cancel">✕</button>
+                  </div>
+
+                  {result.hasBreaks && (
+                    <div className="px-4 pt-3">
+                      <div className="flex rounded-lg bg-slate-100 p-1 text-[11px] font-black uppercase">
+                        {(['keepBreaks', 'backToBack'] as CascadeMode[]).map(m => (
+                          <button
+                            key={m}
+                            onClick={() => setCascadePreview(buildCascadePreview(program, cascadePreview.editedUpdates, m))}
+                            className={`flex-1 py-2 rounded-md transition-all ${mode === m ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}
+                          >
+                            {m === 'keepBreaks' ? 'Keep breaks' : 'Remove breaks'}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-bold mt-1.5">This stage has breaks between programs. "Keep breaks" keeps each gap the same length.</p>
+                    </div>
+                  )}
+
+                  <div ref={previewListRef} className="p-4 overflow-y-auto flex-1 space-y-1.5">
+                    {result.rows.map(r => (
+                      <div
+                        key={r.id}
+                        data-preview-row={r.isEdited ? 'edited' : r.changed ? 'moves' : 'unchanged'}
+                        className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 ${r.isEdited ? 'border-indigo-300 bg-indigo-50' : r.changed ? 'border-amber-200 bg-amber-50/60' : 'border-slate-100 bg-white opacity-70'}`}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-slate-900 uppercase truncate">{r.name}</p>
+                          <p className="text-[10px] font-bold text-slate-500">
+                            {r.duration} min{r.isEdited ? ' · edited' : r.changed ? ' · moves' : ' · unchanged'}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0 text-[11px] font-bold leading-tight">
+                          {r.changed ? (
+                            <>
+                              <p className="text-slate-400 line-through">{formatTime(r.oldStart)} – {formatTime(r.oldEnd)}</p>
+                              <p className={r.isEdited ? 'text-indigo-700' : 'text-amber-700'}>
+                                {formatTime(r.newStart)} – {formatTime(r.newEnd)}
+                                {!sameDay(r.newStart, r.oldStart) && <span className="block text-[9px] uppercase">{formatDate(r.newStart)}</span>}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-slate-600">{formatTime(r.oldStart)} – {formatTime(r.oldEnd)}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {clashes.length > 0 && (
+                    <div className="mx-4 mb-3 rounded-lg border border-rose-200 bg-rose-50 p-3 max-h-36 overflow-y-auto">
+                      <p className="text-[11px] font-black text-rose-700 uppercase mb-1.5">{clashes.length} conflict{clashes.length === 1 ? '' : 's'} with this timetable</p>
+                      {clashes.map((c, i) => (
+                        <p key={i} className="text-[11px] font-bold text-rose-700">
+                          {c.type === 'venue' ? `Stage overlap: ${c.programName} ↔ ${c.conflictingProgramName}` : `${c.participantName} (#${c.chestNumber}): ${c.programName} ↔ ${c.conflictingProgramName}`}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 justify-end">
+                    <button
+                      onClick={() => setCascadePreview(null)}
+                      className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded text-[11px] font-black uppercase tracking-wider transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmCascade}
+                      disabled={isSavingCascade}
+                      className={`px-4 py-2.5 text-white rounded text-[11px] font-black uppercase tracking-wider transition-all disabled:opacity-60 ${clashes.length > 0 ? 'bg-rose-600 hover:bg-rose-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                    >
+                      {isSavingCascade ? 'Saving…' : clashes.length > 0 ? `Save anyway (${result.updates.length})` : `Save ${result.updates.length} change${result.updates.length === 1 ? '' : 's'}`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Baseline Time Modal for New Venue */}
           {pendingBaselineDrop && (
             <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
@@ -746,7 +815,7 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                     <input 
                       type="datetime-local" 
                       id="baselineStart"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded text-base sm:text-xs font-bold text-slate-800 outline-none focus:border-indigo-500" 
                     />
                   </div>
                 </div>
@@ -758,26 +827,22 @@ export const ScheduleManager: React.FC<ScheduleManagerProps> = ({ programs, upda
                     Cancel
                   </button>
                   <button 
-                    onClick={() => {
+                    onClick={async () => {
                       const startInput = (document.getElementById('baselineStart') as HTMLInputElement).value;
-                      if (startInput) {
-                        const explicitStart = new Date(startInput);
-                        const batchUpdates = calculateCascadingTimes(
-                          pendingBaselineDrop.newOrderedVenuePrograms, 
-                          pendingBaselineDrop.targetVenue, 
-                          explicitStart
-                        );
-                        if (batchUpdates) {
-                          processBatchUpdates(
-                            batchUpdates, 
-                            pendingBaselineDrop.activeId, 
-                            pendingBaselineDrop.activeProgram, 
-                            pendingBaselineDrop.targetVenue
-                          );
-                        }
+                      const explicitStart = parseScheduleTime(startInput);
+                      if (explicitStart) {
+                        const pending = pendingBaselineDrop;
                         setPendingBaselineDrop(null);
+                        const batchUpdates = calculateCascadingTimes({
+                          before: pending.venueProgramsBefore,
+                          after: pending.newOrderedVenuePrograms,
+                          movedId: pending.activeId,
+                          venue: pending.targetVenue,
+                          baseline: explicitStart,
+                        });
+                        if (batchUpdates) await processBatchUpdates(batchUpdates);
                       } else {
-                        alert("Please select a date and time");
+                        appDialog.alert("Please select a date and time", { title: 'Start time needed', variant: 'warning' });
                       }
                     }}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-black uppercase tracking-wider transition-all"

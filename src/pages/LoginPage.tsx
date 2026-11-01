@@ -130,6 +130,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onGoogleLogin, is
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    autoComplete="username"
                     className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-purple-600 transition-all font-medium"
                     placeholder="Enter assigned username"
                     required

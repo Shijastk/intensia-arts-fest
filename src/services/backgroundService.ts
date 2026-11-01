@@ -13,7 +13,30 @@ export interface TemplateConfig {
   bgPositionX?: number;
   bgPositionY?: number;
   bgScale?: number;
+
+  // --- Added later; every field is optional so configs saved before these existed still load.
+  // Missing values are filled from the per-type defaults in exportService.mergeTemplateConfig.
+  /** 2 = saved by the editor that understands certificate layout fields (see mergeTemplateConfig). */
+  configVersion?: number;
+  /** Heading font (certificate name / poster event title). */
+  fontFamily?: string;
+  /** Body font (certificate sentence / poster winners). */
+  bodyFontFamily?: string;
+  titleFontSize?: number;
+  bodyFontSize?: number;
+  /** Heading font weight (400-900). */
+  fontWeight?: number;
+  /** Heading letter spacing in em. */
+  letterSpacing?: number;
+  /** Body line height (unitless multiplier). */
+  lineHeight?: number;
+  /** Certificate sentence with {placeholders}; **bold**, ##bold in strong colour##, newline = line break. */
+  bodyTemplate?: string;
+  festVenue?: string;
+  festDates?: string;
 }
+
+export type BackgroundType = 'certificateBgs' | 'posterBgs' | 'studentCardBgs';
 
 export interface BackgroundSettings {
   certificateBgs?: Record<string, string>;
@@ -21,6 +44,9 @@ export interface BackgroundSettings {
   studentCardBgs?: Record<string, string>;
   
   configs?: Record<string, TemplateConfig>;
+
+  /** Background id chosen with "Use for exports", per type. */
+  active?: Partial<Record<BackgroundType, string>>;
   
   // Legacy
   certificateBg?: string;
@@ -54,6 +80,20 @@ export const deleteBackground = async (
   await remove(ref(db, `${getBackgroundsRef(festId)}/${type}/${id}`));
   // Also remove config if it exists
   await remove(ref(db, `${getBackgroundsRef(festId)}/configs/${id}`));
+  // ...and the export selection if it pointed at this background (exports then fall back
+  // to the most recently added one).
+  const activeRef = ref(db, `${getBackgroundsRef(festId)}/active/${type}`);
+  const active = await get(activeRef);
+  if (active.exists() && active.val() === id) await remove(activeRef);
+};
+
+/** Marks a background as the one used by certificate/poster/student-card exports. */
+export const setActiveBackground = async (
+  festId: string,
+  type: BackgroundType,
+  id: string
+): Promise<void> => {
+  await set(ref(db, `${getBackgroundsRef(festId)}/active/${type}`), id);
 };
 
 export const saveBackgroundConfig = async (

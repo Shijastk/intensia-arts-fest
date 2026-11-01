@@ -15,6 +15,8 @@ import { auth } from './src/config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useStaffs } from './src/hooks/useStaffs';
 import { useSettings } from './src/hooks/useSettings';
+import { setSuperAdminUi } from './src/services/sessionFlags';
+import { AppDialogHost } from './src/components/ui/AppDialog';
 
 // ---> NEW IMPORT: Marketing Page <---
 import { MarketingPage } from './src/pages/MarketingPage';
@@ -23,7 +25,7 @@ import { SuperAdminPage } from './src/pages/SuperAdminPage';
 // Wrapper for Public Fest Pages
 const PublicFestRoute = ({ component: Component }: { component: any }) => {
   const { festId } = useParams<{ festId: string }>();
-  const { programs, loading } = usePrograms(festId || null);
+  const { programs, loading } = usePrograms(festId || null, { access: 'public' });
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading Fest Data...</div>;
@@ -50,49 +52,57 @@ const StaffLoginRoute = ({ onLogin, isMaintenanceMode, currentUser }: { onLogin:
   return <LoginPage onLogin={handleStaffLogin} isMaintenanceMode={isMaintenanceMode} adminOnly={false} />;
 };
 
+// Only the fest the session is authorised for can be opened; a Super Admin switches fest.
+const DashboardRoute = ({ currentUser, onSuperAdminFest, children }: { currentUser: User; onSuperAdminFest: (festId: string) => void; children: React.ReactNode }) => {
+  const { festId } = useParams<{ festId: string }>();
+  useEffect(() => {
+    if (festId && currentUser.isSuperAdmin && festId !== currentUser.festId) onSuperAdminFest(festId);
+  }, [festId, currentUser.isSuperAdmin, currentUser.festId, onSuperAdminFest]);
+
+  if (festId && festId !== currentUser.festId && !currentUser.isSuperAdmin) {
+    return currentUser.festId ? <Navigate to={`/fests/${currentUser.festId}/dashboard`} replace /> : <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.USER);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      localStorage.removeItem(STORAGE_KEYS.USER);
-      return null;
-    }
-  });
+  // The session is derived only from the verified Firebase session (see resolveSession).
+  // Anything a browser stores is never trusted for authorisation.
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(false);
-  
-  const { programs, setPrograms, loading: programsLoading, error, addProgram, updateProgram, deleteProgram } = usePrograms(currentUser?.festId || null);
-  const { staffs, addStaff, updateStaff, deleteStaff } = useStaffs(currentUser?.festId || null);
+
+  const role = String(currentUser?.role || '').toLowerCase().replace('_', '');
+  const programAccess = role === 'teamleader' ? 'public' : role === 'judge' ? 'judge' : 'private';
+  const { programs, setPrograms, loading: programsLoading, error, addProgram, updateProgram, deleteProgram } = usePrograms(currentUser?.festId || null, { access: programAccess, judgePanel: currentUser?.judgePanel, teamName: currentUser?.teamName });
+  const { staffs, addStaff, updateStaff, deleteStaff } = useStaffs(currentUser?.festId || null, currentUser);
   const { settings, updateSettings, loading: settingsLoading } = useSettings(currentUser?.festId || null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-      if (!user && (!savedUser || JSON.parse(savedUser).role === 'admin')) {
+    // Remove the old, trusted-by-the-client session record if a previous version stored one.
+    try { localStorage.removeItem(STORAGE_KEYS.USER); } catch { /* storage unavailable */ }
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        setCurrentUser(await authService.resolveSession(firebaseUser));
+      } catch (err) {
+        console.error('Could not restore session:', err);
         setCurrentUser(null);
-        localStorage.removeItem(STORAGE_KEYS.USER);
+      } finally {
+        setAuthReady(true);
       }
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.USER);
-    }
-  }, [currentUser]);
+  useEffect(() => { setSuperAdminUi(currentUser?.isSuperAdmin === true); }, [currentUser]);
+
+  const selectSuperAdminFest = React.useCallback((festId: string) => {
+    authService.setSuperAdminFest(festId);
+    setCurrentUser(prev => (prev?.isSuperAdmin ? { ...prev, festId, displayName: 'Supreme Admin' } : prev));
+  }, []);
 
   const handleLogin = async (username: string, password: string, specificFestId?: string): Promise<{ success: boolean; error?: string }> => {
-    if (username === 'admin' && password === 'admin') {
-      const mockAdmin: User = { uid: 'admin-1', username: 'admin', role: 'admin', festId: specificFestId || 'default-fest', displayName: 'System Admin' };
-      setCurrentUser(mockAdmin);
-      return { success: true };
-    }
-
     const res = await authService.loginStaff(username.trim(), password.trim(), specificFestId);
     if (!res.success || !res.user) {
       return { success: false, error: res.error || `Invalid credentials for ${username}` };
@@ -108,40 +118,29 @@ export default function App() {
       return { success: false, error: res.error || 'Google login failed' };
     }
 
-    const user: User = {
-      uid: auth.currentUser?.uid || 'google-admin',
-      username: auth.currentUser?.email || 'admin',
-      role: 'admin',
-      festId: res.festId || '',
-      displayName: auth.currentUser?.displayName || 'Fest Convenor'
-    };
-
-    setCurrentUser(user);
+    // Re-read the session after the profile write so festId / claims are current.
+    setCurrentUser(await authService.resolveSession(auth.currentUser));
     return { success: true };
   };
 
   const handleLogout = async () => {
     await authService.logout();
     setCurrentUser(null);
-    localStorage.removeItem(STORAGE_KEYS.USER);
   };
 
+  if (!authReady) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
   return (
+    <>
+    <AppDialogHost />
     <HashRouter>
       <Routes>
         <Route path="/maintenance" element={<MaintenancePage />} />
-        
+
         {/* Supreme Admin Route */}
-        <Route path="/supreme-admin" element={<SuperAdminPage onEnterFest={(festId) => {
-          const superAdminUser: User = {
-            uid: auth.currentUser?.uid || 'super-admin-uid',
-            username: auth.currentUser?.email || 'superadmin',
-            role: 'admin',
-            festId: festId,
-            displayName: 'Supreme Admin'
-          };
-          setCurrentUser(superAdminUser);
-        }} />} />
+        <Route path="/supreme-admin" element={<SuperAdminPage onEnterFest={selectSuperAdminFest} />} />
         
         {/* Base URL: Now mapped to our new Marketing Page */}
         <Route path="/" element={<MarketingPage />} />
@@ -181,6 +180,7 @@ export default function App() {
         {/* Admin Dashboard */}
         <Route path="/fests/:festId/dashboard" element={
           currentUser ? (
+            <DashboardRoute currentUser={currentUser} onSuperAdminFest={selectSuperAdminFest}>
             <DashboardLayout
               currentUser={currentUser}
               programs={programs}
@@ -200,6 +200,7 @@ export default function App() {
               isMaintenanceMode={isMaintenanceMode}
               setIsMaintenanceMode={setIsMaintenanceMode}
             />
+            </DashboardRoute>
           ) : (
             <Navigate to="/login" replace />
           )
@@ -208,5 +209,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>
+    </>
   );
 }
