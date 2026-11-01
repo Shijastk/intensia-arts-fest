@@ -1,27 +1,33 @@
 import React, { useMemo, useState } from 'react';
 import { Program } from '../types';
 import { calculateConsolidatedResults } from '../utils/consolidationCalc';
-import { getProgramZone, zoneLabel } from '../utils/resultsUtils';
+import { getResultZone, sortZones, zoneLabel } from '../utils/resultsUtils';
 
 interface ConsolidationViewProps {
   programs: Program[];
+  /** Zone list from Settings; programs in a deleted zone count under General. */
+  zones?: string[];
 }
 
-export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }) => {
+export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs, zones: settingsZones = [] }) => {
   
   const [includeUnpublished, setIncludeUnpublished] = useState(false);
   const [selectedZone, setSelectedZone] = useState('All');
 
-  const zones = useMemo(() => Array.from(new Set(programs.map(p => getProgramZone(p)))).sort(), [programs]);
+  const zones = useMemo(
+    () => sortZones(Array.from(new Set(programs.map(p => getResultZone(p, settingsZones)))), settingsZones),
+    [programs, settingsZones]
+  );
+  const activeZone = selectedZone === 'All' || zones.includes(selectedZone) ? selectedZone : 'All';
 
   // A zone report is the same consolidation run on that zone's programs only.
   const stats = useMemo(() => calculateConsolidatedResults(
-    selectedZone === 'All' ? programs : programs.filter(p => getProgramZone(p) === selectedZone),
+    activeZone === 'All' ? programs : programs.filter(p => getResultZone(p, settingsZones) === activeZone),
     includeUnpublished
-  ), [programs, includeUnpublished, selectedZone]);
+  ), [programs, includeUnpublished, activeZone, settingsZones]);
 
   // " (North Zone)" after each heading when a zone is selected.
-  const zoneSuffix = selectedZone === 'All' ? '' : ` (${selectedZone === 'General' ? 'General' : zoneLabel(selectedZone)})`;
+  const zoneSuffix = activeZone === 'All' ? '' : ` (${activeZone === 'General' ? 'General' : zoneLabel(activeZone)})`;
 
   const handlePrint = () => {
     window.print();
@@ -38,7 +44,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
         </div>
         <div className="flex flex-col items-start md:items-end gap-3">
           <select
-            value={selectedZone}
+            value={activeZone}
             onChange={(e) => setSelectedZone(e.target.value)}
             className="print:hidden bg-gray-100 px-3 py-1.5 rounded border border-gray-300 text-xs font-bold uppercase text-gray-800 cursor-pointer"
           >

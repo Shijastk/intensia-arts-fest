@@ -6,7 +6,7 @@ import { getBackgroundSettings, BackgroundSettings } from '../services/backgroun
 import { getBackgroundMap } from '../services/exportService';
 import { appDialog } from '../components/ui/AppDialog';
 import { calculateConsolidatedResults } from '../utils/consolidationCalc';
-import { getProgramWinners, getProgramZone, ProgramWinner, zoneLabel } from '../utils/resultsUtils';
+import { getProgramWinners, getResultZone, ProgramWinner, sortZones, zoneLabel } from '../utils/resultsUtils';
 
 
 interface ResultsPageProps {
@@ -22,6 +22,8 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
 
   const { settings } = useSettings(festId || null);
   const showOverallPoints = settings?.showOverallLeaderboardInPublic === true;
+  const settingsZones = settings?.zones || [];
+  const zoneOf = (p: Program) => getResultZone(p, settingsZones);
 
   useEffect(() => {
     if (!festId) return;
@@ -52,9 +54,9 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
 
   const availableZones = useMemo(() => {
     const zones = new Set<string>();
-    completedPrograms.forEach(p => zones.add(getProgramZone(p)));
-    return Array.from(zones).sort();
-  }, [completedPrograms]);
+    completedPrograms.forEach(p => zones.add(zoneOf(p)));
+    return sortZones(Array.from(zones), settingsZones);
+  }, [completedPrograms, settings?.zones]);
 
   // Zone standings use the same consolidation rules as the overall standings, run on that
   // zone's programs only. General programs have no zone table (they still count overall).
@@ -62,15 +64,15 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     .filter(zone => zone !== 'General')
     .map(zone => ({
       zone,
-      data: calculateConsolidatedResults(programs.filter(p => getProgramZone(p) === zone))
+      data: calculateConsolidatedResults(programs.filter(p => zoneOf(p) === zone))
         .sortedTeams.map(t => ({ teamName: t.name, points: t.score, position: t.position }))
     }))
-    .filter(z => z.data.length > 0), [programs, availableZones]);
+    .filter(z => z.data.length > 0), [programs, availableZones, settings?.zones]);
 
   // Latest announcements follow the zone filter too.
   const latestPrograms = useMemo(
-    () => completedPrograms.filter(p => selectedZone === 'All' || getProgramZone(p) === selectedZone).slice(0, 5),
-    [completedPrograms, selectedZone]
+    () => completedPrograms.filter(p => selectedZone === 'All' || zoneOf(p) === selectedZone).slice(0, 5),
+    [completedPrograms, selectedZone, settings?.zones]
   );
 
   // Shared with the admin "Download Poster" button and the public page (OffscreenRenderer):
@@ -105,6 +107,11 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     return items;
   }, [latestPrograms, showOverallPoints, overallTeamScores, zoneTeamScores, selectedZone]);
 
+  // A zone deleted in Settings while it is selected falls back to All.
+  useEffect(() => {
+    if (selectedZone !== 'All' && !availableZones.includes(selectedZone)) setSelectedZone('All');
+  }, [availableZones, selectedZone]);
+
   // The slide list changes with the zone filter; start again from the first slide.
   useEffect(() => { setActiveSlide(0); }, [selectedZone]);
 
@@ -126,10 +133,10 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
       );
     }
     if (selectedZone !== 'All') {
-      filtered = filtered.filter(p => getProgramZone(p) === selectedZone);
+      filtered = filtered.filter(p => zoneOf(p) === selectedZone);
     }
     return filtered;
-  }, [completedPrograms, searchQuery, selectedZone]);
+  }, [completedPrograms, searchQuery, selectedZone, settings?.zones]);
 
   const getWinnerNode = (results: ProgramWinner[], targetRank: number) => {
     // Every entry sharing this place is shown (ties use competition ranking: 1, 1, 3).

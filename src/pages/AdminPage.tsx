@@ -420,7 +420,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         
         {activeTab === 'results' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-            <ConsolidationView programs={programs} />
+            <ConsolidationView programs={programs} zones={settings?.zones} />
           </div>
         )}
 

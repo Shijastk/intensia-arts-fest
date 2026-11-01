@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Settings, Program, CustomProgramScore, ProgramStatus } from '../types';
 import { Toast } from '../components/ui/Toast';
+import { appDialog } from '../components/ui/AppDialog';
 import {
   getDefaultCustomScore,
   AVAILABLE_GRADES,
@@ -120,7 +121,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
     const v = newZone.trim();
     if (v && !zones.includes(v)) { setZones([...zones, v]); setNewZone(''); }
   };
-  const handleRemoveZone = (z: string) => setZones(zones.filter(x => x !== z));
+  const handleRemoveZone = async (z: string) => {
+    // Programs keep their stored zone; results then count them under General until they are moved.
+    const used = programs.filter(p => (p.zone || '').trim() === z).length;
+    if (used > 0) {
+      const ok = await appDialog.confirm(
+        `${used} program${used === 1 ? ' is' : 's are'} still in "${z}". After deleting, their results are shown under General until you edit them and pick another zone.`,
+        { title: 'Delete zone?', variant: 'warning' }
+      );
+      if (!ok) return;
+    }
+    setZones(current => current.filter(x => x !== z));
+  };
   const startEditZone = (idx: number) => { setEditingZoneIdx(idx); setEditingZoneValue(zones[idx]); };
   const confirmEditZone = () => {
     if (editingZoneIdx === null) return;
