@@ -50,6 +50,13 @@ export interface TemplateConfig {
   contentSidePct?: number;
   /** Keep left and right spacing equal regardless of alignment. */
   balanceSides?: boolean;
+  /**
+   * Where the text block sits on the page, independent of how its lines are aligned
+   * (e.g. right-aligned text on the left side of the page). Defaults to textAlign.
+   */
+  blockPosition?: 'left' | 'center' | 'right';
+  /** Maximum width of the text block as % of the space between the side margins (default 100). */
+  blockWidthPct?: number;
 }
 
 /** upper = JOHN DOE, title = John Doe, lower = john doe, none = as typed. */

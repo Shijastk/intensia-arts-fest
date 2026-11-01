@@ -443,7 +443,7 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                       return (
                         <>
                           <RangeField label="Top Spacing" value={placement.topPct} min={0} max={70} step={0.5} unit="%" onChange={(v) => update({ contentTopPct: v })} />
-                          <RangeField label={sideSpacingLabel(config.textAlign, placement.balanced)} value={placement.sidePct} min={0} max={40} step={0.5} unit="%" onChange={(v) => update({ contentSidePct: v })} />
+                          <RangeField label={sideSpacingLabel(placement.position, placement.balanced)} value={placement.sidePct} min={0} max={40} step={0.5} unit="%" onChange={(v) => update({ contentSidePct: v })} />
                           <label className="flex items-center justify-between gap-3 cursor-pointer">
                             <span className="text-[10px] font-bold text-slate-700 uppercase">Balance both sides</span>
                             <input type="checkbox" checked={placement.balanced} onChange={(e) => update({ balanceSides: e.target.checked })} className="w-4 h-4 accent-[#3B3BFA]" />
@@ -451,7 +451,7 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                           <p className="text-[10px] text-slate-500 -mt-2">
                             {placement.balanced
                               ? 'Left and right spacing are equal, whatever the alignment.'
-                              : config.textAlign === 'center' ? 'Centred text is always spaced equally on both sides.' : 'Spacing is measured from the edge the text is aligned to.'}
+                              : placement.position === 'center' ? 'A centred block is always spaced equally on both sides.' : `Spacing is measured from the ${placement.position} edge of the page.`}
                           </p>
                         </>
                       );
@@ -474,6 +474,29 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                             {align}
                           </button>
                         ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-700 uppercase block mb-2">Position on Page</label>
+                      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                        {(['left', 'center', 'right'] as const).map(pos => {
+                          const current = config.blockPosition ?? config.textAlign ?? 'left';
+                          return (
+                            <button
+                              key={pos}
+                              onClick={() => update({ blockPosition: pos })}
+                              className={`flex-1 py-1.5 text-[10px] font-black uppercase rounded ${current === pos ? 'bg-white shadow-sm text-[#3B3BFA]' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                              {pos}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1">Where the text block sits. Text Alignment lines the text up inside it, e.g. right-aligned text on the left side.</p>
+                      <div className="mt-3">
+                        <RangeField label="Max Text Width" value={resolvePlacement(type, config).widthPct} min={20} max={100} unit="%" onChange={(v) => update({ blockWidthPct: v })} />
+                        <p className="text-[10px] text-slate-500 mt-1">The text block is always as wide as its content needs. This only limits very long text (e.g. a certificate sentence) so it stays on one side.</p>
                       </div>
                     </div>
 

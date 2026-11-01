@@ -658,13 +658,23 @@ export const resolvePlacement = (
     : config.contentSidePct ?? ((config.contentLeft ?? D.contentLeft ?? 0) / size.width) * 100;
   const top = (topPct / 100) * size.height;
   const side = (sidePct / 100) * size.width;
-  const align = config.textAlign ?? D.textAlign;
+  const align = config.textAlign ?? D.textAlign ?? 'left';
+  // The block's place on the page is separate from line alignment; older configs: same as alignment.
+  const position = config.blockPosition ?? align;
   const balanced = !!config.balanceSides;
   const pad = balanced
     ? { left: side, right: side }
-    : contentPadding(align, side, (OPPOSITE_EDGE_PCT / 100) * size.width);
-  return { size, top, pad, topPct: round1(topPct), sidePct: round1(sidePct), balanced };
+    : contentPadding(position, side, (OPPOSITE_EDGE_PCT / 100) * size.width);
+  // The block is as wide as its content needs (dynamic) and is placed at `position`; widthPct is
+  // only an optional MAXIMUM (default 100%) so very long text, like a certificate sentence, can be
+  // kept to one side.
+  const widthPct = Math.min(100, Math.max(20, config.blockWidthPct ?? 100));
+  return { size, top, pad, topPct: round1(topPct), sidePct: round1(sidePct), balanced, align, position, widthPct };
 };
+
+/** CSS flex alignment for left / center / right. */
+export const flexAlign = (side?: 'left' | 'center' | 'right') =>
+  side === 'center' ? 'center' : side === 'right' ? 'flex-end' : 'flex-start';
 
 // ---------------------------------------------------------------------------
 // Background scaling (shared by every template, editor and export alike)

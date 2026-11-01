@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TemplateConfig } from '../../services/backgroundService';
-import { TEMPLATE_DEFAULTS, applyTextCase, fontStack, resolvePlacement, resolveTextRoles } from '../../services/exportService';
+import { TEMPLATE_DEFAULTS, applyTextCase, flexAlign, fontStack, resolvePlacement, resolveTextRoles } from '../../services/exportService';
 import { TemplateBackground } from './TemplateBackground';
 
 export interface WinnerDetails {
@@ -59,7 +59,7 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
   const lineHeight = c.lineHeight ?? D.lineHeight!;
   const alignItems = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
   // Spacing is a % of the page, so it scales with the poster size (portrait or square).
-  const { top, pad } = resolvePlacement('posterBgs', { ...c, textAlign: align, posterSize: size }, { contentTop, contentLeft });
+  const { top, pad, position, widthPct } = resolvePlacement('posterBgs', { ...c, textAlign: align, posterSize: size }, { contentTop, contentLeft });
   const roles = resolveTextRoles('posterBgs', c);
 
   // Copy before sorting (props must not be mutated); stable for tied places.
@@ -79,10 +79,11 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
           paddingTop: `${top}px`,
           paddingLeft: `${pad.left}px`,
           paddingRight: `${pad.right}px`,
-          alignItems: alignItems,
-          textAlign: align
+          // The block sits at its page position; its lines are aligned inside it.
+          alignItems: flexAlign(position)
         }}
       >
+        <div className="flex flex-col" style={{ width: 'fit-content', maxWidth: `${widthPct}%`, alignItems, textAlign: align }}>
         {/* Event Title */}
         <h1
           className="mb-8 break-words max-w-full"
@@ -120,6 +121,7 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
               )}
             </div>
           ))}
+        </div>
         </div>
       </div>
     </div>
