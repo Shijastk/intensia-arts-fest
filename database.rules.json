@@ -50,6 +50,22 @@
           ".read": true,
           ".write": "((auth != null && auth.token.superAdmin === true) || ((auth != null && auth.token.firebase.sign_in_provider === 'google.com' && root.child('users').child(auth.uid).child('isActive').val() !== false) && root.child('fests').child($festId).child('adminUid').val() === auth.uid) || ((auth != null && auth.token.festId === $festId && auth.token.staffId != null && root.child('fests').child($festId).child('staff').child(auth.token.staffId).exists() && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('isDisabled').val() !== true) && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('role').val() === 'ADMIN'))"
         },
+        "customFonts": {
+          ".read": true,
+          ".write": "((auth != null && auth.token.superAdmin === true) || ((auth != null && auth.token.firebase.sign_in_provider === 'google.com' && root.child('users').child(auth.uid).child('isActive').val() !== false) && root.child('fests').child($festId).child('adminUid').val() === auth.uid) || ((auth != null && auth.token.festId === $festId && auth.token.staffId != null && root.child('fests').child($festId).child('staff').child(auth.token.staffId).exists() && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('isDisabled').val() !== true) && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('role').val() === 'ADMIN'))",
+          "$fontId": {
+            ".validate": "newData.hasChildren(['family', 'dataUrl'])",
+            "family": {
+              ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9 _-]{1,60}$/)"
+            },
+            "dataUrl": {
+              ".validate": "newData.isString() && newData.val().beginsWith('data:') && newData.val().length <= 1500000"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
         "students": {
           ".read": "(((auth != null && auth.token.superAdmin === true) || ((auth != null && auth.token.firebase.sign_in_provider === 'google.com' && root.child('users').child(auth.uid).child('isActive').val() !== false) && root.child('fests').child($festId).child('adminUid').val() === auth.uid) || ((auth != null && auth.token.festId === $festId && auth.token.staffId != null && root.child('fests').child($festId).child('staff').child(auth.token.staffId).exists() && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('isDisabled').val() !== true) && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('role').val() === 'ADMIN')) || (auth != null && auth.token.festId === $festId && auth.token.staffId != null && root.child('fests').child($festId).child('staff').child(auth.token.staffId).exists() && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('isDisabled').val() !== true))",
           ".write": "((auth != null && auth.token.superAdmin === true) || ((auth != null && auth.token.firebase.sign_in_provider === 'google.com' && root.child('users').child(auth.uid).child('isActive').val() !== false) && root.child('fests').child($festId).child('adminUid').val() === auth.uid) || ((auth != null && auth.token.festId === $festId && auth.token.staffId != null && root.child('fests').child($festId).child('staff').child(auth.token.staffId).exists() && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('isDisabled').val() !== true) && root.child('fests').child($festId).child('staff').child(auth.token.staffId).child('role').val() === 'ADMIN'))",

@@ -5,7 +5,10 @@ import {
   DEFAULT_CERT_BODY_TEMPLATE,
   LEGACY_CERT_DATES,
   LEGACY_CERT_VENUE,
+  OPPOSITE_EDGE_MARGIN,
   TEMPLATE_DEFAULTS,
+  contentPadding,
+  sideSpacingLabel,
   aggregateParticipants,
   aspectRatioWarning,
   autoFitBlockFontSize,
@@ -258,5 +261,25 @@ describe('upload validation', () => {
     expect(aspectRatioWarning('certificateBgs', 1123, 794)).toMatch(/A4/);
     expect(aspectRatioWarning('posterBgs', 1080, 1080)).toBeNull();
     expect(aspectRatioWarning('posterBgs', 1920, 1080)).toMatch(/portrait/);
+  });
+});
+
+describe('contentPadding (side spacing measured from the aligned edge)', () => {
+  it('right-aligned: spacing from the right edge, small margin on the left', () => {
+    expect(contentPadding('right', 200)).toEqual({ left: OPPOSITE_EDGE_MARGIN, right: 200 });
+  });
+  it('left-aligned: spacing from the left edge, small margin on the right', () => {
+    expect(contentPadding('left', 96)).toEqual({ left: 96, right: OPPOSITE_EDGE_MARGIN });
+  });
+  it('centred: equal spacing on both sides (unchanged behaviour)', () => {
+    expect(contentPadding('center', 120)).toEqual({ left: 120, right: 120 });
+  });
+  it('zero spacing lets text reach both edges', () => {
+    expect(contentPadding('right', 0)).toEqual({ left: 0, right: 0 });
+  });
+  it('labels the control by the edge it measures from', () => {
+    expect(sideSpacingLabel('right')).toBe('Right Edge Spacing');
+    expect(sideSpacingLabel('left')).toBe('Left Edge Spacing');
+    expect(sideSpacingLabel('center')).toBe('Side Spacing (both sides)');
   });
 });

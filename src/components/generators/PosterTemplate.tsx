@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TemplateConfig } from '../../services/backgroundService';
-import { TEMPLATE_DEFAULTS, fontStack } from '../../services/exportService';
+import { TEMPLATE_DEFAULTS, applyTextCase, contentPadding, fontStack, resolveTextRoles } from '../../services/exportService';
 import { TemplateBackground } from './TemplateBackground';
 
 export interface WinnerDetails {
@@ -60,6 +60,8 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
   const letterSpacing = c.letterSpacing ?? D.letterSpacing!;
   const lineHeight = c.lineHeight ?? D.lineHeight!;
   const alignItems = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+  const pad = contentPadding(align, side);
+  const roles = resolveTextRoles('posterBgs', c);
 
   // Copy before sorting (props must not be mutated); stable for tied places.
   const sortedWinners = (winners || []).map((w, i) => ({ w, i })).sort((a, b) => a.w.place - b.w.place || a.i - b.i);
@@ -76,25 +78,25 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
         className="absolute inset-0 flex flex-col justify-start"
         style={{
           paddingTop: `${top}px`,
-          paddingLeft: `${side}px`,
-          paddingRight: `${side}px`,
+          paddingLeft: `${pad.left}px`,
+          paddingRight: `${pad.right}px`,
           alignItems: alignItems,
           textAlign: align
         }}
       >
         {/* Event Title */}
         <h1
-          className="uppercase mb-8 break-words max-w-full"
+          className="mb-8 break-words max-w-full"
           style={{
             color: primary,
-            fontFamily: fontStack(c.fontFamily ?? D.fontFamily),
+            fontFamily: fontStack(roles.title.font),
             fontWeight: c.fontWeight ?? D.fontWeight,
             fontSize: `${titleSize}px`,
             lineHeight: 1,
             letterSpacing: `${letterSpacing}em`,
           }}
         >
-          {eventName}
+          {applyTextCase(eventName, roles.title.textCase)}
         </h1>
 
         {/* Category */}
@@ -109,12 +111,12 @@ export const PosterTemplate: React.FC<PosterTemplateProps> = ({
               <span className="font-bold uppercase tracking-widest mb-1 break-words max-w-full" style={{ color: accent, fontSize: `${14 * k}px`, lineHeight: 20 / 14 }}>
                 {winner.place}{winner.place === 1 ? 'ST' : winner.place === 2 ? 'ND' : 'RD'} PLACE
               </span>
-              <span className="font-black uppercase mb-1 break-words max-w-full" style={{ color: primary, fontSize: `${bodySize}px`, lineHeight }}>
-                {winner.name}
+              <span className="font-black mb-1 break-words max-w-full" style={{ color: primary, fontFamily: fontStack(roles.name.font), fontSize: `${bodySize}px`, lineHeight }}>
+                {applyTextCase(winner.name, roles.name.textCase)}
               </span>
               {winner.team && (
-                <span className="uppercase tracking-wider break-words max-w-full" style={{ color: primary, opacity: 0.8, fontSize: `${14 * k}px`, lineHeight: 20 / 14 }}>
-                  {winner.team}
+                <span className="tracking-wider break-words max-w-full" style={{ color: primary, opacity: 0.8, fontFamily: fontStack(roles.team.font), fontSize: `${14 * k}px`, lineHeight: 20 / 14 }}>
+                  {applyTextCase(winner.team, roles.team.textCase)}
                 </span>
               )}
             </div>

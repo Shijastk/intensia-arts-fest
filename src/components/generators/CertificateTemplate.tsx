@@ -5,9 +5,12 @@ import {
   TEMPLATE_DEFAULTS,
   autoFitBlockFontSize,
   autoFitFontSize,
+  applyTextCase,
+  contentPadding,
   fillPlaceholders,
   fontStack,
   parseRichText,
+  resolveTextRoles,
   stripRichMarkers,
 } from '../../services/exportService';
 import { TemplateBackground } from './TemplateBackground';
@@ -61,8 +64,10 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
   const bodyColor = c.textColor ?? '#374151';
   const strongColor = c.textColor ?? '#000000';
 
-  const name = (participantName || '').toUpperCase();
-  const innerWidth = A4_PX.width - contentLeft * 2;
+  const roles = resolveTextRoles('certificateBgs', c);
+  const name = applyTextCase(participantName, roles.name.textCase);
+  const pad = contentPadding(textAlign, contentLeft);
+  const innerWidth = A4_PX.width - pad.left - pad.right;
 
   // Name: shrink with length (~0.68em per uppercase glyph + tracking), wrap to at most 2 lines.
   const nameCharsAtBase = Math.max(8, Math.floor(innerWidth / (titleSize * (0.68 + letterSpacing))));
@@ -81,8 +86,13 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
     date: c.festDates ?? D.festDates,
     venue: c.festVenue ?? D.festVenue,
   });
-  // Body block (px-24 inside the content area): ~0.5em per glyph, up to 8 lines before shrinking.
-  const bodyWidth = Math.max(200, innerWidth - 192);
+  // Centred layouts keep the original inner insets (details px-12, body px-24); left/right aligned
+  // text lines up exactly with the name on the aligned edge, so the insets are dropped there.
+  const centred = textAlign === 'center';
+  const detailsInset = centred ? 'px-12' : '';
+  const bodyInset = centred ? 'px-24' : '';
+  // Body block: ~0.5em per glyph, up to 8 lines before shrinking.
+  const bodyWidth = Math.max(200, innerWidth - (centred ? 192 : 0));
   const bodyCapacity = Math.floor(bodyWidth / (bodySize * 0.5)) * 8;
   const bodyFitSize = autoFitBlockFontSize(stripRichMarkers(body), bodySize, bodyCapacity, 10);
 
@@ -96,14 +106,14 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
       {/* Content wrapper to position elements relative to the design */}
       <div
         className="absolute inset-0 flex flex-col justify-center"
-        style={{ paddingTop: `${contentTop}px`, paddingLeft: `${contentLeft}px`, paddingRight: `${contentLeft}px`, alignItems, textAlign }}
+        style={{ paddingTop: `${contentTop}px`, paddingLeft: `${pad.left}px`, paddingRight: `${pad.right}px`, alignItems, textAlign }}
       >
         {/* Name */}
         <h1
           className="mb-4 max-w-full"
           style={{
             color: accent,
-            fontFamily: fontStack(c.fontFamily ?? D.fontFamily),
+            fontFamily: fontStack(roles.name.font),
             fontWeight: c.fontWeight ?? D.fontWeight,
             fontSize: `${nameSize}px`,
             lineHeight: nameLineHeight,
@@ -118,14 +128,14 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
 
         {/* Details Row */}
         <p
-          className="mb-10 px-12 max-w-full"
+          className={`mb-10 ${detailsInset} max-w-full`}
           style={{ color: detailsColor, fontSize: `${bodySize}px`, lineHeight, letterSpacing: '0.025em' }}
         >
-          Chest No. {chestNo} &middot; {team}{category ? <> &middot; <span className="whitespace-nowrap">{category}</span></> : null}
+          Chest No. {chestNo} &middot; <span style={{ fontFamily: fontStack(roles.team.font) }}>{applyTextCase(team, roles.team.textCase)}</span>{category ? <> &middot; <span className="whitespace-nowrap">{category}</span></> : null}
         </p>
 
         {/* Participated Events Text */}
-        <div className="px-24 max-w-full" style={{ color: bodyColor, fontSize: `${bodyFitSize}px`, lineHeight, overflowWrap: 'anywhere' }}>
+        <div className={`${bodyInset} max-w-full`} style={{ color: bodyColor, fontSize: `${bodyFitSize}px`, lineHeight, overflowWrap: 'anywhere' }}>
           {parseRichText(body).map((line, li) => (
             <React.Fragment key={li}>
               {li > 0 && <br />}

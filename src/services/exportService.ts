@@ -9,7 +9,7 @@
 import { toJpeg, getFontEmbedCSS } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { Program, ProgramStatus } from '../types';
-import type { BackgroundSettings, BackgroundType, TemplateConfig } from './backgroundService';
+import type { BackgroundSettings, BackgroundType, TemplateConfig, TextCase } from './backgroundService';
 
 // ---------------------------------------------------------------------------
 // Sizes / render settings
@@ -43,6 +43,44 @@ export const FONT_OPTIONS: { family: string; stack: string; weights: number[] }[
   { family: 'Lora', stack: '"Lora", serif', weights: [400, 500, 600, 700] },
   { family: 'Great Vibes', stack: '"Great Vibes", cursive', weights: [400] },
 ];
+
+// ---------------------------------------------------------------------------
+// Letter case and per-role fonts (event title, participant/winner name, team)
+// ---------------------------------------------------------------------------
+
+export const TEXT_CASE_OPTIONS: { value: TextCase; label: string }[] = [
+  { value: 'upper', label: 'UPPERCASE' },
+  { value: 'title', label: 'Capitalize Each Word' },
+  { value: 'lower', label: 'lowercase' },
+  { value: 'none', label: 'As typed' },
+];
+
+export const applyTextCase = (text: string | null | undefined, mode: TextCase = 'none'): string => {
+  const value = String(text ?? '');
+  if (mode === 'upper') return value.toUpperCase();
+  if (mode === 'lower') return value.toLowerCase();
+  // "john O'NEIL-smith" -> "John O'neil-Smith": first letter of each word/hyphen part.
+  if (mode === 'title') return value.toLowerCase().replace(/(^|[\s\-\/(])(\p{L})/gu, (_m, sep, ch) => sep + ch.toUpperCase());
+  return value;
+};
+
+export interface TextRole { font: string; textCase: TextCase }
+
+/**
+ * Font + case for the three text roles. Fallbacks reproduce what each template rendered before
+ * these settings existed: poster title in the heading font, winner names and teams in the body
+ * font, all uppercase; certificate name in the heading font (uppercase), team as typed.
+ */
+export const resolveTextRoles = (type: BackgroundType, config: TemplateConfig): { title: TextRole; name: TextRole; team: TextRole } => {
+  const heading = config.fontFamily || 'Playfair Display';
+  const body = config.bodyFontFamily || 'Bricolage Grotesque';
+  const isCert = type === 'certificateBgs';
+  return {
+    title: { font: config.titleFontFamily || heading, textCase: config.titleCase || 'upper' },
+    name: { font: config.nameFontFamily || (isCert ? heading : body), textCase: config.nameCase || 'upper' },
+    team: { font: config.teamFontFamily || body, textCase: config.teamCase || (isCert ? 'none' : 'upper') },
+  };
+};
 
 export const fontStack = (family?: string): string => {
   const known = FONT_OPTIONS.find(f => f.family === family);
@@ -487,14 +525,18 @@ export const waitForImages = async (node: HTMLElement): Promise<void> => {
 export const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 
 /** Fonts (and weights) a config needs. */
-export const fontsForConfig = (config: TemplateConfig): { family: string; weight: number }[] => {
+export const fontsForConfig = (config: TemplateConfig, type: BackgroundType = 'posterBgs'): { family: string; weight: number }[] => {
   const title = config.fontFamily || 'Playfair Display';
   const body = config.bodyFontFamily || 'Bricolage Grotesque';
+  const roles = resolveTextRoles(type, config);
   return [
     { family: title, weight: config.fontWeight || 700 },
     { family: body, weight: 400 },
     { family: body, weight: 700 },
     { family: body, weight: 900 },
+    ...[roles.title.font, roles.name.font, roles.team.font].flatMap(family => [
+      { family, weight: 400 }, { family, weight: config.fontWeight || 700 }, { family, weight: 900 }
+    ]),
   ];
 };
 
@@ -557,6 +599,37 @@ export const downloadDataUrl = (dataUrl: string, fileName: string) => {
 };
 
 export const safeFileName = (s: string) => (s || 'export').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_');
+
+// ---------------------------------------------------------------------------
+// Text block placement (shared by every template, editor and export alike)
+// ---------------------------------------------------------------------------
+
+/** Margin kept on the side opposite the alignment edge, so text never touches the page edge. */
+export const OPPOSITE_EDGE_MARGIN = 48;
+
+/**
+ * Horizontal padding of the text block. "Side spacing" is the distance from the edge the text
+ * is aligned to: left-aligned text is spaced from the left edge, right-aligned text from the
+ * right edge, and the other side keeps only a small safe margin so the text can use the full
+ * width. Centred text is spaced equally on both sides.
+ * (Previously the spacing was applied to BOTH sides, which squeezed right-aligned text into a
+ * narrow column in the middle of the page.)
+ */
+export const contentPadding = (
+  align: 'left' | 'center' | 'right' | undefined,
+  spacing: number,
+  oppositeMargin = OPPOSITE_EDGE_MARGIN
+): { left: number; right: number } => {
+  const s = Math.max(0, Number(spacing) || 0);
+  const other = Math.min(oppositeMargin, s);
+  if (align === 'right') return { left: other, right: s };
+  if (align === 'left') return { left: s, right: other };
+  return { left: s, right: s };
+};
+
+/** Label for the spacing control, so it says which edge it measures from. */
+export const sideSpacingLabel = (align?: 'left' | 'center' | 'right') =>
+  align === 'right' ? 'Right Edge Spacing' : align === 'left' ? 'Left Edge Spacing' : 'Side Spacing (both sides)';
 
 // ---------------------------------------------------------------------------
 // Background scaling (shared by every template, editor and export alike)

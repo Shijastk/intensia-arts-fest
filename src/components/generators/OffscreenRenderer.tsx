@@ -24,6 +24,7 @@ import {
   waitForImages,
 } from '../../services/exportService';
 import { getProgramWinners } from '../../utils/resultsUtils';
+import { loadCustomFonts } from '../../services/customFontService';
 import { CertificateTemplate } from './CertificateTemplate';
 import { PosterTemplate } from './PosterTemplate';
 
@@ -56,7 +57,8 @@ export const prepareTemplate = async (
   festId: string,
   backgrounds?: BackgroundSettings | null
 ): Promise<PickedTemplate> => {
-  const bgs = backgrounds ?? await getBackgroundSettings(festId);
+  // Uploaded fonts must be registered before the template renders and fonts are awaited.
+  const [bgs] = await Promise.all([backgrounds ?? getBackgroundSettings(festId), loadCustomFonts(festId)]);
   const picked = pickTemplate(bgs, type);
   if (!picked.url) return picked;
   const dataUrl = await toDataUrl(picked.url);
@@ -98,7 +100,7 @@ export const exportCertificatesPdf = async (opts: {
   const { festId, items, fileName, onProgress } = opts;
   if (items.length === 0) throw new Error('No participants to export.');
   const template = await prepareTemplate('certificateBgs', festId, opts.backgrounds);
-  await ensureFonts(fontsForConfig(template.config));
+  await ensureFonts(fontsForConfig(template.config, 'certificateBgs'));
   const fontCSS: { value?: string } = {};
   let pdf: jsPDF | null = null;
   for (let i = 0; i < items.length; i++) {
@@ -122,7 +124,7 @@ export const exportPosterJpeg = async (opts: {
   const template = await prepareTemplate('posterBgs', festId, opts.backgrounds);
   if (!template.url) throw new Error('Upload a poster background in Publishing first.');
   const size = getTemplateSize('posterBgs', template.config);
-  await ensureFonts(fontsForConfig(template.config));
+  await ensureFonts(fontsForConfig(template.config, 'posterBgs'));
   const { node, dispose } = await renderOffscreen(
     <PosterTemplate backgroundUrl={template.url} eventName={program.name} category={program.category} winners={winners} config={template.config} />,
     size

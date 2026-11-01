@@ -34,7 +34,18 @@ export interface TemplateConfig {
   bodyTemplate?: string;
   festVenue?: string;
   festDates?: string;
+  /** Separate font per text role. Missing values fall back to fontFamily / bodyFontFamily. */
+  titleFontFamily?: string;   // poster event title
+  nameFontFamily?: string;    // poster winner names / certificate participant name
+  teamFontFamily?: string;    // poster team line / certificate team in the details line
+  /** Letter case per text role (default: the look the templates always had). */
+  titleCase?: TextCase;
+  nameCase?: TextCase;
+  teamCase?: TextCase;
 }
+
+/** upper = JOHN DOE, title = John Doe, lower = john doe, none = as typed. */
+export type TextCase = 'upper' | 'title' | 'lower' | 'none';
 
 export type BackgroundType = 'certificateBgs' | 'posterBgs' | 'studentCardBgs';
 
