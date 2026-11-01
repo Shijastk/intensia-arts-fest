@@ -78,8 +78,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         const targetState = !allInGR;
 
         const updatePromises = eligibleForGR.map(p => {
-          if (p.isPublished !== targetState) {
-            return updateProgram(p.id, { isPublished: targetState });
+          // Sending also clears a leftover judge allocation (these are all PENDING programs),
+          // so every sent program really shows up in the Green Room.
+          const stale = targetState && (p.isAllocatedToJudge || p.judgePanel);
+          if (p.isPublished !== targetState || stale) {
+            return updateProgram(p.id, stale
+              ? { isPublished: targetState, isAllocatedToJudge: false, judgePanel: null as any }
+              : { isPublished: targetState });
           }
           return Promise.resolve(true);
         });

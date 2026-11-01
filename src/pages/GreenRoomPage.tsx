@@ -190,7 +190,8 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
         .filter(p => {
             const isPublished = p?.isPublished === true;
             const hasParticipants = (p?.teams || []).some(t => (t?.participants?.length ?? 0) > 0);
-            const isPending = p?.status === ProgramStatus.PENDING && !p?.isAllocatedToJudge;
+            // Status decides (allocation always sets JUDGING); a leftover isAllocatedToJudge flag must not hide it.
+            const isPending = p?.status === ProgramStatus.PENDING;
             const matchesSearch = !searchTerm || p?.name.toLowerCase().includes(searchTerm.toLowerCase()) || p?.category.toLowerCase().includes(searchTerm.toLowerCase());
             return isPublished && hasParticipants && isPending && matchesSearch;
         })
@@ -262,7 +263,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                     {activeTab === 'PROGRAMS' && (
                         <div className="px-4 sm:px-5 py-2 bg-indigo-600 text-white rounded-xl text-center shadow-lg shadow-indigo-100 flex-shrink-0 flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-0">
                             <p className="text-[10px] font-black uppercase leading-none opacity-80">Active Queue</p>
-                            <p className="text-lg sm:text-xl font-black">{filteredPrograms.filter(p => !p?.isAllocatedToJudge && p?.status === ProgramStatus.PENDING).length}</p>
+                            <p className="text-lg sm:text-xl font-black">{filteredPrograms.filter(p => p?.status === ProgramStatus.PENDING).length}</p>
                         </div>
                     )}
                 </div>

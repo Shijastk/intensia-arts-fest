@@ -30,7 +30,9 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
 
     const teamsList = program?.teams || [];
     const allRevealed = teamsList.every(t => (t?.participants || []).every(pt => pt.isCodeRevealed));
-    const isPending = program.status === ProgramStatus.PENDING && !program.isAllocatedToJudge;
+    // Status decides: allocating to a judge always sets JUDGING, so a PENDING program is waiting
+    // even if an old isAllocatedToJudge flag was left behind.
+    const isPending = program.status === ProgramStatus.PENDING;
 
     const handleAllocate = () => {
         if (!selectedPanel) {
@@ -47,7 +49,7 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
         <div className={`bg-white rounded-2xl border overflow-hidden transition-all ${isPending ? 'border-slate-200 shadow-lg' : 'border-slate-100 opacity-60 grayscale'}`}>
             <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 border-b border-slate-100">
                 <div className="flex items-center space-x-5">
-                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black shadow-inner ${program.isAllocatedToJudge ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-indigo-600 text-white border border-indigo-700'}`}>
+                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black shadow-inner ${!isPending ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-indigo-600 text-white border border-indigo-700'}`}>
                         <span className="text-[9px] uppercase tracking-tighter opacity-80">Start</span>
                         <span className="text-base leading-none">{formatTime(program.startTime).slice(0, 5) || '--:--'}</span>
                         {formatTime(program.startTime).slice(6) && <span className="text-[8px] leading-none mt-0.5">{formatTime(program.startTime).slice(6)}</span>}
