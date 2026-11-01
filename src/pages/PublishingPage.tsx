@@ -16,6 +16,7 @@ import {
   mergeTemplateConfig,
   pickTemplate,
   sideSpacingLabel,
+  resolvePlacement,
   TEXT_CASE_OPTIONS,
   fontStack,
   resolveTextRoles,
@@ -436,8 +437,25 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                 <div className="pt-4 border-t border-slate-100">
                   <h3 className={sectionTitle}>Positioning</h3>
                   <div className="space-y-4">
-                    <RangeField label="Top Spacing" value={config.contentTop ?? 0} min={0} max={800} unit="px" onChange={(v) => update({ contentTop: v })} />
-                    <RangeField label={sideSpacingLabel(config.textAlign)} value={config.contentLeft ?? 0} min={0} max={400} unit="px" onChange={(v) => update({ contentLeft: v })} />
+                    {(() => {
+                      // Spacing is a % of the page, so it keeps its proportions on every page size and screen.
+                      const placement = resolvePlacement(type, config);
+                      return (
+                        <>
+                          <RangeField label="Top Spacing" value={placement.topPct} min={0} max={70} step={0.5} unit="%" onChange={(v) => update({ contentTopPct: v })} />
+                          <RangeField label={sideSpacingLabel(config.textAlign, placement.balanced)} value={placement.sidePct} min={0} max={40} step={0.5} unit="%" onChange={(v) => update({ contentSidePct: v })} />
+                          <label className="flex items-center justify-between gap-3 cursor-pointer">
+                            <span className="text-[10px] font-bold text-slate-700 uppercase">Balance both sides</span>
+                            <input type="checkbox" checked={placement.balanced} onChange={(e) => update({ balanceSides: e.target.checked })} className="w-4 h-4 accent-[#3B3BFA]" />
+                          </label>
+                          <p className="text-[10px] text-slate-500 -mt-2">
+                            {placement.balanced
+                              ? 'Left and right spacing are equal, whatever the alignment.'
+                              : config.textAlign === 'center' ? 'Centred text is always spaced equally on both sides.' : 'Spacing is measured from the edge the text is aligned to.'}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 

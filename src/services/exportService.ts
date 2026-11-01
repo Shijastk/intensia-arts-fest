@@ -628,8 +628,43 @@ export const contentPadding = (
 };
 
 /** Label for the spacing control, so it says which edge it measures from. */
-export const sideSpacingLabel = (align?: 'left' | 'center' | 'right') =>
-  align === 'right' ? 'Right Edge Spacing' : align === 'left' ? 'Left Edge Spacing' : 'Side Spacing (both sides)';
+export const sideSpacingLabel = (align?: 'left' | 'center' | 'right', balanced = false) =>
+  balanced || align === 'center' ? 'Side Spacing (both sides)' : align === 'right' ? 'Right Edge Spacing' : 'Left Edge Spacing';
+
+/** Safe margin on the side opposite the alignment edge, as % of the page width (48px on a 1080px poster). */
+export const OPPOSITE_EDGE_PCT = (OPPOSITE_EDGE_MARGIN / 1080) * 100;
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Where the text block sits, from page-relative spacing. Top spacing is a % of the page height,
+ * side spacing a % of the page width, so a design keeps its proportions on a portrait poster,
+ * a square poster or an A4 certificate, and in the scaled editor preview at any screen size.
+ * Configs saved with pixel values (contentTop / contentLeft) are converted, so they look the same.
+ * `balanceSides` keeps left and right spacing equal whatever the alignment.
+ */
+export const resolvePlacement = (
+  type: BackgroundType,
+  config: TemplateConfig,
+  pxOverrides: { contentTop?: number; contentLeft?: number } = {}
+) => {
+  const size = getTemplateSize(type, config);
+  const D = TEMPLATE_DEFAULTS[type];
+  const topPct = pxOverrides.contentTop !== undefined
+    ? (pxOverrides.contentTop / size.height) * 100
+    : config.contentTopPct ?? ((config.contentTop ?? D.contentTop ?? 0) / size.height) * 100;
+  const sidePct = pxOverrides.contentLeft !== undefined
+    ? (pxOverrides.contentLeft / size.width) * 100
+    : config.contentSidePct ?? ((config.contentLeft ?? D.contentLeft ?? 0) / size.width) * 100;
+  const top = (topPct / 100) * size.height;
+  const side = (sidePct / 100) * size.width;
+  const align = config.textAlign ?? D.textAlign;
+  const balanced = !!config.balanceSides;
+  const pad = balanced
+    ? { left: side, right: side }
+    : contentPadding(align, side, (OPPOSITE_EDGE_PCT / 100) * size.width);
+  return { size, top, pad, topPct: round1(topPct), sidePct: round1(sidePct), balanced };
+};
 
 // ---------------------------------------------------------------------------
 // Background scaling (shared by every template, editor and export alike)
