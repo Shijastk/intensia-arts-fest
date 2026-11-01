@@ -6,6 +6,7 @@ import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { downloadFestBackup } from '../utils/supremeAdminBackup';
+import { appDialog } from '../components/ui/AppDialog';
 
 export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string) => void }) => {
   const navigate = useNavigate();
@@ -52,27 +53,27 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
       await signInWithPopup(auth, googleProvider);
       if (!(await checkSuperAdmin())) {
         await signOut(auth);
-        alert('This Google account is not authorised for Supreme Admin access.');
+        appDialog.alert('This Google account is not authorised for Supreme Admin access.');
         return;
       }
       setIsAuthenticated(true);
       fetchData();
     } catch (err: any) {
-      alert('Supreme Admin Login Failed: ' + err.message);
+      appDialog.alert('Supreme Admin Login Failed: ' + err.message);
     }
   };
 
   const handleMigration = async () => {
     if (migrating) return;
-    if (!window.confirm('Run the security migration? It hashes every remaining plaintext staff password (staff keep their current passwords) and rebuilds the public results copy. It is safe to run more than once.')) return;
+    if (!await appDialog.confirm('Run the security migration? It hashes every remaining plaintext staff password (staff keep their current passwords) and rebuilds the public results copy. It is safe to run more than once.', { variant: 'warning', title: 'Run security migration', confirmText: 'Run migration' })) return;
     setMigrating(true);
     try {
       const migrate = httpsCallable(functions, 'migrateSecurity', { timeout: 540000 });
       const { data } = await migrate({});
-      alert('Migration finished:\n' + JSON.stringify(data, null, 2));
+      appDialog.alert('Migration finished:\n' + JSON.stringify(data, null, 2), { variant: 'success', title: 'Migration finished' });
       fetchData();
     } catch (err: any) {
-      alert('Migration failed: ' + (err?.message || 'Unknown error'));
+      appDialog.alert('Migration failed: ' + (err?.message || 'Unknown error'));
     } finally {
       setMigrating(false);
     }
@@ -120,31 +121,31 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
       await downloadFestBackup(festId, festName);
     } catch (error: any) {
       console.error('Fest backup export failed:', error);
-      alert(`Backup export failed: ${error?.message || 'Unknown error'}`);
+      appDialog.alert(`Backup export failed: ${error?.message || 'Unknown error'}`);
     } finally {
       setBackupFestId(null);
     }
   };
 
   const handleDeactivate = async (uid: string, currentStatus: boolean) => {
-    if (window.confirm(`Are you sure you want to ${currentStatus === false ? 'activate' : 'deactivate'} this user?`)) {
+    if (await appDialog.confirm(`Are you sure you want to ${currentStatus === false ? 'activate' : 'deactivate'} this user?`, { variant: currentStatus === false ? 'primary' : 'danger', title: currentStatus === false ? 'Activate user' : 'Deactivate user', confirmText: currentStatus === false ? 'Activate' : 'Deactivate' })) {
       try {
         await update(ref(db, `users/${uid}`), { isActive: currentStatus === false ? true : false });
         fetchData();
       } catch (error: any) {
-        alert("Action failed! Your Firebase Database rules are blocking writes. Please update the rules in Firebase Console first.");
+        appDialog.alert("Action failed! Your Firebase Database rules are blocking writes. Please update the rules in Firebase Console first.");
         console.error('Error updating status', error);
       }
     }
   };
 
   const handleDelete = async (uid: string, festId: string) => {
-    if (window.confirm('Are you SURE you want to completely DELETE this user? If they have a fest, it will be orphaned unless you delete it manually.')) {
+    if (await appDialog.confirm('Are you SURE you want to completely DELETE this user? If they have a fest, it will be orphaned unless you delete it manually.', { variant: 'danger', title: 'Delete user', confirmText: 'Delete user' })) {
       try {
         await remove(ref(db, `users/${uid}`));
         fetchData();
       } catch (error: any) {
-        alert("Action failed! Your Firebase Database rules are blocking deletes. Please update the rules in Firebase Console first.");
+        appDialog.alert("Action failed! Your Firebase Database rules are blocking deletes. Please update the rules in Firebase Console first.");
         console.error('Error deleting user', error);
       }
     }

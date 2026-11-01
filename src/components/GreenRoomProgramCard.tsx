@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { Program, ProgramStatus } from '../types';
+import { appDialog } from './ui/AppDialog';
+import { formatTime } from '../utils/timeUtils';
 
 interface GreenRoomProgramCardProps {
     program: Program;
@@ -32,7 +34,7 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
 
     const handleAllocate = () => {
         if (!selectedPanel) {
-            alert('Please select a Judge Panel first!');
+            appDialog.alert('Please select a Judge Panel first!', { title: 'Select a judge panel' });
             return;
         }
         setPrograms(prev => prev.map(p =>
@@ -47,7 +49,8 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
                 <div className="flex items-center space-x-5">
                     <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black shadow-inner ${program.isAllocatedToJudge ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-indigo-600 text-white border border-indigo-700'}`}>
                         <span className="text-[9px] uppercase tracking-tighter opacity-80">Start</span>
-                        <span className="text-base">{program.startTime?.split(' ')[1] || '--:--'}</span>
+                        <span className="text-base leading-none">{formatTime(program.startTime).slice(0, 5) || '--:--'}</span>
+                        {formatTime(program.startTime).slice(6) && <span className="text-[8px] leading-none mt-0.5">{formatTime(program.startTime).slice(6)}</span>}
                     </div>
                     <div>
                         <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">{program.name}</h3>
@@ -113,7 +116,7 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
                             return acc.concat(subTeams);
                         }, []).map((subTeam) => {
                             const representative = subTeam.participants[0];
-                            const isRevealed = subTeam.participants.every(p => p.isCodeRevealed);
+                            const isRevealed = (subTeam.participants || []).every(p => p.isCodeRevealed);
                             const codeLetter = representative?.codeLetter;
                             const uniqueKey = `${subTeam.teamId}-${representative?.chestNumber}`;
 
@@ -127,9 +130,9 @@ export const GreenRoomProgramCard: React.FC<GreenRoomProgramCardProps> = ({
                                     <div className="mt-8 w-full">
                                         <h4 className="text-lg font-black text-slate-900 leading-none uppercase truncate">{subTeam.teamName}</h4>
                                         <div className="flex flex-col items-center mt-2">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{subTeam.participants.length} Participants</span>
+                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{(subTeam.participants || []).length} Participants</span>
                                             <div className="flex flex-wrap justify-center gap-1 mt-2 max-h-20 overflow-y-auto">
-                                                {subTeam.participants.map(p => (
+                                                {(subTeam.participants || []).map(p => (
                                                     <span key={p.chestNumber} className="text-[9px] font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
                                                         {p.name.split(' ')[0]}
                                                     </span>

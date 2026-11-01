@@ -247,7 +247,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         );
       }
       case 'SETTINGS':
-        return <SettingsPage settings={settings} updateSettings={updateSettings} programs={programs} />;
+        return <SettingsPage settings={settings} updateSettings={updateSettings} programs={programs} updateProgram={updateProgram} />;
       default:
         return null;
     }

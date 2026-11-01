@@ -120,6 +120,26 @@ export const programService = {
     }
   },
 
+  /**
+   * Apply field updates to several programs atomically with ONE multi-path update on
+   * fests/{festId}/programs (paths like '<id>/startTime'). Throws on failure.
+   * Not for publish-state changes (use updateProgram, which assigns resultPublishedOrder).
+   */
+  batchUpdatePrograms: async (festId: string, changes: { id: string; updates: Partial<Program> }[]): Promise<boolean> => {
+    const payload: Record<string, any> = {};
+    changes.forEach(({ id, updates }) => {
+      Object.entries(cleanData(updates) || {}).forEach(([key, value]) => { payload[`${id}/${key}`] = value; });
+    });
+    if (Object.keys(payload).length === 0) return true;
+    try {
+      await update(ref(db, `fests/${festId}/programs`), payload);
+      return true;
+    } catch (error: any) {
+      console.error('Firebase batchUpdatePrograms failed:', { code: error?.code, message: error?.message, path: `fests/${festId}/programs` });
+      throw error;
+    }
+  },
+
   deleteProgram: async (festId: string, id: string): Promise<boolean> => {
     await remove(ref(db, `fests/${festId}/programs/${id}`));
     return true;

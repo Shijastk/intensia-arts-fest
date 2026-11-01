@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Program, ProgramStatus, CustomProgramScore, Team, Participant, Staff } from '../types';
-import { calculatePoints } from '../utils/pointsCalculator';
+import { collectScoreInputs, getGradeFromScore, rankProgramResults } from '../utils/pointsCalculator';
+
+const GRADE_OPTIONS = ['A+', 'A', 'B', 'C'];
 import { AdminRegistrationModal } from './AdminRegistrationModal';
 import { isSuperAdminUi } from '../services/sessionFlags';
+import { appDialog } from './ui/AppDialog';
 
 interface ProgramAccordionProps {
   program: Program;
@@ -47,30 +50,9 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
   const hasCodesGenerated = (program.teams || []).some(t => (t.participants || []).some(p => p.codeLetter || p.isCodeRevealed));
   const isUpcoming = program.startTime ? new Date(program.startTime).getTime() > Date.now() - 4 * 60 * 60 * 1000 : false;
 
-  // Custom alert / confirmation modal state
-  const [modalConfig, setModalConfig] = useState<{
-    isOpen: boolean;
-    type: 'alert' | 'confirm' | 'prompt';
-    title?: string;
-    message: string;
-    confirmText?: string;
-    confirmVariant?: 'danger' | 'warning' | 'primary';
-    defaultValue?: string;
-    onConfirm?: (value?: string) => void;
-  }>({
-    isOpen: false,
-    type: 'alert',
-    message: ''
-  });
-  const [promptValue, setPromptValue] = useState('');
-
+  // Alert / confirm / prompt helpers, rendered by the shared AppDialog (same styled modal).
   const showAlert = (message: string, title?: string) => {
-    setModalConfig({
-      isOpen: true,
-      type: 'alert',
-      title,
-      message
-    });
+    appDialog.alert(message, { title });
   };
 
   const showConfirm = (
@@ -80,15 +62,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     confirmVariant: 'danger' | 'warning' | 'primary' = 'primary',
     confirmText = 'Confirm'
   ) => {
-    setModalConfig({
-      isOpen: true,
-      type: 'confirm',
-      title,
-      message,
-      confirmText,
-      confirmVariant,
-      onConfirm
-    });
+    appDialog.confirm(message, { title, variant: confirmVariant, confirmText }).then(ok => { if (ok) onConfirm(); });
   };
 
   const showPrompt = (
@@ -97,17 +71,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     defaultValue: string,
     onConfirm: (value: string) => void
   ) => {
-    setPromptValue(defaultValue);
-    setModalConfig({
-      isOpen: true,
-      type: 'prompt',
-      title,
-      message,
-      confirmText: 'Save',
-      confirmVariant: 'primary',
-      defaultValue,
-      onConfirm: (val) => onConfirm(val || '')
-    });
+    appDialog.prompt(message, defaultValue, { title, variant: 'primary', confirmText: 'Save' }).then(value => { if (value !== null) onConfirm(value); });
   };
 
   const getStatusColor = (status: ProgramStatus) => {
@@ -161,13 +125,17 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
     setEditedTeams(program.teams || []);
   }, [program]);
 
-  const handleScoreEdit = (teamId: string, chestNumber: string, field: 'score' | 'grade', value: string) => {
+  const handleScoreEdit = (teamId: string, chestNumber: string, field: 'score' | 'grade', rawValue: string) => {
+    // A score change also sets the matching grade (as the judge screen does); the grade can
+    // still be changed afterwards with the grade selector.
+    const value = field === 'grade' ? rawValue.trim().toUpperCase() : rawValue;
+    const autoGrade = field === 'score' ? { grade: getGradeFromScore(Number(value) || 0) } : {};
     setEditedTeams(prev => prev.map(t => {
       if (t.id !== teamId) return t;
       if (!program.isGroup) {
         const updatedParticipants = (t.participants || []).map(p => {
           if (p.chestNumber === chestNumber) {
-            const updates: any = { [field]: field === 'grade' ? value : Number(value) };
+            const updates: any = { [field]: field === 'grade' ? value : Number(value), ...autoGrade };
             return { ...p, ...updates };
           }
           return p;
@@ -189,7 +157,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
 
         const updatedParticipants = pList.map((p, idx) => {
           if (idx >= startIndex && idx < endIndex) {
-            return { ...p, [field]: field === 'grade' ? value : Number(value) };
+            return { ...p, [field]: field === 'grade' ? value : Number(value), ...autoGrade };
           }
           return p;
         });
@@ -198,11 +166,19 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
         const updates: any = { participants: updatedParticipants };
         if (!isSplit) {
           updates[field] = field === 'grade' ? value : Number(value);
+          Object.assign(updates, autoGrade);
         }
         return { ...t, ...updates };
       }
     }));
   };
+
+  // While "Edit Results" is open, removals start from the edited (unsaved) teams.
+  const currentTeams = () => (isEditingScores ? editedTeams : (program.teams || []));
+  // A completed program is re-ranked after a removal so nobody keeps a stale rank or points.
+  const finalizeTeams = (teams: Team[]) => program.status === ProgramStatus.COMPLETED
+    ? rankProgramResults({ ...program, teams }, collectScoreInputs(teams), customScores?.[program.id])
+    : teams;
 
   const saveScores = async () => {
     if (!onUpdateProgram) {
@@ -210,45 +186,8 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
       return;
     }
 
-    let allParticipants = editedTeams.reduce((acc: any[], team) => acc.concat(
-      (team.participants || []).map(p => ({ ...p, teamId: team.id }))
-    ), []);
-
-    allParticipants.sort((a, b) => (b.score || 0) - (a.score || 0));
-
-    let currentRank = 1;
-    for (let i = 0; i < allParticipants.length; i++) {
-      if (i > 0 && (allParticipants[i].score || 0) < (allParticipants[i - 1].score || 0)) {
-        currentRank = i + 1;
-      }
-      allParticipants[i].rank = currentRank;
-      const customConfig = customScores?.[program.id];
-      allParticipants[i].points = calculatePoints(
-        allParticipants[i].score || 0, 
-        allParticipants[i].grade || '', 
-        program.isGroup, 
-        currentRank,
-        customConfig
-      );
-    }
-
-    const finalizedTeams = editedTeams.map(team => {
-      const updatedParticipants = (team.participants || []).map(p => {
-        const calc = allParticipants.find(ap => ap.chestNumber === p.chestNumber);
-        return calc ? { ...p, rank: calc.rank, points: calc.points } : p;
-      });
-
-      const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0] || {} as any);
-
-      return {
-        ...team,
-        participants: updatedParticipants,
-        score: bestParticipant?.score || 0,
-        grade: bestParticipant?.grade || '',
-        rank: bestParticipant?.rank || 0,
-        points: program.isGroup ? (updatedParticipants[0]?.points || 0) : updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0)
-      };
-    });
+    // Same ranking as the judge submission (per sub-team for group programs, absentees unranked).
+    const finalizedTeams = rankProgramResults({ ...program, teams: editedTeams }, collectScoreInputs(editedTeams), customScores?.[program.id]);
 
     const success = await onUpdateProgram(program.id, { teams: finalizedTeams });
     if (success) {
@@ -336,8 +275,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
             });
 
             await Promise.all(updatePromises);
-            setModalConfig(prev => ({ ...prev, isOpen: false }));
-            setTimeout(() => alert('Participant name updated globally!'), 100);
+            appDialog.alert('Participant name updated globally!', { variant: 'success', title: 'Name updated' });
           },
           'warning',
           'Rename Everywhere'
@@ -615,20 +553,21 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                     'Remove Participant',
                                     `Are you sure you want to remove ${participant.name} from this program?`,
                                     async () => {
-                                      const team = (program.teams || []).find(t => t.id === participant.teamId);
+                                      const team = currentTeams().find(t => t.id === participant.teamId);
                                       if (team) {
                                         const newParticipants = (team.participants || []).filter(p => p.chestNumber !== participant.chestNumber);
                                         let newTeams;
                                         if (newParticipants.length === 0) {
-                                          newTeams = (program.teams || []).filter(t => t.id !== participant.teamId);
+                                          newTeams = currentTeams().filter(t => t.id !== participant.teamId);
                                         } else {
-                                          newTeams = (program.teams || []).map(t =>
+                                          newTeams = currentTeams().map(t =>
                                             t.id === participant.teamId ? { ...t, participants: newParticipants } : t
                                           );
                                         }
                                         if (onUpdateProgram) {
-                                          await onUpdateProgram(program.id, { teams: newTeams });
-                                          setEditedTeams(newTeams);
+                                          const finalTeams = finalizeTeams(newTeams);
+                                          await onUpdateProgram(program.id, { teams: finalTeams });
+                                          setEditedTeams(finalTeams);
                                         }
                                       }
                                     },
@@ -666,12 +605,14 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           </td>
                           <td className="py-3 px-4 text-center align-top pt-2.5">
                             {isEditingScores ? (
-                              <input
-                                type="text"
-                                className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-bold uppercase focus:ring-2 focus:ring-indigo-500 outline-none"
+                              <select
+                                className="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
                                 value={participant.grade || ''}
                                 onChange={(e) => handleScoreEdit(participant.teamId, participant.chestNumber, 'grade', e.target.value)}
-                              />
+                              >
+                                <option value="">-</option>
+                                {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                              </select>
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
                                 <span className="font-black text-emerald-600 text-sm">{participant.grade || '-'}</span>
@@ -732,7 +673,7 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           <td className="py-3 px-4 align-top">
                             <p className="font-bold text-slate-700 text-xs uppercase">{team.displayName}</p>
                             <div className="flex flex-col gap-1 mt-1.5">
-                              {team.participants.map((p: any, idx: number) => (
+                              {(team.participants || []).map((p: any, idx: number) => (
                                 <div key={idx} className="group/member flex items-center justify-between text-xs text-slate-500 hover:text-slate-700 transition-colors py-0.5">
                                   <div className="flex items-center gap-1.5 group/name">
                                     <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
@@ -758,20 +699,21 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                           'Remove Participant',
                                           `Are you sure you want to remove ${p.name} from this team?`,
                                           async () => {
-                                            const teamToUpdate = (program.teams || []).find(t => t.id === team.id);
+                                            const teamToUpdate = currentTeams().find(t => t.id === team.id);
                                             if (teamToUpdate) {
-                                              const newParticipants = teamToUpdate.participants.filter(pt => pt.chestNumber !== p.chestNumber);
+                                              const newParticipants = (teamToUpdate.participants || []).filter(pt => pt.chestNumber !== p.chestNumber);
                                               let newTeams;
                                               if (newParticipants.length === 0) {
-                                                newTeams = (program.teams || []).filter(t => t.id !== team.id);
+                                                newTeams = currentTeams().filter(t => t.id !== team.id);
                                               } else {
-                                                newTeams = (program.teams || []).map(t => 
+                                                newTeams = currentTeams().map(t => 
                                                   t.id === team.id ? { ...t, participants: newParticipants } : t
                                                 );
                                               }
                                               if (onUpdateProgram) {
-                                                await onUpdateProgram(program.id, { teams: newTeams });
-                                                setEditedTeams(newTeams);
+                                                const finalTeams = finalizeTeams(newTeams);
+                                                await onUpdateProgram(program.id, { teams: finalTeams });
+                                                setEditedTeams(finalTeams);
                                               }
                                             }
                                           },
@@ -796,10 +738,11 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                                     'Remove Team',
                                     `Are you sure you want to remove ${team.displayName} from this program?`,
                                     async () => {
-                                      const newTeams = (program.teams || []).filter(t => t.id !== team.id);
+                                      const newTeams = currentTeams().filter(t => t.id !== team.id);
                                       if (onUpdateProgram) {
-                                        await onUpdateProgram(program.id, { teams: newTeams });
-                                        setEditedTeams(newTeams);
+                                        const finalTeams = finalizeTeams(newTeams);
+                                        await onUpdateProgram(program.id, { teams: finalTeams });
+                                        setEditedTeams(finalTeams);
                                       }
                                     },
                                     'danger',
@@ -833,12 +776,14 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                           </td>
                           <td className="py-3 px-4 text-center align-top pt-2.5">
                             {isEditingScores ? (
-                              <input
-                                type="text"
-                                className="w-14 text-center bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-bold uppercase focus:ring-2 focus:ring-indigo-500 outline-none"
+                              <select
+                                className="w-16 text-center bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
                                 value={team.displayGrade || ''}
                                 onChange={(e) => handleScoreEdit(team.id, team.participants[0].chestNumber, 'grade', e.target.value)}
-                              />
+                              >
+                                <option value="">-</option>
+                                {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                              </select>
                             ) : (
                               program.status === ProgramStatus.COMPLETED ? (
                                 <span className="font-black text-emerald-600 text-sm">{team.displayGrade || '-'}</span>
@@ -862,81 +807,6 @@ export const ProgramAccordion: React.FC<ProgramAccordionProps> = ({
                   )}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Styled Modern Custom Modal (Alert / Confirm) */}
-      {modalConfig.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 transform transition-all">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                modalConfig.confirmVariant === 'danger' ? 'bg-rose-100 text-rose-600' :
-                modalConfig.confirmVariant === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'
-              }`}>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-slate-900">{modalConfig.title || 'Notification'}</h4>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 mb-5 leading-relaxed pl-1">{modalConfig.message}</p>
-            
-            {modalConfig.type === 'prompt' && (
-              <div className="mb-5">
-                <input
-                  type="text"
-                  autoFocus
-                  value={promptValue}
-                  onChange={(e) => setPromptValue(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      if (modalConfig.onConfirm) modalConfig.onConfirm(promptValue);
-                      setModalConfig(prev => ({ ...prev, isOpen: false }));
-                    }
-                  }}
-                />
-              </div>
-            )}
-            
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              {(modalConfig.type === 'confirm' || modalConfig.type === 'prompt') && (
-                <button
-                  type="button"
-                  onClick={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
-                  className="px-3.5 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (modalConfig.onConfirm) {
-                    if (modalConfig.type === 'prompt') {
-                      modalConfig.onConfirm(promptValue);
-                    } else {
-                      modalConfig.onConfirm();
-                    }
-                  }
-                  setModalConfig(prev => ({ ...prev, isOpen: false }));
-                }}
-                className={`px-3.5 py-1.5 text-xs font-bold text-white rounded-lg transition-colors cursor-pointer shadow-sm ${
-                  modalConfig.confirmVariant === 'danger'
-                    ? 'bg-rose-600 hover:bg-rose-700'
-                    : modalConfig.confirmVariant === 'warning'
-                    ? 'bg-amber-600 hover:bg-amber-700'
-                    : 'bg-indigo-600 hover:bg-indigo-700'
-                }`}
-              >
-                {modalConfig.type === 'confirm' ? (modalConfig.confirmText || 'Confirm') : 'OK'}
-              </button>
             </div>
           </div>
         </div>

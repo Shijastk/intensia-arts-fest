@@ -55,7 +55,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
             <tbody>
               {stats.sortedTeams.map((team, idx) => (
                 <tr key={team.name} className="border-b border-gray-300 last:border-0">
-                  <td className="py-2 font-bold">{idx + 1}. {team.name}</td>
+                  <td className="py-2 font-bold">{team.position ?? idx + 1}. {team.name}</td>
                   <td className="py-2 text-right font-bold text-lg">{team.score.toFixed(1)}</td>
                 </tr>
               ))}
@@ -118,7 +118,7 @@ export const ConsolidationView: React.FC<ConsolidationViewProps> = ({ programs }
             <tbody>
               {stats.top15.length > 0 ? stats.top15.map((cand, idx) => (
                 <tr key={cand.chestNumber} className="hover:bg-gray-50">
-                  <td className="border border-black p-2 text-center font-bold">{idx + 1}</td>
+                  <td className="border border-black p-2 text-center font-bold">{cand.position ?? idx + 1}</td>
                   <td className="border border-black p-2 font-mono">{cand.chestNumber}</td>
                   <td className="border border-black p-2 font-bold uppercase">{cand.name}</td>
                   <td className="border border-black p-2 uppercase text-gray-700">{cand.teamName}</td>

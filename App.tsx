@@ -16,6 +16,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useStaffs } from './src/hooks/useStaffs';
 import { useSettings } from './src/hooks/useSettings';
 import { setSuperAdminUi } from './src/services/sessionFlags';
+import { AppDialogHost } from './src/components/ui/AppDialog';
 
 // ---> NEW IMPORT: Marketing Page <---
 import { MarketingPage } from './src/pages/MarketingPage';
@@ -132,6 +133,8 @@ export default function App() {
   }
 
   return (
+    <>
+    <AppDialogHost />
     <HashRouter>
       <Routes>
         <Route path="/maintenance" element={<MaintenancePage />} />
@@ -206,5 +209,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>
+    </>
   );
 }

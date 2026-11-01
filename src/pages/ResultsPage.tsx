@@ -3,56 +3,11 @@ import { Program, ProgramStatus } from '../types';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../hooks/useSettings';
 import { getBackgroundSettings, BackgroundSettings } from '../services/backgroundService';
-import { PosterTemplate, WinnerDetails } from '../components/generators/PosterTemplate';
-import { toJpeg } from 'html-to-image';
+import { getBackgroundMap } from '../services/exportService';
+import { appDialog } from '../components/ui/AppDialog';
 import { calculateConsolidatedResults } from '../utils/consolidationCalc';
+import { getProgramWinners, getProgramZone, ProgramWinner } from '../utils/resultsUtils';
 
-const extractZone = (category: string): string => {
-  const catLower = category.toLowerCase();
-  if (catLower.includes('a zone')) return 'A';
-  if (catLower.includes('b zone')) return 'B';
-  if (catLower.includes('c zone')) return 'C';
-  return 'General';
-};
-
-const getGroupResults = (teams: any[]) => {
-  const results = teams.filter(t => (t.rank && t.rank > 0) || (t.points && t.points > 0)).map(team => {
-    return {
-      name: team.teamName,
-      teamName: team.teamName,
-      points: team.points || 0,
-      rank: team.rank || 999,
-      score: team.score || 0,
-      grade: team.grade || ''
-    };
-  });
-  return results.sort((a, b) => {
-    if (a.rank !== b.rank) return a.rank - b.rank;
-    return b.points - a.points;
-  }).slice(0, 3);
-};
-
-const getIndividualResults = (teams: any[]) => {
-  const participants: any[] = [];
-  teams.forEach(team => {
-    team.participants?.forEach((p: any) => {
-      if ((p.rank && p.rank > 0) || (p.points && p.points > 0)) {
-        participants.push({
-          name: p.name,
-          teamName: team.teamName,
-          points: p.points || 0,
-          rank: p.rank || 999,
-          score: p.score || 0,
-          grade: p.grade || ''
-        });
-      }
-    });
-  });
-  return participants.sort((a, b) => {
-    if (a.rank !== b.rank) return a.rank - b.rank;
-    return b.points - a.points;
-  }).slice(0, 3);
-};
 
 interface ResultsPageProps {
   programs: Program[];
@@ -64,8 +19,6 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
   const [activeSlide, setActiveSlide] = useState(0);
   const [backgrounds, setBackgrounds] = useState<BackgroundSettings | null>(null);
   const [isGeneratingPoster, setIsGeneratingPoster] = useState(false);
-  const [posterRenderItem, setPosterRenderItem] = useState<any>(null);
-  const posterResolveRef = useRef<(() => void) | null>(null);
 
   const { settings } = useSettings(festId || null);
   const showOverallPoints = settings?.showOverallLeaderboardInPublic === true;
@@ -75,7 +28,7 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
     getBackgroundSettings(festId).then(bgs => setBackgrounds(bgs));
   }, [festId]);
 
-  const hasPosterBg = backgrounds?.posterBgs && Object.keys(backgrounds.posterBgs).length > 0;
+  const hasPosterBg = Object.keys(getBackgroundMap(backgrounds, 'posterBgs')).length > 0;
 
   const completedPrograms = useMemo(
     () => {
@@ -98,72 +51,21 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
 
   const latestPrograms = useMemo(() => completedPrograms.slice(0, 5), [completedPrograms]);
 
-  const getWinnersForProgram = (program: Program): WinnerDetails[] => {
-    const results: WinnerDetails[] = [];
-    if (program.isGroup) {
-      (program.teams || [])
-        .filter(t => t.rank && t.rank >= 1 && t.rank <= 3)
-        .sort((a, b) => (a.rank || 99) - (b.rank || 99))
-        .slice(0, 3)
-        .forEach(t => results.push({ place: t.rank as 1|2|3, name: t.teamName, team: '' }));
-    } else {
-      const allParts: any[] = [];
-      (program.teams || []).forEach(t =>
-        (t.participants || []).forEach(p => allParts.push({ ...p, teamName: t.teamName }))
-      );
-      allParts
-        .filter(p => p.rank && p.rank >= 1 && p.rank <= 3)
-        .sort((a, b) => (a.rank || 99) - (b.rank || 99))
-        .slice(0, 3)
-        .forEach(p => results.push({ place: p.rank as 1|2|3, name: p.name, team: p.teamName }));
-    }
-    return results;
-  };
-
+  // Shared with the admin "Download Poster" button and the public page (OffscreenRenderer):
+  // same template selection, winners (all ties), fonts and render settings.
   const generateAndDownloadPoster = async (program: Program) => {
-    if (isGeneratingPoster || !hasPosterBg || !backgrounds) return;
-    const bgId = Object.keys(backgrounds.posterBgs!)[0];
-    const bgUrlOriginal = backgrounds.posterBgs![bgId];
-    const config = backgrounds.configs?.[bgId];
-
-    const winners = getWinnersForProgram(program);
-    if (winners.length === 0) return;
-
+    if (isGeneratingPoster || !hasPosterBg || !festId) return;
     setIsGeneratingPoster(true);
-
-    // Convert to base64 to avoid CORS issues
-    let bgUrl = bgUrlOriginal;
     try {
-      const res = await fetch(bgUrlOriginal);
-      const blob = await res.blob();
-      bgUrl = await new Promise<string>(resolve => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) { /* use original url */ }
-
-    setPosterRenderItem({ program, winners, config, bgUrl });
-    // Wait for DOM render
-    await new Promise<void>(resolve => { posterResolveRef.current = resolve; });
-
-    const element = document.getElementById('results-poster-render');
-    if (element) {
-      try {
-        const imgData = await toJpeg(element, {
-          quality: 0.95, pixelRatio: 1,
-          style: { transform: 'scale(1)', transformOrigin: 'top left' }
-        });
-        const link = document.createElement('a');
-        link.download = `${program.name.replace(/\s+/g, '_')}_Winner_Poster.jpg`;
-        link.href = imgData;
-        link.click();
-      } catch (e) { console.error('Poster generation failed', e); }
+      // Loaded on demand so the public bundle does not carry jsPDF/html-to-image up front.
+      const { exportPosterJpeg } = await import('../components/generators/OffscreenRenderer');
+      await exportPosterJpeg({ festId, program, backgrounds });
+    } catch (e: any) {
+      console.error('Poster generation failed', e);
+      appDialog.alert(`Could not generate the poster: ${e?.message || 'Unknown error'}`, { variant: 'danger', title: 'Poster failed' });
+    } finally {
+      setIsGeneratingPoster(false);
     }
-
-    setPosterRenderItem(null);
-    posterResolveRef.current = null;
-    setIsGeneratingPoster(false);
   };
 
   const carouselItems = useMemo(() => {
@@ -193,36 +95,35 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
       );
     }
     if (selectedZone !== 'All') {
-      filtered = filtered.filter(p => extractZone(p.category) === selectedZone);
+      filtered = filtered.filter(p => getProgramZone(p) === selectedZone);
     }
     return filtered;
   }, [completedPrograms, searchQuery, selectedZone]);
 
   const availableZones = useMemo(() => {
     const zones = new Set<string>();
-    completedPrograms.forEach(p => zones.add(extractZone(p.category)));
+    completedPrograms.forEach(p => zones.add(getProgramZone(p)));
     return Array.from(zones).sort();
   }, [completedPrograms]);
 
-  const getWinnerNode = (results: any[], targetRank: number) => {
-    const winner = results.find(r => r.rank === targetRank);
-    if (!winner) return <span className="text-slate-300 text-xs italic">-</span>;
+  const getWinnerNode = (results: ProgramWinner[], targetRank: number) => {
+    // Every entry sharing this place is shown (ties use competition ranking: 1, 1, 3).
+    const tied = results.filter(r => r.rank === targetRank);
+    if (tied.length === 0) return <span className="text-slate-300 text-xs italic">-</span>;
     return (
-      <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-black text-slate-900 truncate max-w-[200px]" title={winner.name}>{winner.name}</span>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate max-w-[200px]">{winner.teamName}</span>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {winner.grade && (
-             <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-widest">
-               {winner.grade}
-             </span>
-          )}
-          {winner.points > 0 && (
-             <span className="text-[10px] font-bold text-slate-500">
-               {winner.points} Pts
-             </span>
-          )}
-        </div>
+      <div className="flex flex-col gap-2">
+        {tied.map((winner, i) => (
+          <div key={`${winner.chestNumber || winner.name}-${i}`} className="flex flex-col gap-0.5">
+            <span className="text-sm font-black text-slate-900 truncate max-w-[200px]" title={winner.name}>{winner.name}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate max-w-[200px]">{winner.teamName}</span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {winner.grade && (
+                <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-widest">{winner.grade}</span>
+              )}
+              {winner.points > 0 && <span className="text-[10px] font-bold text-slate-500">{winner.points} Pts</span>}
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
@@ -322,9 +223,7 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
               }
 
               const program = item.data;
-              const results = program.isGroup 
-                ? getGroupResults(program.teams || [])
-                : getIndividualResults(program.teams || []);
+              const results = getProgramWinners(program);
 
               return (
                 <div key={program.id} className="w-full flex flex-col lg:flex-row items-center justify-between bg-white/70 backdrop-blur-2xl p-8 lg:p-12 rounded-[2rem] shadow-2xl shadow-slate-200/50 transition-all duration-700 animate-fade-in border border-white">
@@ -400,9 +299,7 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
                     </div>
                     <div className="block md:grid md:grid-cols-2 lg:block divide-y md:divide-y-0 lg:divide-y divide-slate-100 md:gap-4 lg:gap-0 md:p-4 lg:p-0">
                         {filteredPrograms.map((program) => {
-                            const results = program.isGroup 
-                                ? getGroupResults(program.teams || [])
-                                : getIndividualResults(program.teams || []);
+                            const results = getProgramWinners(program);
                             
                             return (
                                 <div key={program.id} className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-4 px-6 py-5 hover:bg-slate-50/50 transition-colors group md:bg-white md:border md:border-slate-100 md:rounded-[1.5rem] md:shadow-sm lg:bg-transparent lg:border-0 lg:rounded-none lg:shadow-none">
@@ -489,31 +386,6 @@ export const ResultsPage: React.FC<ResultsPageProps & { festId?: string }> = ({ 
         </div>
       )}
 
-      {/* Hidden poster render container */}
-      <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', zIndex: -1, pointerEvents: 'none', opacity: 0 }}>
-        {posterRenderItem && (
-          <div
-            id="results-poster-render"
-            ref={(el) => { if (el && posterResolveRef.current) { setTimeout(posterResolveRef.current, 150); } }}
-          >
-            <PosterTemplate
-              backgroundUrl={posterRenderItem.bgUrl}
-              eventName={posterRenderItem.program.name}
-              category={posterRenderItem.program.category}
-              winners={posterRenderItem.winners}
-              contentTop={posterRenderItem.config?.contentTop}
-              contentLeft={posterRenderItem.config?.contentLeft}
-              textAlign={posterRenderItem.config?.textAlign}
-              textColor={posterRenderItem.config?.textColor}
-              secondaryColor={posterRenderItem.config?.secondaryColor}
-              posterSize={posterRenderItem.config?.posterSize}
-              bgPositionX={posterRenderItem.config?.bgPositionX}
-              bgPositionY={posterRenderItem.config?.bgPositionY}
-              bgScale={posterRenderItem.config?.bgScale}
-            />
-          </div>
-        )}
-      </div>
     </div>
   );
 };

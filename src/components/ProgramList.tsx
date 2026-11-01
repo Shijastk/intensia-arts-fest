@@ -1,13 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { Program, ProgramStatus, ParticipantSummary, CustomProgramScore, Staff } from '../types';
 import { ProgramAccordion } from './ProgramAccordion';
-import { Users, Award, LayoutTemplate, Download } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import { toJpeg } from 'html-to-image';
-import { getBackgroundSettings } from '../services/backgroundService';
-import { CertificateTemplate } from './generators/CertificateTemplate';
-import { StudentCardBatchTemplate } from './generators/StudentCardBatchTemplate';
-import { PosterTemplate, WinnerDetails } from './generators/PosterTemplate';
+import { aggregateParticipants, buildCertificateData, cleanFestName, safeFileName, toParticipantSummary } from '../services/exportService';
+import { exportCertificatesPdf, exportPosterJpeg } from './generators/OffscreenRenderer';
+import { appDialog } from './ui/AppDialog';
+import { compareScheduleTimes } from '../utils/timeUtils';
 
 interface ProgramListProps {
     programs: Program[];
@@ -28,20 +25,9 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null);
     const [cancelProgramId, setCancelProgramId] = useState<string | null>(null);
     const [exportProgress, setExportProgress] = useState<{ current: number, total: number, label: string } | null>(null);
-    const [exportItem, setExportItem] = useState<any>(null);
     const [isExporting, setIsExporting] = useState(false);
 
-    const participantSummaries: ParticipantSummary[] = useMemo(() => {
-        const map = new Map<string, ParticipantSummary>();
-        (programs || []).forEach(prog => (prog.teams || []).forEach(team => (team.participants || []).forEach(p => {
-            if (!map.has(p.chestNumber)) map.set(p.chestNumber, { name: p.name, chestNumber: p.chestNumber, teamName: team.teamName, programCount: 0, programNames: [], achievements: [], totalWins: 0 });
-            const summary = map.get(p.chestNumber)!;
-            summary.programCount++; summary.programNames.push(prog.name);
-            if (team.rank === 1) summary.totalWins++;
-            if (team.rank) summary.achievements.push({ programName: prog.name, rank: team.rank });
-        })));
-        return Array.from(map.values());
-    }, [programs]);
+    const participantSummaries: ParticipantSummary[] = useMemo(() => aggregateParticipants(programs || []).map(toParticipantSummary), [programs]);
 
     const selectedParticipant = useMemo(() => selectedParticipantName ? participantSummaries.find(p => p.name === selectedParticipantName) : null, [selectedParticipantName, participantSummaries]);
 
@@ -50,7 +36,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         .filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
         .sort((a, b) => {
             if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
-            if (sortBy === 'time') return (a.startTime || '').localeCompare(b.startTime || '');
+            if (sortBy === 'time') return compareScheduleTimes(a.startTime, b.startTime);
             return (a.category || '').localeCompare(b.category || '');
         }), [programs, filter, searchTerm, sortBy]);
 
@@ -59,16 +45,16 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     // which left the delete button doing nothing.)
     const handleDeleteRequest = async (id: string) => {
         const program = programs.find(p => p.id === id);
-        if (program?.isAllocatedToJudge || program?.status === ProgramStatus.JUDGING) return alert('Cannot delete: This program has been allocated to a Judge Panel. You cannot delete an active judging program.');
+        if (program?.isAllocatedToJudge || program?.status === ProgramStatus.JUDGING) return appDialog.alert('This program has been allocated to a Judge Panel. You cannot delete an active judging program.', { variant: 'warning', title: 'Cannot delete program' });
         const programName = program?.name || 'this program';
         if (deleteProgram) {
-            if (!(await deleteProgram(id))) alert(`Failed to delete "${programName}" from the database. Please try again.`);
+            if (!(await deleteProgram(id))) appDialog.alert(`Failed to delete "${programName}" from the database. Please try again.`, { variant: 'danger', title: 'Delete failed' });
         } else setPrograms(p => p.filter(x => x.id !== id));
     };
 
     const handleStatusUpdate = async (id: string, newStatus: ProgramStatus) => {
         const program = programs.find(p => p.id === id); if (!program) return;
-        if (newStatus === ProgramStatus.CANCELLED && program.isAllocatedToJudge) return alert('Cannot cancel: This program has been allocated to a Judge Panel. Please recall it from the judge panel first.');
+        if (newStatus === ProgramStatus.CANCELLED && program.isAllocatedToJudge) return appDialog.alert('This program has been allocated to a Judge Panel. Please recall it from the judge panel first.', { variant: 'warning', title: 'Cannot cancel program' });
         if (updateProgram) {
             const updates: Partial<Program> = { status: newStatus };
             if (newStatus === ProgramStatus.PENDING) { updates.isAllocatedToJudge = false; updates.judgePanel = null as any; }
@@ -82,7 +68,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         const newPublishedState = !program.isPublished;
         const updates: Partial<Program> = { isPublished: newPublishedState };
         if (!newPublishedState && (program.status === ProgramStatus.JUDGING || program.status === ProgramStatus.COMPLETED)) {
-            if (!window.confirm('Recalling this program will remove it from the judge\'s panel/Green Room and reset it to PENDING. Continue?')) return;
+            if (!await appDialog.confirm('Recalling this program will remove it from the judge\'s panel/Green Room and reset it to PENDING. Continue?', { variant: 'warning', title: 'Recall program', confirmText: 'Recall' })) return;
             updates.status = ProgramStatus.PENDING; updates.isAllocatedToJudge = false; updates.isResultPublished = false;
         }
         if (updateProgram) { if (!(await updateProgram(id, updates))) console.error('Failed to update publish status'); }
@@ -108,20 +94,54 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         }
     };
 
-    // The rest of this component is intentionally kept identical in behavior for
-    // certificates/posters/participant tools. Only result publication ordering is changed.
-    const getBase64Image = async (url: string) => { try { const response = await fetch(url); const blob = await response.blob(); return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result as string); reader.onerror = reject; reader.readAsDataURL(blob); }); } catch (e) { return url; } };
+    // Program-level exports (ProgramAccordion "Print Certificates" / "Download Poster").
+    // Both reuse the shared exportService/OffscreenRenderer pipeline used everywhere else.
+    const handlePrintProgramCertificates = async (programId: string) => {
+      if (isExporting) return;
+      const program = programs.find(p => p.id === programId);
+      if (!program) return;
+      const festId = program.festId || programs[0]?.festId;
+      if (!festId) return;
+      const inProgram = new Set((program.teams || []).flatMap(t => (t.participants || []).map(pt => pt.chestNumber)));
+      const items = aggregateParticipants([program])
+        .filter(a => inProgram.has(a.chestNumber))
+        .map(a => buildCertificateData(a, cleanFestName(festId), program.id));
+      if (items.length === 0) return appDialog.alert('This program has no participants to print certificates for.', { variant: 'warning', title: 'No participants' });
+      setIsExporting(true);
+      setExportProgress({ current: 0, total: items.length, label: 'Preparing template...' });
+      try {
+        await exportCertificatesPdf({
+          festId,
+          items,
+          fileName: `${safeFileName(program.name)}_Certificates.pdf`,
+          onProgress: (current, total) => setExportProgress({ current, total, label: 'Certificates' }),
+        });
+      } catch (e: any) {
+        console.error('Certificate export failed:', e);
+        appDialog.alert(`Could not generate certificates: ${e?.message || 'Unknown error'}`, { variant: 'danger', title: 'Export failed' });
+      } finally {
+        setExportProgress(null);
+        setIsExporting(false);
+      }
+    };
 
-    // Existing export helpers are retained below; their implementation does not affect result ordering.
-    const generateBulkCertificates = async () => {
-      if (isExporting) return; const participants = participantSummaries; if (participants.length === 0) return alert('No participants found.');
-      setIsExporting(true); const festId = programs[0]?.festId; if (!festId) { setIsExporting(false); return; }
-      const backgrounds = await getBackgroundSettings(festId); const bgId = Object.keys(backgrounds?.certificateBgs || {})[0]; const bgUrlOriginal = bgId ? backgrounds!.certificateBgs[bgId] : undefined; const config = bgId ? backgrounds!.configs?.[bgId] : (backgrounds?.configs?.['blank'] || {});
-      if (!backgrounds) { alert('Unable to fetch configurations.'); setIsExporting(false); return; }
-      setExportProgress({ current: 0, total: participants.length, label: 'Fetching Template...' }); const bgUrl = await getBase64Image(bgUrlOriginal);
-      const pdf = new jsPDF('p', 'px', [794, 1123]);
-      for (let i = 0; i < participants.length; i++) { setExportProgress({ current: i + 1, total: participants.length, label: 'Certificates' }); const rawFestId = programs[0]?.festId || 'Arts Fest'; const festParts = rawFestId.split('-'); const cleanFestName = (festParts.length > 1 ? festParts.slice(0, -1).join(' ') : rawFestId).toUpperCase(); const pData = { participantName: participants[i].name, chestNo: participants[i].chestNumber, team: participants[i].teamName, category: cleanFestName, events: participants[i].programNames, festName: cleanFestName }; setExportItem({ type: 'certificate', data: pData, bgUrl, config }); await new Promise(resolve => setTimeout(resolve, 100)); const element = document.getElementById('export-render-container'); if (element) { try { const imgData = await toJpeg(element, { quality: 0.8, pixelRatio: 1.5, style: { transform: 'scale(1)', transformOrigin: 'top left' } }); if (i > 0) pdf.addPage([794, 1123], 'p'); pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123); } catch (e) { console.error('Error generating image:', e); } } }
-      pdf.save('Bulk_Certificates.pdf'); setExportProgress(null); setExportItem(null); setIsExporting(false);
+    const handleDownloadProgramPoster = async (programId: string) => {
+      if (isExporting) return;
+      const program = programs.find(p => p.id === programId);
+      if (!program) return;
+      const festId = program.festId || programs[0]?.festId;
+      if (!festId) return;
+      setIsExporting(true);
+      setExportProgress({ current: 0, total: 1, label: 'Poster' });
+      try {
+        await exportPosterJpeg({ festId, program });
+      } catch (e: any) {
+        console.error('Poster export failed:', e);
+        appDialog.alert(`Could not generate the poster: ${e?.message || 'Unknown error'}`, { variant: 'danger', title: 'Export failed' });
+      } finally {
+        setExportProgress(null);
+        setIsExporting(false);
+      }
     };
 
     return (<>
@@ -132,7 +152,23 @@ export const ProgramList: React.FC<ProgramListProps> = ({
             <select value={filter} onChange={e => setFilter(e.target.value as any)} className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide text-slate-700 outline-none cursor-pointer"><option value="ALL">All States</option>{Object.values(ProgramStatus).map(s => <option key={s} value={s}>{s}</option>)}</select>
           </div>
         </div>
-        <div className="space-y-3">{filteredPrograms.map(prog => <ProgramAccordion key={prog.id} program={prog} onUpdateStatus={handleStatusUpdate} onDelete={handleDeleteRequest} onEdit={onEdit} onSelectParticipant={setSelectedParticipantName} onPublish={handlePublish} onPublishResult={handlePublishResult} onRequestCancel={setCancelProgramId} onUpdateProgram={updateProgram} customScores={customScores} staffs={staffs} allPrograms={programs} onPrintCertificate={() => {}} onDownloadPoster={() => {}} />)}</div>
+        <div className="space-y-3">{filteredPrograms.map(prog => <ProgramAccordion key={prog.id} program={prog} onUpdateStatus={handleStatusUpdate} onDelete={handleDeleteRequest} onEdit={onEdit} onSelectParticipant={setSelectedParticipantName} onPublish={handlePublish} onPublishResult={handlePublishResult} onRequestCancel={setCancelProgramId} onUpdateProgram={updateProgram} customScores={customScores} staffs={staffs} allPrograms={programs} onPrintCertificate={handlePrintProgramCertificates} onDownloadPoster={handleDownloadProgramPoster} />)}</div>
       </div>
+      {exportProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center gap-3 min-w-[260px]">
+            <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="font-black text-slate-900 uppercase tracking-widest text-sm">Generating {exportProgress.label}...</span>
+            {exportProgress.total > 1 && (
+              <>
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-600 transition-all" style={{ width: `${Math.round((exportProgress.current / exportProgress.total) * 100)}%` }} />
+                </div>
+                <span className="text-xs font-bold text-slate-500">{exportProgress.current} / {exportProgress.total}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>);
 };

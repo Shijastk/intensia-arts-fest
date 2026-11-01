@@ -1,4 +1,5 @@
 import React from 'react';
+import { TemplateBackground } from './TemplateBackground';
 
 export interface StudentCardData {
   name: string;
@@ -36,15 +37,8 @@ export const StudentCardBatchTemplate: React.FC<StudentCardBatchTemplateProps> =
         <div key={`${student.chestNo}-${index}`} className="w-full h-full">
           {layoutType === 'detailed' ? (
             // Detailed Layout (with background and events list)
-            <div 
-              className="w-full h-full relative rounded-md overflow-hidden border border-gray-200 shadow-sm"
-              style={{
-                backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : 'none',
-                backgroundSize: bgScale && bgScale !== 100 ? `${bgScale}%` : 'cover',
-                backgroundPosition: `${bgPositionX}% ${bgPositionY}%`,
-                backgroundRepeat: 'no-repeat'
-              }}
-            >
+            <div className="w-full h-full relative rounded-md overflow-hidden border border-gray-200 shadow-sm">
+              <TemplateBackground url={backgroundUrl} bgScale={bgScale} bgPositionX={bgPositionX} bgPositionY={bgPositionY} />
               <div className="absolute inset-0 p-4 flex flex-col pt-16">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1 min-w-0 mr-2">

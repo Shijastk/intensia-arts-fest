@@ -147,4 +147,5 @@ export interface Settings {
   festName?: string;
   festSlogan?: string;
   theme?: 'emerald' | 'purple' | 'blue' | 'crimson';
+  stages?: string[];          // schedule venues/stages saved from the Schedule Manager
 }

@@ -1,9 +1,14 @@
 import React from 'react';
+import type { TemplateConfig } from '../../services/backgroundService';
+import { TEMPLATE_DEFAULTS, fontStack } from '../../services/exportService';
+import { TemplateBackground } from './TemplateBackground';
 
 export interface WinnerDetails {
   place: 1 | 2 | 3;
   name: string;
   team: string;
+  /** Unique key; tied winners share a place. */
+  id?: string;
 }
 
 interface PosterTemplateProps {
@@ -20,67 +25,95 @@ interface PosterTemplateProps {
   bgPositionX?: number;
   bgPositionY?: number;
   bgScale?: number;
+  /** Merged template config; explicit props above win over it. */
+  config?: TemplateConfig;
 }
+
+const D = TEMPLATE_DEFAULTS.posterBgs;
 
 export const PosterTemplate: React.FC<PosterTemplateProps> = ({
   backgroundUrl,
   eventName,
   category,
   winners,
-  contentTop = 350,
-  contentLeft = 96,
-  textAlign = 'left',
-  textColor = '#000000',
-  secondaryColor = '#ca8a04',
-  posterSize = 'portrait',
-  bgPositionX = 50,
-  bgPositionY = 50,
-  bgScale = 100
+  contentTop,
+  contentLeft,
+  textAlign,
+  textColor,
+  secondaryColor,
+  posterSize,
+  bgPositionX,
+  bgPositionY,
+  bgScale,
+  config = {}
 }) => {
-  const alignItems = textAlign === 'center' ? 'center' : textAlign === 'right' ? 'flex-end' : 'flex-start';
+  const c: TemplateConfig = config;
+  const top = contentTop ?? c.contentTop ?? D.contentTop!;
+  const side = contentLeft ?? c.contentLeft ?? D.contentLeft!;
+  const align = textAlign ?? c.textAlign ?? D.textAlign!;
+  const primary = textColor ?? c.textColor ?? D.textColor!;
+  const accent = secondaryColor ?? c.secondaryColor ?? D.secondaryColor!;
+  const size = posterSize ?? c.posterSize ?? D.posterSize;
+  const titleSize = c.titleFontSize ?? D.titleFontSize!;
+  const bodySize = c.bodyFontSize ?? D.bodyFontSize!;
+  const k = bodySize / 30; // secondary text scales with the winner-name size
+  const letterSpacing = c.letterSpacing ?? D.letterSpacing!;
+  const lineHeight = c.lineHeight ?? D.lineHeight!;
+  const alignItems = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+
+  // Copy before sorting (props must not be mutated); stable for tied places.
+  const sortedWinners = (winners || []).map((w, i) => ({ w, i })).sort((a, b) => a.w.place - b.w.place || a.i - b.i);
+
   return (
-    <div 
-      className={`relative w-[1080px] ${posterSize === 'square' ? 'h-[1080px]' : 'h-[1350px]'} bg-white mx-auto overflow-hidden shadow-xl`}
-      style={{
-        backgroundImage: `url(${backgroundUrl})`,
-        backgroundSize: bgScale && bgScale !== 100 ? `${bgScale}%` : 'cover',
-        backgroundPosition: `${bgPositionX}% ${bgPositionY}%`,
-        backgroundRepeat: 'no-repeat'
-      }}
+    <div
+      className={`relative w-[1080px] ${size === 'square' ? 'h-[1080px]' : 'h-[1350px]'} bg-white mx-auto overflow-hidden shadow-xl`}
+      style={{ fontFamily: fontStack(c.bodyFontFamily ?? D.bodyFontFamily) }}
     >
+      <TemplateBackground url={backgroundUrl} bgScale={bgScale ?? c.bgScale} bgPositionX={bgPositionX ?? c.bgPositionX} bgPositionY={bgPositionY ?? c.bgPositionY} />
+
       {/* Content wrapper */}
-      <div 
+      <div
         className="absolute inset-0 flex flex-col justify-start"
-        style={{ 
-          paddingTop: `${contentTop}px`, 
-          paddingLeft: `${contentLeft}px`, 
-          paddingRight: `${contentLeft}px`,
+        style={{
+          paddingTop: `${top}px`,
+          paddingLeft: `${side}px`,
+          paddingRight: `${side}px`,
           alignItems: alignItems,
-          textAlign: textAlign
+          textAlign: align
         }}
       >
         {/* Event Title */}
-        <h1 className="text-5xl font-black uppercase tracking-wider mb-8 font-serif break-words max-w-full" style={{ color: textColor }}>
+        <h1
+          className="uppercase mb-8 break-words max-w-full"
+          style={{
+            color: primary,
+            fontFamily: fontStack(c.fontFamily ?? D.fontFamily),
+            fontWeight: c.fontWeight ?? D.fontWeight,
+            fontSize: `${titleSize}px`,
+            lineHeight: 1,
+            letterSpacing: `${letterSpacing}em`,
+          }}
+        >
           {eventName}
         </h1>
 
         {/* Category */}
-        <h2 className="text-xl font-bold uppercase tracking-[0.2em] mb-12 break-words max-w-full" style={{ color: secondaryColor }}>
+        <h2 className="font-bold uppercase tracking-[0.2em] mb-12 break-words max-w-full" style={{ color: accent, fontSize: `${20 * k}px`, lineHeight: 1.4 }}>
           {category}
         </h2>
 
         {/* Winners List */}
         <div className="space-y-8 flex flex-col w-full" style={{ alignItems: alignItems }}>
-          {winners.sort((a, b) => a.place - b.place).map((winner) => (
-            <div key={winner.place} className="flex flex-col" style={{ alignItems: alignItems }}>
-              <span className="text-sm font-bold uppercase tracking-widest mb-1 break-words max-w-full" style={{ color: secondaryColor }}>
+          {sortedWinners.map(({ w: winner, i }) => (
+            <div key={winner.id ?? `${winner.place}-${winner.name}-${i}`} className="flex flex-col" style={{ alignItems: alignItems }}>
+              <span className="font-bold uppercase tracking-widest mb-1 break-words max-w-full" style={{ color: accent, fontSize: `${14 * k}px`, lineHeight: 20 / 14 }}>
                 {winner.place}{winner.place === 1 ? 'ST' : winner.place === 2 ? 'ND' : 'RD'} PLACE
               </span>
-              <span className="text-3xl font-black uppercase mb-1 break-words max-w-full leading-tight" style={{ color: textColor }}>
+              <span className="font-black uppercase mb-1 break-words max-w-full" style={{ color: primary, fontSize: `${bodySize}px`, lineHeight }}>
                 {winner.name}
               </span>
               {winner.team && (
-                <span className="text-sm uppercase tracking-wider break-words max-w-full" style={{ color: textColor, opacity: 0.8 }}>
+                <span className="uppercase tracking-wider break-words max-w-full" style={{ color: primary, opacity: 0.8, fontSize: `${14 * k}px`, lineHeight: 20 / 14 }}>
                   {winner.team}
                 </span>
               )}

@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Program, ProgramStatus, Settings } from '../types';
-import { calculatePoints, getGradeFromScore } from '../utils/pointsCalculator';
+import { getGradeFromScore, rankProgramResults } from '../utils/pointsCalculator';
+import { appDialog } from '../components/ui/AppDialog';
+import { compareScheduleTimes, compareScheduleTimesDesc, formatDateTime } from '../utils/timeUtils';
 
 interface JudgesPageProps {
     programs: Program[];
@@ -40,7 +42,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                       p.category.toLowerCase().includes(searchQuery.toLowerCase());
                 return isAllocated && matchesPanel && matchesSearch;
             })
-            .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+            .sort((a, b) => compareScheduleTimes(a.startTime, b.startTime));
     }, [programs, currentUser, searchQuery]);
 
     const completedPrograms = useMemo(() => {
@@ -54,14 +56,14 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                       p.category.toLowerCase().includes(searchQuery.toLowerCase());
                 return isCompleted && matchesPanel && matchesSearch;
             })
-            .sort((a, b) => (b.startTime || '').localeCompare(a.startTime || ''));
+            .sort((a, b) => compareScheduleTimesDesc(a.startTime, b.startTime));
     }, [programs, currentUser, searchQuery]);
 
     const handleSelectProgram = (program: Program) => {
         setSelectedProgram(program);
         const initialScores: { [key: string]: { score: string, grade: string } } = {};
-        program.teams.forEach(team => {
-            team.participants.forEach(participant => {
+        (program.teams || []).forEach(team => {
+            (team.participants || []).forEach(participant => {
                 initialScores[participant.chestNumber] = {
                     score: participant.score?.toString() || team.score?.toString() || '',
                     grade: participant.grade || team.grade || ''
@@ -81,10 +83,10 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
         }
 
         if (selectedProgram?.isGroup) {
-            const team = selectedProgram.teams.find(t => t.participants.some(p => p.chestNumber === chestNumber));
+            const team = (selectedProgram.teams || []).find(t => (t.participants || []).some(p => p.chestNumber === chestNumber));
             if (team) {
                 const limit = (selectedProgram.membersPerGroup && selectedProgram.membersPerGroup > 0) ? selectedProgram.membersPerGroup : 999;
-                const pIndex = team.participants.findIndex(p => p.chestNumber === chestNumber);
+                const pIndex = (team.participants || []).findIndex(p => p.chestNumber === chestNumber);
                 if (pIndex === -1) return;
 
                 const chunkIndex = Math.floor(pIndex / limit);
@@ -119,138 +121,12 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
     const handleSubmitScores = async () => {
         if (!selectedProgram) return;
 
-        const confirm = window.confirm('Are you sure you want to submit these scores? This will mark the program as completed.');
+        const confirm = await appDialog.confirm('Are you sure you want to submit these scores? This will mark the program as completed.', { variant: 'primary', title: 'Submit scores', confirmText: 'Submit' });
         if (!confirm) return;
 
-        let entitiesToRank: any[] = [];
-
-        if (selectedProgram.isGroup) {
-            // Rank teams/sub-teams based on their representative's score
-            selectedProgram.teams.forEach(team => {
-                const limit = (selectedProgram.membersPerGroup && selectedProgram.membersPerGroup > 0) ? selectedProgram.membersPerGroup : 999;
-                const pList = team.participants;
-                for (let i = 0; i < pList.length; i += limit) {
-                    const chunk = pList.slice(i, i + limit);
-                    if (chunk.length === 0) continue;
-                    const rep = chunk[0];
-                    const scoreData = scores[rep.chestNumber];
-                    const score = parseFloat(scoreData?.score || '0');
-                    const grade = scoreData?.grade || '';
-                    entitiesToRank.push({
-                        isGroup: true,
-                        teamId: team.id,
-                        chunkParticipants: chunk,
-                        score,
-                        grade,
-                        points: 0,
-                        rank: 0
-                    });
-                }
-            });
-        } else {
-            // Rank individuals
-            selectedProgram.teams.forEach(team => {
-                team.participants.forEach(p => {
-                    const scoreData = scores[p.chestNumber];
-                    const score = parseFloat(scoreData?.score || '0');
-                    const grade = scoreData?.grade || '';
-                    entitiesToRank.push({
-                        isGroup: false,
-                        teamId: team.id,
-                        participant: p,
-                        score,
-                        grade,
-                        points: 0,
-                        rank: 0
-                    });
-                });
-            });
-        }
-
-        // Sort by score descending
-        entitiesToRank.sort((a, b) => b.score - a.score);
-
-        // Assign ranks and calculate points
-        let currentRank = 1;
-        for (let i = 0; i < entitiesToRank.length; i++) {
-            if (i > 0 && entitiesToRank[i].score < entitiesToRank[i - 1].score) {
-                currentRank = i + 1;
-            }
-            entitiesToRank[i].rank = currentRank;
-            const customConfig = settings?.customScores?.[selectedProgram.id];
-            entitiesToRank[i].points = calculatePoints(
-                entitiesToRank[i].score, 
-                entitiesToRank[i].grade, 
-                selectedProgram.isGroup, 
-                currentRank,
-                customConfig
-            );
-        }
-
-        // Map back to teams structure
-        const updatedTeams = selectedProgram.teams.map(team => {
-            let teamPoints = 0;
-            let teamScore = 0;
-            let teamGrade = '';
-            let teamRank = 999;
-
-            const updatedParticipants = team.participants.map(p => {
-                if (selectedProgram.isGroup) {
-                    const entity = entitiesToRank.find(e => e.teamId === team.id && e.chunkParticipants.some((cp: any) => cp.chestNumber === p.chestNumber));
-                    if (entity) {
-                        return {
-                            ...p,
-                            score: entity.score,
-                            grade: entity.grade,
-                            points: entity.points,
-                            rank: entity.rank
-                        };
-                    }
-                } else {
-                    const entity = entitiesToRank.find(e => e.teamId === team.id && e.participant.chestNumber === p.chestNumber);
-                    if (entity) {
-                        return {
-                            ...p,
-                            score: entity.score,
-                            grade: entity.grade,
-                            points: entity.points,
-                            rank: entity.rank
-                        };
-                    }
-                }
-                return p;
-            });
-
-            // Calculate team-level summary
-            if (selectedProgram.isGroup) {
-                 // For group, team score/grade/rank comes from the best performing sub-team
-                 const subTeamsForThisTeam = entitiesToRank.filter(e => e.teamId === team.id);
-                 if (subTeamsForThisTeam.length > 0) {
-                     const bestSubTeam = subTeamsForThisTeam[0]; // already sorted by score
-                     teamScore = bestSubTeam.score;
-                     teamGrade = bestSubTeam.grade;
-                     teamRank = bestSubTeam.rank;
-                     teamPoints = bestSubTeam.points;
-                 }
-            } else {
-                 const bestParticipant = updatedParticipants.reduce((prev, curr) => (prev.score || 0) > (curr.score || 0) ? prev : curr, updatedParticipants[0]);
-                 if (bestParticipant) {
-                     teamScore = bestParticipant.score || 0;
-                     teamGrade = bestParticipant.grade || '';
-                     teamRank = bestParticipant.rank || 999;
-                 }
-                 teamPoints = updatedParticipants.reduce((sum, part) => sum + (part.points || 0), 0);
-            }
-
-            return {
-                ...team,
-                participants: updatedParticipants,
-                score: teamScore,
-                grade: teamGrade,
-                rank: teamRank,
-                points: teamPoints
-            };
-        });
+        // Ranking, ties, absentees and points are computed by the shared helper (also used by
+        // the admin "Edit Results" screen) so both always produce the same results.
+        const updatedTeams = rankProgramResults(selectedProgram, scores, settings?.customScores?.[selectedProgram.id]);
 
         if (updateProgram) {
             const success = await updateProgram(selectedProgram.id, {
@@ -259,11 +135,11 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                 teams: updatedTeams
             });
             if (success) {
-                alert('Scores submitted successfully! Program marked as completed.');
+                appDialog.alert('Scores submitted successfully! Program marked as completed.', { variant: 'success', title: 'Scores submitted' });
                 setSelectedProgram(null);
                 setScores({});
             } else {
-                alert('Failed to submit scores. Please try again.');
+                appDialog.alert('Failed to submit scores. Please try again.');
             }
         } else {
             setPrograms(prev => prev.map(p => {
@@ -275,7 +151,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                     teams: updatedTeams
                 };
             }));
-            alert('Scores submitted locally (Verify persistence).');
+            appDialog.alert('Scores submitted locally (Verify persistence).');
             setSelectedProgram(null);
             setScores({});
         }
@@ -378,7 +254,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                             </div>
                                         </div>
                                         <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[9px] font-black uppercase">
-                                            {program.teams.reduce((acc: any[], t) => acc.concat(t.participants), []).length} Participants
+                                            {(program.teams || []).reduce((acc: any[], t) => acc.concat(t.participants), []).length} Participants
                                         </span>
                                     </div>
                                     <div className="space-y-2 mb-3">
@@ -386,7 +262,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            <span className="font-medium">{program.startTime || 'Time TBA'}</span>
+                                            <span className="font-medium">{formatDateTime(program.startTime, 'Time TBA')}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-slate-600">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -445,7 +321,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {selectedProgram.isGroup ? (
-                                        selectedProgram.teams.reduce((acc: any[], team) => {
+                                        (selectedProgram.teams || []).reduce((acc: any[], team) => {
                                             const limit = (selectedProgram.membersPerGroup && selectedProgram.membersPerGroup > 0) ? selectedProgram.membersPerGroup : 999;
                                             const subTeams = [];
                                             const pList = team.participants;
@@ -476,7 +352,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                                     </td>
                                                     <td className="px-4 py-4">
                                                         <p className="text-sm font-bold text-slate-900">Team Entry</p>
-                                                        <p className="text-xs text-slate-500">{subTeam.participants.length} Participants</p>
+                                                        <p className="text-xs text-slate-500">{(subTeam.participants || []).length} Participants</p>
                                                     </td>
                                                     <td className="px-4 py-4">
                                                         <input
@@ -512,9 +388,9 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                             );
                                         })
                                     ) : (
-                                        selectedProgram.teams.map((team) => (
+                                        (selectedProgram.teams || []).map((team) => (
                                             <React.Fragment key={team.id}>
-                                                {team.participants.map((participant) => (
+                                                {(team.participants || []).map((participant) => (
                                                     <tr key={participant.chestNumber} className="hover:bg-slate-50 transition-colors">
                                                         <td className="px-4 py-4">
                                                             <div className="flex items-center gap-3">
@@ -613,7 +489,7 @@ export const JudgesPage: React.FC<JudgesPageProps> = ({
                                     </span>
                                 </div>
                                 <div className="text-xs text-slate-400 font-medium mt-auto pt-2 border-t border-slate-200/60">
-                                    {program.startTime || 'Time TBA'}
+                                    {formatDateTime(program.startTime, 'Time TBA')}
                                 </div>
                             </div>
                         ))}

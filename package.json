@@ -13,7 +13,8 @@
     "test:functions": "npm --prefix functions run build && firebase emulators:exec --project demo-intensia --only auth,database,functions \"node --test tests/functions.e2e.test.mjs\"",
     "test:security": "npm run test:rules && npm run test:functions",
     "emulators": "npm --prefix functions run build && firebase emulators:start --project demo-intensia --only auth,database,functions",
-    "emulators:rules": "node firebase/load-emulator-rules.mjs"
+    "emulators:rules": "node firebase/load-emulator-rules.mjs",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -44,6 +45,7 @@
     "firebase-tools": "^14.27.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^3.2.7"
   }
 }

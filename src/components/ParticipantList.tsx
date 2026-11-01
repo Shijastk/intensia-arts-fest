@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Program } from '../types';
+import { formatDateTime } from '../utils/timeUtils';
 import { useStudents } from '../hooks/useStudents';
 import { StudentBulkEntryModal } from './StudentBulkEntryModal';
 
@@ -183,7 +184,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
                         {prog.venue && <span>📍 {prog.venue}</span>}
                         {prog.startTime && prog.status !== 'COMPLETED' && (
                           <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                            🕒 {new Date(prog.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(prog.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            🕒 {formatDateTime(prog.startTime)}
                           </span>
                         )}
                       </div>

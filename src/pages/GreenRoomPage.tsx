@@ -3,8 +3,10 @@ import { Program, ProgramStatus } from '../types';
 import { GreenRoomProgramCard } from '../components/GreenRoomProgramCard';
 import { db } from '../config/firebase';
 import { ref, onValue } from 'firebase/database';
-import { calculateLeaderboardStats } from '../utils/statsCalculator';
 import { calculateConsolidatedResults } from '../utils/consolidationCalc';
+import { appDialog } from '../components/ui/AppDialog';
+import { compareScheduleTimes } from '../utils/timeUtils';
+import { getProgramWinners, getTeamZones, ProgramWinner } from '../utils/resultsUtils';
 
 interface GreenRoomPageProps {
     programs: Program[];
@@ -23,68 +25,27 @@ const shuffleArray = <T,>(array: T[]): T[] => {
     return shuffled;
 };
 
-const extractZone = (category: string): string => {
-    const catLower = (category || '').toLowerCase();
-    if (catLower.includes('a zone')) return 'A';
-    if (catLower.includes('b zone')) return 'B';
-    if (catLower.includes('c zone')) return 'C';
-    return 'General';
-};
 
-const getGroupResults = (teams: any[]) => {
-  const results = teams.filter(t => (t.rank && t.rank > 0) || (t.points && t.points > 0)).map(team => {
-    return {
-      name: team.teamName,
-      teamName: team.teamName,
-      points: team.points || 0,
-      rank: team.rank || 999,
-      score: team.score || 0,
-      grade: team.grade || ''
-    };
-  });
-  return results.sort((a, b) => a.rank - b.rank).slice(0, 3);
-};
-
-const getIndividualResults = (teams: any[]) => {
-  const participants: any[] = [];
-  teams.forEach(team => {
-    team.participants?.forEach((p: any) => {
-      if ((p.rank && p.rank > 0) || (p.points && p.points > 0)) {
-        participants.push({
-          name: p.name,
-          teamName: team.teamName,
-          points: p.points || 0,
-          rank: p.rank || 999,
-          score: p.score || 0,
-          grade: p.grade || ''
-        });
-      }
-    });
-  });
-  return participants.sort((a, b) => a.rank - b.rank).slice(0, 3);
-};
-
-const getWinnerNode = (results: any[], targetRank: number) => {
-    const winner = results.find(r => r.rank === targetRank);
-    if (!winner) return <span className="text-slate-300 text-xs italic">-</span>;
-    return (
-        <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-black text-slate-900 truncate max-w-[200px]" title={winner.name}>{winner.name}</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate max-w-[200px]">{winner.teamName}</span>
-            <div className="flex items-center gap-1.5 mt-0.5">
-                {winner.grade && (
-                    <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-widest">
-                        {winner.grade}
-                    </span>
-                )}
-                {winner.points > 0 && (
-                    <span className="text-[10px] font-bold text-slate-500">
-                        {winner.points} Pts
-                    </span>
-                )}
-            </div>
+const getWinnerNode = (results: ProgramWinner[], targetRank: number) => {
+  // Every entry sharing this place is shown (ties use competition ranking: 1, 1, 3).
+  const tied = results.filter(r => r.rank === targetRank);
+  if (tied.length === 0) return <span className="text-slate-300 text-xs italic">-</span>;
+  return (
+    <div className="flex flex-col gap-2">
+      {tied.map((winner, i) => (
+        <div key={`${winner.chestNumber || winner.name}-${i}`} className="flex flex-col gap-0.5">
+          <span className="text-sm font-black text-slate-900 truncate max-w-[200px]" title={winner.name}>{winner.name}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate max-w-[200px]">{winner.teamName}</span>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {winner.grade && (
+              <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-widest">{winner.grade}</span>
+            )}
+            {winner.points > 0 && <span className="text-[10px] font-bold text-slate-500">{winner.points} Pts</span>}
+          </div>
         </div>
-    );
+      ))}
+    </div>
+  );
 };
 
 export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setPrograms, updateProgram, canManageOrders = false }) => {
@@ -126,7 +87,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
             let totalSubTeams = 0;
             teams.forEach(t => {
                 if ((t?.participants || []).length > 0) {
-                    totalSubTeams += Math.ceil(t.participants.length / memberLimit);
+                    totalSubTeams += Math.ceil((t.participants || []).length / memberLimit);
                 }
             });
 
@@ -233,17 +194,12 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
             const matchesSearch = !searchTerm || p?.name.toLowerCase().includes(searchTerm.toLowerCase()) || p?.category.toLowerCase().includes(searchTerm.toLowerCase());
             return isPublished && hasParticipants && isPending && matchesSearch;
         })
-        .sort((a, b) => (a?.startTime || '').localeCompare(b?.startTime || ''));
+        .sort((a, b) => compareScheduleTimes(a?.startTime, b?.startTime));
 
-    const stats = React.useMemo(() => calculateLeaderboardStats(programs), [programs]);
     const consolidated = React.useMemo(() => calculateConsolidatedResults(programs), [programs]);
     
-    const teamZones: Record<string, string> = {};
-    Object.entries(stats.zones).forEach(([zoneKey, zone]: [string, any]) => {
-        Object.keys(zone.teamScores as Record<string, number>).forEach(teamName => {
-            teamZones[teamName] = zoneKey;
-        });
-    });
+    // A team's zone comes from the programs it entered (previously every team got the last zone).
+    const teamZones = React.useMemo(() => getTeamZones(programs || []), [programs]);
     
     const overallTeamScores = consolidated.sortedTeams.map(t => ({
         name: t.name,
@@ -293,12 +249,12 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                                 }
                             });
                             const toUpdate = (programs || []).filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished && typeof p?.resultPublishedOrder !== 'number');
-                            if (toUpdate.length === 0) { alert('No missing orders found.'); return; }
+                            if (toUpdate.length === 0) { appDialog.alert('No missing orders found.'); return; }
                             for (const p of toUpdate) {
                                 maxOrder++;
                                 await updateProgram(p.id, { resultPublishedOrder: maxOrder });
                             }
-                            alert(`Fixed ${toUpdate.length} programs!`);
+                            appDialog.alert(`Fixed ${toUpdate.length} programs!`);
                         }} className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap bg-amber-100 text-amber-700 hover:bg-amber-200">Fix Missing Orders</button>}
                     </div>
                     {activeTab === 'PROGRAMS' && (
@@ -369,9 +325,7 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                             </div>
                             <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto hide-scrollbar">
                                 {completedPrograms.map((program) => {
-                                    const results = program.isGroup 
-                                        ? getGroupResults(program.teams || [])
-                                        : getIndividualResults(program.teams || []);
+                                    const results = getProgramWinners(program);
                                     
                                     return (
                                         <div key={program.id} className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-4 px-4 sm:px-6 py-5 hover:bg-slate-50/50 transition-colors group">

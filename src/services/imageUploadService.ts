@@ -24,8 +24,17 @@ export const uploadImageToImgBB = async (file: File, festId: string): Promise<st
     const upload = httpsCallable<{ festId: string; imageBase64: string; fileName: string }, { url: string }>(functions, 'uploadImage');
     const { data } = await upload({ festId, imageBase64, fileName: file.name });
     return data.url; // Return the direct image URL
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading to ImgBB:', error);
+    // A bare "internal" (no detail) means the uploadImage Cloud Function could not be reached:
+    // usually it is not deployed yet, or its IMGBB_API_KEY secret / region is not set up.
+    const code = String(error?.code || '');
+    if ((code === 'functions/internal' && (!error?.message || error.message === 'internal')) || code === 'functions/not-found' || code === 'functions/unavailable') {
+      throw new Error('The image upload service is not reachable. The "uploadImage" Cloud Function is probably not deployed yet (see SECURITY.md, Firebase Console steps).');
+    }
+    if (code === 'functions/permission-denied' || code === 'functions/unauthenticated') {
+      throw new Error('Only the fest admin can upload images. Please sign in again with the admin account.');
+    }
     throw error;
   }
 };

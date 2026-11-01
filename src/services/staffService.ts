@@ -2,6 +2,7 @@ import { ref, get } from 'firebase/database';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../config/firebase';
 import { Staff } from '../types';
+import { appDialog } from '../components/ui/AppDialog';
 
 // Staff accounts are created and changed only by the manageStaff Cloud Function, which
 // checks that the caller is the fest admin and stores passwords as bcrypt hashes.
@@ -30,7 +31,7 @@ export const staffService = {
       return true;
     } catch (error) {
       console.error("Error adding staff:", error);
-      alert(errorMessage(error));
+      appDialog.alert(errorMessage(error), { variant: 'danger', title: 'Staff account not saved' });
       return false;
     }
   },
@@ -41,7 +42,7 @@ export const staffService = {
       return true;
     } catch (error) {
       console.error("Error updating staff:", error);
-      alert(errorMessage(error));
+      appDialog.alert(errorMessage(error), { variant: 'danger', title: 'Staff account not saved' });
       return false;
     }
   },
@@ -52,7 +53,7 @@ export const staffService = {
       return true;
     } catch (error) {
       console.error("Error deleting staff:", error);
-      alert(errorMessage(error));
+      appDialog.alert(errorMessage(error), { variant: 'danger', title: 'Staff account not saved' });
       return false;
     }
   }

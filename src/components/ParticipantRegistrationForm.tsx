@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Program } from '../types';
+import { appDialog } from './ui/AppDialog';
 
 interface ParticipantRegistrationFormProps {
     program: Program;
@@ -20,7 +21,7 @@ export const ParticipantRegistrationForm: React.FC<ParticipantRegistrationFormPr
         e.preventDefault();
 
         if (!name.trim() || !chestNumber.trim()) {
-            alert('Please fill in all required fields');
+            appDialog.alert('Please fill in all required fields');
             return;
         }
 

@@ -1,4 +1,16 @@
 import React from 'react';
+import type { TemplateConfig } from '../../services/backgroundService';
+import {
+  A4_PX,
+  TEMPLATE_DEFAULTS,
+  autoFitBlockFontSize,
+  autoFitFontSize,
+  fillPlaceholders,
+  fontStack,
+  parseRichText,
+  stripRichMarkers,
+} from '../../services/exportService';
+import { TemplateBackground } from './TemplateBackground';
 
 interface CertificateTemplateProps {
   backgroundUrl: string;
@@ -11,7 +23,13 @@ interface CertificateTemplateProps {
   bgPositionY?: number;
   bgScale?: number;
   festName?: string;
+  position?: string;
+  grade?: string;
+  /** Merged template config (exportService.pickTemplate / mergeTemplateConfig). Missing fields use today's defaults. */
+  config?: TemplateConfig;
 }
+
+const D = TEMPLATE_DEFAULTS.certificateBgs;
 
 export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
   backgroundUrl,
@@ -20,37 +38,104 @@ export const CertificateTemplate: React.FC<CertificateTemplateProps> = ({
   team,
   category,
   events,
-  bgPositionX = 50,
-  bgPositionY = 50,
-  bgScale = 100,
-  festName = "ARTS FEST"
+  bgPositionX,
+  bgPositionY,
+  bgScale,
+  festName = "ARTS FEST",
+  position,
+  grade,
+  config = {}
 }) => {
+  const c: TemplateConfig = config;
+  const contentTop = c.contentTop ?? D.contentTop!;
+  const contentLeft = c.contentLeft ?? D.contentLeft!;
+  const textAlign = c.textAlign ?? D.textAlign!;
+  const alignItems = textAlign === 'center' ? 'center' : textAlign === 'right' ? 'flex-end' : 'flex-start';
+  const accent = c.secondaryColor ?? D.secondaryColor!;
+  const titleSize = c.titleFontSize ?? D.titleFontSize!;
+  const bodySize = c.bodyFontSize ?? D.bodyFontSize!;
+  const letterSpacing = c.letterSpacing ?? D.letterSpacing!;
+  const lineHeight = c.lineHeight ?? D.lineHeight!;
+  // Unset textColor keeps the original per-line colours (gray-600 / gray-700 / black).
+  const detailsColor = c.textColor ?? '#4b5563';
+  const bodyColor = c.textColor ?? '#374151';
+  const strongColor = c.textColor ?? '#000000';
+
+  const name = (participantName || '').toUpperCase();
+  const innerWidth = A4_PX.width - contentLeft * 2;
+
+  // Name: shrink with length (~0.68em per uppercase glyph + tracking), wrap to at most 2 lines.
+  const nameCharsAtBase = Math.max(8, Math.floor(innerWidth / (titleSize * (0.68 + letterSpacing))));
+  const nameSize = autoFitFontSize(name, titleSize, { charsPerLineAtBase: nameCharsAtBase });
+  const nameLineHeight = nameSize === titleSize ? 1 : 1.1;
+
+  const body = fillPlaceholders(c.bodyTemplate ?? D.bodyTemplate!, {
+    name: participantName,
+    chestNo,
+    team,
+    events: (events || []).join(', '),
+    category,
+    festName,
+    position,
+    grade,
+    date: c.festDates ?? D.festDates,
+    venue: c.festVenue ?? D.festVenue,
+  });
+  // Body block (px-24 inside the content area): ~0.5em per glyph, up to 8 lines before shrinking.
+  const bodyWidth = Math.max(200, innerWidth - 192);
+  const bodyCapacity = Math.floor(bodyWidth / (bodySize * 0.5)) * 8;
+  const bodyFitSize = autoFitBlockFontSize(stripRichMarkers(body), bodySize, bodyCapacity, 10);
+
   return (
-    <div 
+    <div
       className="relative w-[794px] h-[1123px] bg-white mx-auto overflow-hidden shadow-xl"
-      style={{
-        backgroundImage: `url(${backgroundUrl})`,
-        backgroundSize: bgScale && bgScale !== 100 ? `${bgScale}%` : 'cover',
-        backgroundPosition: `${bgPositionX}% ${bgPositionY}%`,
-        backgroundRepeat: 'no-repeat'
-      }}
+      style={{ fontFamily: fontStack(c.bodyFontFamily ?? D.bodyFontFamily) }}
     >
+      <TemplateBackground url={backgroundUrl} bgScale={bgScale ?? c.bgScale} bgPositionX={bgPositionX ?? c.bgPositionX} bgPositionY={bgPositionY ?? c.bgPositionY} />
+
       {/* Content wrapper to position elements relative to the design */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pt-[200px]">
+      <div
+        className="absolute inset-0 flex flex-col justify-center"
+        style={{ paddingTop: `${contentTop}px`, paddingLeft: `${contentLeft}px`, paddingRight: `${contentLeft}px`, alignItems, textAlign }}
+      >
         {/* Name */}
-        <h1 className="text-5xl font-bold text-red-600 tracking-wider mb-4 font-serif">
-          {participantName.toUpperCase()}
+        <h1
+          className="mb-4 max-w-full"
+          style={{
+            color: accent,
+            fontFamily: fontStack(c.fontFamily ?? D.fontFamily),
+            fontWeight: c.fontWeight ?? D.fontWeight,
+            fontSize: `${nameSize}px`,
+            lineHeight: nameLineHeight,
+            letterSpacing: `${letterSpacing}em`,
+            overflowWrap: 'anywhere',
+            maxHeight: `${nameSize * nameLineHeight * 2}px`,
+            overflow: 'hidden',
+          }}
+        >
+          {name}
         </h1>
 
         {/* Details Row */}
-        <p className="text-lg text-gray-600 mb-10 tracking-wide text-center px-12 leading-relaxed">
-          Chest No. {chestNo} &middot; {team} &middot; <span className="whitespace-nowrap">{category}</span>
+        <p
+          className="mb-10 px-12 max-w-full"
+          style={{ color: detailsColor, fontSize: `${bodySize}px`, lineHeight, letterSpacing: '0.025em' }}
+        >
+          Chest No. {chestNo} &middot; {team}{category ? <> &middot; <span className="whitespace-nowrap">{category}</span></> : null}
         </p>
 
         {/* Participated Events Text */}
-        <div className="text-center px-24 text-gray-700 leading-relaxed text-lg">
-          has participated in <span className="font-bold">{events.join(', ')}</span><br/>
-          at <span className="font-bold text-black">{festName} &mdash; Celebration of Creativity</span>, held at Ismath Campus, Ismath English School Kalad, on 11, 12 & 13 August 2026.
+        <div className="px-24 max-w-full" style={{ color: bodyColor, fontSize: `${bodyFitSize}px`, lineHeight, overflowWrap: 'anywhere' }}>
+          {parseRichText(body).map((line, li) => (
+            <React.Fragment key={li}>
+              {li > 0 && <br />}
+              {line.map((seg, si) =>
+                seg.bold
+                  ? <span key={si} className="font-bold" style={seg.strong ? { color: strongColor } : undefined}>{seg.text}</span>
+                  : <React.Fragment key={si}>{seg.text}</React.Fragment>
+              )}
+            </React.Fragment>
+          ))}
         </div>
       </div>
     </div>
