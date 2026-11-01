@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings } from '../types';
 import { settingsService } from '../services/settingsService';
 import { CATEGORIES } from '../constants/categories';
+import { reportError } from '../utils/errorReporting';
 
 const DEFAULT_SETTINGS: Settings = {
   categories: CATEGORIES,
@@ -32,7 +33,11 @@ export const useSettings = (festId: string | null) => {
 
   const updateSettings = async (updates: Partial<Settings>) => {
     if (!festId) return false;
-    return await settingsService.updateSettings(festId, updates);
+    try {
+      return await settingsService.updateSettings(festId, updates);
+    } catch (err) {
+      return reportError('Settings not saved', err);
+    }
   };
 
   return { settings, loading, updateSettings };

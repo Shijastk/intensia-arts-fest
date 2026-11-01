@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Program } from '../types';
 import { programService, ProgramAccess } from '../services/programService';
+import { reportError } from '../utils/errorReporting';
 
 interface UseProgramsOptions {
   // 'private': admins & green room (full data). 'public': score-free copy (public pages,
@@ -41,8 +42,7 @@ export const usePrograms = (festId: string | null, options: UseProgramsOptions =
       await programService.addProgram(festId, programData);
       return true;
     } catch (err: any) {
-      console.error("Error adding program:", err);
-      return false;
+      return reportError('Program not added', err, { name: programData.name });
     }
   };
 
@@ -56,8 +56,7 @@ export const usePrograms = (festId: string | null, options: UseProgramsOptions =
       }
       return true;
     } catch (err: any) {
-      console.error("Error updating program:", err);
-      return false;
+      return reportError('Program not updated', err, { programId: id });
     }
   };
 
@@ -67,8 +66,7 @@ export const usePrograms = (festId: string | null, options: UseProgramsOptions =
       await programService.deleteProgram(festId, id);
       return true;
     } catch (err: any) {
-      console.error("Error deleting program:", err);
-      return false;
+      return reportError('Program not deleted', err, { programId: id });
     }
   };
 

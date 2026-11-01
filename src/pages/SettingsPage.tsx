@@ -58,9 +58,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
   const [maxStudents, setMaxStudents] = useState<number>(settings?.maxStudentsPerTeam || 50);
   const [maxNonGeneral, setMaxNonGeneral] = useState<number>(settings?.maxNonGeneralPerStudent || 3);
   const [showOverallPoints, setShowOverallPoints] = useState<boolean>(settings?.showOverallLeaderboardInPublic ?? true);
-  
+
   const [festName, setFestName] = useState(settings?.festName || 'Arts Fest');
   const [festSlogan, setFestSlogan] = useState(settings?.festSlogan || 'The Art Form of Creativity');
+  const [festVenue, setFestVenue] = useState(settings?.festVenue || '');
+  const [festDates, setFestDates] = useState(settings?.festDates || '');
   const [theme, setTheme] = useState(settings?.theme || 'emerald');
 
   const [isSaving, setIsSaving] = useState(false);
@@ -151,7 +153,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
     if (catName) {
       // Remove any manually typed stage type to prevent duplication like "Kids (Stage) (Stage)"
       catName = catName.replace(/\s*\((Stage|Off-Stage)\)$/i, '').trim();
-      
+
       if (newCategoryType !== 'None') {
         catName = `${catName} (${newCategoryType})`;
       }
@@ -191,6 +193,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
         showOverallLeaderboardInPublic: showOverallPoints,
         festName,
         festSlogan,
+        festVenue,
+        festDates,
         theme: theme as any,
       });
       setIsSaving(false);
@@ -203,7 +207,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [categories, zones, maxStudents, maxNonGeneral, showOverallPoints, festName, festSlogan, theme, updateSettings]);
+  }, [categories, zones, maxStudents, maxNonGeneral, showOverallPoints, festName, festSlogan, festVenue, festDates, theme, updateSettings]);
 
   // ── Custom score helpers ──────────────────────────────────────────────────
   const handleCustomFormChange = (section: 'gradePoints' | 'rankPoints', key: string, value: string) => {
@@ -297,27 +301,46 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
                 placeholder="e.g. A Celebration of Culture"
               />
             </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Venue (School / Place)</label>
+              <input
+                type="text" value={festVenue}
+                onChange={e => setFestVenue(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-indigo-600 outline-none"
+                placeholder="e.g. GHSS Kalady, Ernakulam"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Festival Dates</label>
+              <input
+                type="text" value={festDates}
+                onChange={e => setFestDates(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold focus:border-indigo-600 outline-none"
+                placeholder="e.g. 11, 12 & 13 August 2026"
+              />
+            </div>
           </div>
-          
+          <p className="text-[11px] text-slate-500 -mt-2">The festival name, venue and dates are printed on certificates.</p>
+
           <div>
             <label className="block text-[10px] font-black text-slate-600 uppercase mb-2">Landing Page Theme</label>
             <div className="flex gap-4">
-              <button 
+              <button
                 onClick={() => setTheme('emerald')}
                 className={`w-16 h-16 rounded-2xl border-4 ${theme === 'emerald' ? 'border-emerald-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-emerald-600 via-teal-600 to-amber-500`}
                 title="Emerald & Amber"
               />
-              <button 
+              <button
                 onClick={() => setTheme('purple')}
                 className={`w-16 h-16 rounded-2xl border-4 ${theme === 'purple' ? 'border-purple-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-purple-600 via-fuchsia-600 to-pink-500`}
                 title="Royal Purple & Pink"
               />
-              <button 
+              <button
                 onClick={() => setTheme('blue')}
                 className={`w-16 h-16 rounded-2xl border-4 ${theme === 'blue' ? 'border-blue-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-blue-600 via-cyan-600 to-emerald-400`}
                 title="Ocean Blue & Cyan"
               />
-              <button 
+              <button
                 onClick={() => setTheme('crimson')}
                 className={`w-16 h-16 rounded-2xl border-4 ${theme === 'crimson' ? 'border-rose-600 shadow-md' : 'border-transparent hover:scale-105 transition-transform'} bg-gradient-to-br from-rose-700 via-red-600 to-orange-500`}
                 title="Midnight Crimson & Orange"
@@ -478,7 +501,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
               const isOffStage = cat.includes('(Off-Stage)');
               const typeLabel = isStage ? 'Stage' : isOffStage ? 'Off-Stage' : 'None';
               const baseName = cat.replace(/\s*\((Stage|Off-Stage)\)$/, '').trim();
-              
+
               const toggleType = () => {
                 let newCat = baseName;
                 if (typeLabel === 'Stage') {
@@ -492,8 +515,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
               };
 
               return (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   draggable
                   onDragStart={() => setDraggedCatIdx(idx)}
                   onDragOver={(e) => e.preventDefault()}
@@ -516,8 +539,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, updateSett
                   <button
                     onClick={toggleType}
                     className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border transition-colors ${
-                      isStage ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' : 
-                      isOffStage ? 'bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-100' : 
+                      isStage ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' :
+                      isOffStage ? 'bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-100' :
                       'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
                     }`}
                     title={`Click to change type (Currently: ${typeLabel})`}

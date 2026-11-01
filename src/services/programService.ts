@@ -1,4 +1,5 @@
-import { db, functions } from '../config/firebase';
+import { auth, db, functions } from '../config/firebase';
+import { reportLoadError } from '../utils/errorReporting';
 import { ref, get, set, update, remove, push, onValue } from 'firebase/database';
 import { httpsCallable } from 'firebase/functions';
 import { Program } from '../types';
@@ -35,7 +36,7 @@ export const programService = {
     callback: (programs: Program[]) => void,
     { access = 'private', judgePanel }: { access?: ProgramAccess; judgePanel?: string } = {}
   ) => {
-    const onError = (error: Error) => { console.error('Firebase Subscription Error:', error); callback([]); };
+    const onError = (error: Error) => { reportLoadError('programs', error, !!auth.currentUser); callback([]); };
 
     if (access === 'private') {
       return onValue(ref(db, `fests/${festId}/programs`), (snapshot) => callback(toProgramList(snapshot.val())), onError);

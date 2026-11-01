@@ -22,8 +22,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     const [filter, setFilter] = useState<ProgramStatus | 'ALL'>('ALL');
     const [sortBy, setSortBy] = useState<'name' | 'time' | 'category'>('name');
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null);
-    const [cancelProgramId, setCancelProgramId] = useState<string | null>(null);
+    const [selectedParticipantName, setSelectedParticipantName] = useState<string | null>(null);
     const [exportProgress, setExportProgress] = useState<{ current: number, total: number, label: string } | null>(null);
     const [isExporting, setIsExporting] = useState(false);
 
@@ -46,9 +45,9 @@ export const ProgramList: React.FC<ProgramListProps> = ({
     const handleDeleteRequest = async (id: string) => {
         const program = programs.find(p => p.id === id);
         if (program?.isAllocatedToJudge || program?.status === ProgramStatus.JUDGING) return appDialog.alert('This program has been allocated to a Judge Panel. You cannot delete an active judging program.', { variant: 'warning', title: 'Cannot delete program' });
-        const programName = program?.name || 'this program';
+        // A failed delete/update is reported to the user by usePrograms.
         if (deleteProgram) {
-            if (!(await deleteProgram(id))) appDialog.alert(`Failed to delete "${programName}" from the database. Please try again.`, { variant: 'danger', title: 'Delete failed' });
+            await deleteProgram(id);
         } else setPrograms(p => p.filter(x => x.id !== id));
     };
 
@@ -58,7 +57,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         if (updateProgram) {
             const updates: Partial<Program> = { status: newStatus };
             if (newStatus === ProgramStatus.PENDING) { updates.isAllocatedToJudge = false; updates.judgePanel = null as any; }
-            if (!(await updateProgram(id, updates))) console.error('Failed to update status');
+            await updateProgram(id, updates);
         } else setPrograms(p => p.map(x => x.id === id ? { ...x, status: newStatus } : x));
     };
 
@@ -71,7 +70,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
             if (!await appDialog.confirm('Recalling this program will remove it from the judge\'s panel/Green Room and reset it to PENDING. Continue?', { variant: 'warning', title: 'Recall program', confirmText: 'Recall' })) return;
             updates.status = ProgramStatus.PENDING; updates.isAllocatedToJudge = false; updates.isResultPublished = false;
         }
-        if (updateProgram) { if (!(await updateProgram(id, updates))) console.error('Failed to update publish status'); }
+        if (updateProgram) { await updateProgram(id, updates); }
         else setPrograms(p => p.map(x => x.id === id ? { ...x, ...updates } : x));
     };
 
@@ -88,7 +87,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
         }
 
         if (updateProgram) {
-            if (!(await updateProgram(id, updates))) console.error('Failed to update result publish status');
+            await updateProgram(id, updates);
         } else {
             setPrograms(p => p.map(x => x.id === id ? { ...x, ...updates } : x));
         }
@@ -152,7 +151,7 @@ export const ProgramList: React.FC<ProgramListProps> = ({
             <select value={filter} onChange={e => setFilter(e.target.value as any)} className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold uppercase tracking-wide text-slate-700 outline-none cursor-pointer"><option value="ALL">All States</option>{Object.values(ProgramStatus).map(s => <option key={s} value={s}>{s}</option>)}</select>
           </div>
         </div>
-        <div className="space-y-3">{filteredPrograms.map(prog => <ProgramAccordion key={prog.id} program={prog} onUpdateStatus={handleStatusUpdate} onDelete={handleDeleteRequest} onEdit={onEdit} onSelectParticipant={setSelectedParticipantName} onPublish={handlePublish} onPublishResult={handlePublishResult} onRequestCancel={setCancelProgramId} onUpdateProgram={updateProgram} customScores={customScores} staffs={staffs} allPrograms={programs} onPrintCertificate={handlePrintProgramCertificates} onDownloadPoster={handleDownloadProgramPoster} />)}</div>
+        <div className="space-y-3">{filteredPrograms.map(prog => <ProgramAccordion key={prog.id} program={prog} onUpdateStatus={handleStatusUpdate} onDelete={handleDeleteRequest} onEdit={onEdit} onSelectParticipant={setSelectedParticipantName} onPublish={handlePublish} onPublishResult={handlePublishResult} onRequestCancel={(id) => handleStatusUpdate(id, ProgramStatus.CANCELLED)} onUpdateProgram={updateProgram} customScores={customScores} staffs={staffs} allPrograms={programs} onPrintCertificate={handlePrintProgramCertificates} onDownloadPoster={handleDownloadProgramPoster} />)}</div>
       </div>
       {exportProgress && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">

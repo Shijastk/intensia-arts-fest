@@ -13,6 +13,9 @@ import { PublishingPage } from './PublishingPage';
 import { aggregateParticipants, buildCertificateData, cleanFestName, safeFileName } from '../services/exportService';
 import { exportCertificatesPdf } from '../components/generators/OffscreenRenderer';
 import { appDialog } from '../components/ui/AppDialog';
+import { programService } from '../services/programService';
+import { studentService } from '../services/studentService';
+import { reportError } from '../utils/errorReporting';
 import { parseScheduleTime, toStoredTime, addMinutes } from '../utils/timeUtils';
 
 interface AdminPageProps {
@@ -56,7 +59,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
   const handleToggleAllToGR = () => {
     if (isUpdatingSettings) return;
-    
+
     if (eligibleForGR.length === 0) {
       appDialog.alert('No pending events with performers found.', { title: 'Notice' });
       return;
@@ -65,22 +68,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     setModalConfig({
       isOpen: true,
       title: allInGR ? 'Recall All' : 'Send All to GR',
-      message: allInGR 
-        ? 'Are you sure you want to recall ALL eligible events from the Green Room?' 
+      message: allInGR
+        ? 'Are you sure you want to recall ALL eligible events from the Green Room?'
         : 'Are you sure you want to send ALL eligible events to the Green Room?',
       confirmVariant: allInGR ? 'warning' : 'primary',
       confirmText: allInGR ? 'Yes, Recall' : 'Yes, Send All',
       onConfirm: async () => {
         setIsUpdatingSettings(true);
         const targetState = !allInGR;
-        
+
         const updatePromises = eligibleForGR.map(p => {
           if (p.isPublished !== targetState) {
             return updateProgram(p.id, { isPublished: targetState });
           }
           return Promise.resolve(true);
         });
-        
+
         await Promise.all(updatePromises);
         setIsUpdatingSettings(false);
       }
@@ -92,14 +95,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [isGroup, setIsGroup] = useState(false);
-  
+
   // Individual certificate state
   const [isCertExporting, setIsCertExporting] = useState(false);
-  
+
   // Staff Modal State
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
-  
+
   // Custom Confirmation Modal State for Staff Deletion
   const [staffDeleteId, setStaffDeleteId] = useState<string | null>(null);
   // Confirmations use the shared AppDialog (same styled modal); this keeps the old call shape.
@@ -157,7 +160,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const handleSaveProgram = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
     // In edit mode, it might still be name (if we didn't change it), but we changed it to 'names' in the form
     const namesStr = formData.get('names') as string;
     const names = namesStr.split('\n').map(n => n.trim()).filter(n => n);
@@ -198,7 +201,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         if (!added) success = false;
       }
     }
-    
+
     if (success) {
       if (!editingProgram) {
         (e.target as HTMLFormElement).reset();
@@ -219,26 +222,24 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         const oldTeamName = editingStaff.teamName;
         const newTeamName = staffData.teamName;
         if (oldTeamName && newTeamName && oldTeamName !== newTeamName) {
-          const updatePromises = programs.map(async (p) => {
-            if (!p.teams) return;
-            let changed = false;
-            const updatedTeams = (p.teams || []).map(t => {
-              if (t.teamName.toLowerCase() === oldTeamName.toLowerCase()) {
-                changed = true;
-                return { ...t, teamName: newTeamName };
-              }
-              return t;
-            });
-            if (changed) {
-              await updateProgram(p.id, { teams: updatedTeams });
-            }
-          });
-          await Promise.all(updatePromises);
+          const changes = programs
+            .filter(p => (p.teams || []).some(t => t.teamName.toLowerCase() === oldTeamName.toLowerCase()))
+            .map(p => ({
+              id: p.id,
+              updates: { teams: (p.teams || []).map(t => t.teamName.toLowerCase() === oldTeamName.toLowerCase() ? { ...t, teamName: newTeamName } : t) }
+            }));
+          try {
+            await programService.batchUpdatePrograms(programs[0]?.festId, changes);
+          } catch (err) {
+            reportError('Team not renamed', err, { oldTeamName, newTeamName });
+            return;
+          }
         }
       }
-      await updateStaff(editId, staffData);
+      // The staff functions show their own error message; keep the form open so nothing typed is lost.
+      if (!(await updateStaff(editId, staffData))) return;
     } else {
-      await addStaff(staffData);
+      if (!(await addStaff(staffData))) return;
     }
     setEditingStaff(null);
     setShowStaffModal(false);
@@ -260,7 +261,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 font-sans">
-      
+
       {/* HEADER - Image 1 Style */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
         {/* Top bar on mobile (Title + Add Button) / Left section on desktop (Title only) */}
@@ -273,8 +274,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
 
           {/* Add Event Button for Mobile/Tablet (Top Right) */}
-          <button 
-            onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
+          <button
+            onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }}
             className="xl:hidden px-3.5 sm:px-5 py-2 sm:py-2.5 bg-[#3B3BFA] hover:bg-blue-700 text-white rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-widest shadow-md shadow-blue-500/30 transition-all flex items-center gap-1.5 shrink-0"
           >
             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
@@ -282,7 +283,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             <span className="sm:hidden">Add</span>
           </button>
         </div>
-        
+
         {/* Controls Container: Row 2 on Mobile/Tablet, Right side of Row 1 on Desktop */}
         <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto custom-scrollbar pb-1 xl:pb-0 w-full xl:w-auto xl:justify-end shrink-0">
           {/* Quick Toggle */}
@@ -310,25 +311,25 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
 
           {/* Add Event Button for Desktop */}
-          <button 
-            onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }} 
+          <button
+            onClick={() => { setEditingProgram(null); setIsGroup(false); setShowProgramModal(true); }}
             className="hidden xl:flex px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider shadow-md transition-all items-center gap-2 shrink-0 whitespace-nowrap"
           >
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
             Add Event
           </button>
-          
+
           {/* Bulk Upload */}
-          <button 
-            onClick={() => setShowBulkUploadModal(true)} 
+          <button
+            onClick={() => setShowBulkUploadModal(true)}
             className="px-4 py-2.5 bg-white text-blue-800 border border-slate-200 hover:bg-slate-50 rounded-xl text-[11px] font-bold uppercase tracking-wider shadow-sm transition-all flex items-center gap-2 shrink-0 whitespace-nowrap"
           >
             <svg className="w-4 h-4 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-            Bulk Upload 
+            Bulk Upload
           </button>
         </div>
       </div>
-      
+
       {/* TAB NAVIGATION */}
       <div className="flex flex-wrap w-full gap-1 sm:gap-2 border-b border-slate-200 pb-2 mb-6">
         {[
@@ -411,13 +412,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     </div>
                 </div>
             </div>
-            
+
             <ProgramList programs={programs} setPrograms={setPrograms} deleteProgram={deleteProgram} updateProgram={updateProgram} onEdit={(p) => { setEditingProgram(p); setShowProgramModal(true); }} customScores={settings?.customScores} staffs={staffs} />
           </div>
         )}
 
         {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} festId={programs[0]?.festId} settings={settings} updateSettings={updateSettings} />}
-        
+
         {activeTab === 'results' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
             <ConsolidationView programs={programs} zones={settings?.zones} />
@@ -447,26 +448,29 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           }
         }} deleteParticipant={async (chestNo) => {
           if (!await appDialog.confirm(`Are you SURE you want to completely delete participant (Chest No: ${chestNo}) from the entire festival? This will remove them from ALL programs. This action cannot be undone.`, { variant: 'danger', title: 'Delete participant', confirmText: 'Delete' })) return;
-          
-          const updatePromises = programs.map(async (p) => {
-            if (!p.teams) return;
-            let changed = false;
-            const updatedTeams = (p.teams || []).map(t => {
-              const initialLen = t.participants?.length || 0;
-              const newParticipants = (t.participants || []).filter(pt => pt.chestNumber !== chestNo);
-              if (newParticipants.length !== initialLen) changed = true;
-              return { ...t, participants: newParticipants };
-            }).filter(t => t.participants && (t.participants || []).length > 0);
-            
-            if (changed) {
-              await updateProgram(p.id, { teams: updatedTeams });
+
+          const festId = programs[0]?.festId;
+          if (!festId) {
+            appDialog.alert('The fest could not be identified, so nothing was deleted. Please reload the page and try again.', { variant: 'danger', title: 'Participant not deleted' });
+            return false;
+          }
+          try {
+            const { programCount, studentCount } = await studentService.removeParticipantEverywhere(festId, programs, chestNo);
+            if (programCount === 0 && studentCount === 0) {
+              appDialog.alert(`Chest No ${chestNo} was not found in any program or in the student list. Nothing was deleted.`, { variant: 'warning', title: 'Participant not found' });
+              return false;
             }
-          });
-          
-          await Promise.all(updatePromises);
-          appDialog.alert('Participant completely deleted from all programs.', { variant: 'success', title: 'Participant deleted' });
+            const places = [
+              programCount ? `${programCount} program${programCount === 1 ? '' : 's'}` : '',
+              studentCount ? 'the student list' : ''
+            ].filter(Boolean).join(' and ');
+            appDialog.alert(`Chest No ${chestNo} was removed from ${places}.`, { variant: 'success', title: 'Participant deleted' });
+            return true;
+          } catch (err) {
+            return reportError('Participant not deleted', err, { chestNo });
+          }
         }} />}
-                 
+
         {activeTab === 'requests' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
             {pendingRequests.length === 0 ? (
@@ -566,31 +570,32 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       </div>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-                      <button 
-                        onClick={() => updateStaff(staff.id, { isDisabled: !staff.isDisabled })} 
+                      <button
+                        onClick={() => updateStaff(staff.id, { isDisabled: !staff.isDisabled })}
                         className={`flex-1 sm:flex-none px-4 py-2 border rounded-lg text-xs font-bold transition-all
                           ${staff.isDisabled ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                       >
                         {staff.isDisabled ? 'Enable' : 'Disable'}
                       </button>
                       <button onClick={() => { setEditingStaff(staff); setShowStaffModal(true); }} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:border-indigo-400 rounded-lg text-xs font-bold transition-all">Edit</button>
-                      
+
                       {staff.role === 'TEAM_LEADER' && staff.teamName && (
                         <button onClick={async () => {
                           if (!await appDialog.confirm(`Are you SURE you want to completely wipe out ALL participants and entries for Team "${staff.teamName}" from EVERY program? This action CANNOT be undone.`, { variant: 'danger', title: 'Wipe team', confirmText: 'Wipe team' })) return;
-                          
-                          const updatePromises = programs.map(async (p) => {
-                            if (!p.teams) return;
-                            const newTeams = (p.teams || []).filter(t => t.teamName.toLowerCase() !== staff.teamName!.toLowerCase());
-                            if (newTeams.length !== (p.teams || []).length) {
-                              await updateProgram(p.id, { teams: newTeams });
-                            }
-                          });
-                          await Promise.all(updatePromises);
-                          appDialog.alert(`Team "${staff.teamName}" data wiped from all programs.`, { variant: 'success', title: 'Team wiped' });
+
+                          const team = staff.teamName!.toLowerCase();
+                          const changes = programs
+                            .filter(p => (p.teams || []).some(t => t.teamName.toLowerCase() === team))
+                            .map(p => ({ id: p.id, updates: { teams: (p.teams || []).filter(t => t.teamName.toLowerCase() !== team) } }));
+                          try {
+                            await programService.batchUpdatePrograms(programs[0]?.festId, changes);
+                            appDialog.alert(`Team "${staff.teamName}" was removed from ${changes.length} program${changes.length === 1 ? '' : 's'}.`, { variant: 'success', title: 'Team wiped' });
+                          } catch (err) {
+                            reportError('Team not wiped', err, { team: staff.teamName });
+                          }
                         }} className="flex-1 sm:flex-none px-4 py-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-bold transition-all" title="Delete Team from all Programs">Wipe Team</button>
                       )}
-                      
+
                       <button onClick={() => confirmDeleteStaff(staff.id, staff.username)} className="flex-1 sm:flex-none px-4 py-2 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-bold transition-all">Delete Staff</button>
                     </div>
                   </div>
@@ -604,12 +609,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           <PublishingPage festId={programs[0]?.festId || 'default-fest'} />
         )}
       </div>
-             
+
       <ProgramFormModal show={showProgramModal} onClose={() => { setShowProgramModal(false); setEditingProgram(null); setIsGroup(false); }} onSave={handleSaveProgram} editingProgram={editingProgram} isGroup={isGroup} setIsGroup={setIsGroup} categories={settings?.categories || CATEGORIES} zones={settings?.zones || ZONES} />
-      
+
       <BulkUploadModal show={showBulkUploadModal} onClose={() => setShowBulkUploadModal(false)} addProgram={addProgram} programs={programs} updateProgram={updateProgram} />
 
-      <StaffCredentialModal 
+      <StaffCredentialModal
          festId={programs[0]?.festId || 'default-fest'}
          isOpen={showStaffModal}
          onClose={() => { setShowStaffModal(false); setEditingStaff(null); }}

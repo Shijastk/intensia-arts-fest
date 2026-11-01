@@ -92,6 +92,10 @@ export const fontStack = (family?: string): string => {
 // Template config defaults
 // ---------------------------------------------------------------------------
 
+/**
+ * Venue/dates that used to be hard-coded. Older saved certificate designs may still contain
+ * them; they are treated as "not set" so the fest's own Settings are used instead.
+ */
 export const LEGACY_CERT_VENUE = 'Ismath Campus, Ismath English School Kalad';
 export const LEGACY_CERT_DATES = '11, 12 & 13 August 2026';
 /** Reproduces the sentence that used to be hard-coded in CertificateTemplate. */
@@ -123,8 +127,7 @@ export const TEMPLATE_DEFAULTS: Record<BackgroundType, TemplateConfig> = {
     letterSpacing: 0.05,
     lineHeight: 1.625,
     bodyTemplate: DEFAULT_CERT_BODY_TEMPLATE,
-    festVenue: LEGACY_CERT_VENUE,
-    festDates: LEGACY_CERT_DATES,
+    // festVenue / festDates: no default. They come from the fest's Settings unless a design overrides them.
   },
   posterBgs: {
     ...BG_DEFAULTS,
@@ -186,7 +189,27 @@ export interface PickedTemplate {
   /** Background URL ('' for blank). */
   url: string;
   config: TemplateConfig;
+  /** Fest name / venue / dates from the fest's Settings (loaded for exports). */
+  fest?: FestDetails;
 }
+
+/** Fest identity from Settings, used on certificates. */
+export interface FestDetails { festName?: string; festVenue?: string; festDates?: string }
+
+const designValue = (value: string | undefined, legacy: string) => {
+  const v = (value || '').trim();
+  return v && v !== legacy ? v : '';
+};
+
+/** A value typed in the certificate design wins; otherwise the fest's Settings; otherwise empty. */
+export const resolveCertificateFestText = (config: TemplateConfig, fest: FestDetails = {}) => ({
+  venue: designValue(config.festVenue, LEGACY_CERT_VENUE) || (fest.festVenue || '').trim(),
+  date: designValue(config.festDates, LEGACY_CERT_DATES) || (fest.festDates || '').trim(),
+});
+
+/** Fest name for certificates: the name in Settings, else the name derived from the fest id. */
+export const certificateFestName = (fest: FestDetails | undefined, festId?: string | null) =>
+  (fest?.festName || '').trim() || cleanFestName(festId);
 
 /** Folds the legacy single-image fields into the per-type maps. */
 export const getBackgroundMap = (backgrounds: BackgroundSettings | null | undefined, type: BackgroundType): Record<string, string> => {

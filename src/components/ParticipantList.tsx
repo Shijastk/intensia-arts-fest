@@ -6,7 +6,8 @@ import { StudentBulkEntryModal } from './StudentBulkEntryModal';
 
 interface ParticipantListProps {
   programs: Program[];
-  deleteParticipant?: (chestNo: string) => Promise<void>;
+  /** Resolves true when the participant was deleted (errors are shown by the caller). */
+  deleteParticipant?: (chestNo: string) => Promise<boolean | void>;
   onPrintCertificate?: (participant: { name: string; chestNumber: string; teamName: string; programNames: string[] }) => void;
 }
 
@@ -29,7 +30,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
 
   const participants = useMemo(() => {
     const map = new Map<string, any>();
-    
+
     // 1. Add global students
     students.forEach(s => {
       map.set(s.chestNumber, {
@@ -77,14 +78,14 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
       <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row gap-3 justify-between items-center">
         <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">All Performers ({participants.length})</h3>
         <div className="flex gap-2 w-full sm:w-auto">
-          <input 
-            type="text" 
-            placeholder="Search by name or chest no..." 
+          <input
+            type="text"
+            placeholder="Search by name or chest no..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full sm:w-64 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-600"
           />
-          <button 
+          <button
             onClick={() => setShowBulkModal(true)}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 whitespace-nowrap shadow-sm transition-all"
           >
@@ -93,11 +94,11 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
         </div>
       </div>
 
-      <StudentBulkEntryModal 
-         show={showBulkModal} 
-         onClose={() => setShowBulkModal(false)} 
-         onSave={addBulkStudents} 
-         availableTeams={availableTeams} 
+      <StudentBulkEntryModal
+         show={showBulkModal}
+         onClose={() => setShowBulkModal(false)}
+         onSave={addBulkStudents}
+         availableTeams={availableTeams}
          existingChestNumbers={participants.map(p => p.chestNumber)}
       />
 
@@ -120,7 +121,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
                  </div>
                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
                    {onPrintCertificate && (
-                     <button 
+                     <button
                        onClick={() => onPrintCertificate({
                          name: p.name,
                          chestNumber: p.chestNumber,
@@ -133,7 +134,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                      </button>
                    )}
-                   <button 
+                   <button
                      onClick={() => setSelectedParticipant(p)}
                      className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-slate-600 rounded text-[10px] font-bold uppercase transition-all"
                    >
@@ -155,7 +156,7 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
               <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">Performer Info</h3>
               <button onClick={() => setSelectedParticipant(null)} className="text-slate-400 hover:text-slate-600 font-bold text-lg leading-none">✕</button>
             </div>
-            
+
             {/* Modal Body */}
             <div className="p-6 text-center border-b border-slate-100">
               <div className="w-16 h-16 mx-auto bg-indigo-100 text-indigo-700 font-black text-2xl rounded-full flex items-center justify-center mb-3">
@@ -198,8 +199,8 @@ export const ParticipantList: React.FC<ParticipantListProps> = ({ programs, dele
             <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-2">
                {deleteParticipant && (
                  <button onClick={async () => {
-                   await deleteParticipant(selectedParticipant.chestNumber);
-                   setSelectedParticipant(null);
+                   // Keep the details open when the delete was cancelled or failed.
+                   if (await deleteParticipant(selectedParticipant.chestNumber)) setSelectedParticipant(null);
                  }} className="w-full py-2.5 bg-rose-50 text-rose-600 text-xs font-bold rounded-lg uppercase tracking-wider hover:bg-rose-100 transition-colors border border-rose-200 shadow-sm">
                     Delete Participant Completely
                  </button>

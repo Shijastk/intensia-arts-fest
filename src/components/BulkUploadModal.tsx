@@ -123,8 +123,12 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
 
   const uploadPrograms = async () => {
     try {
+      let added = 0;
       for (const item of parsedData) {
-        await addProgram(item);
+        if (!(await addProgram(item))) {
+          throw new Error(`Stopped at "${item.name}": ${added} of ${parsedData.length} programs were added. Fix the problem and upload the remaining rows again.`);
+        }
+        added++;
       }
       setSuccessCount(parsedData.length);
       setParsedData([]);
@@ -216,12 +220,13 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ show, onClose,
             }
         }
 
-        await updateProgram(matchingProgram.id, { 
+        const saved = await updateProgram(matchingProgram.id, {
           teams: updatedTeams,
           participantsCount: newParticipantsCount,
           groupCount: newGroupCount,
           membersPerGroup: newMembersPerGroup
         });
+        if (!saved) throw new Error(`Stopped at program "${matchingProgram.name}". Programs before it were saved; check them before uploading again.`);
       }
 
       setSuccessCount(totalUploaded);

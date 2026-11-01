@@ -250,11 +250,13 @@ export const GreenRoomPage: React.FC<GreenRoomPageProps> = ({ programs, setProgr
                             });
                             const toUpdate = (programs || []).filter(p => p?.status === ProgramStatus.COMPLETED && p?.isResultPublished && typeof p?.resultPublishedOrder !== 'number');
                             if (toUpdate.length === 0) { appDialog.alert('No missing orders found.'); return; }
+                            let fixed = 0;
                             for (const p of toUpdate) {
                                 maxOrder++;
-                                await updateProgram(p.id, { resultPublishedOrder: maxOrder });
+                                if (!(await updateProgram(p.id, { resultPublishedOrder: maxOrder }))) break; // error already shown
+                                fixed++;
                             }
-                            appDialog.alert(`Fixed ${toUpdate.length} programs!`);
+                            if (fixed > 0) appDialog.alert(`Fixed ${fixed} of ${toUpdate.length} programs.`, { variant: fixed === toUpdate.length ? 'success' : 'warning' });
                         }} className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-[11px] sm:text-xs font-black uppercase tracking-wide transition-all whitespace-nowrap bg-amber-100 text-amber-700 hover:bg-amber-200">Fix Missing Orders</button>}
                     </div>
                     {activeTab === 'PROGRAMS' && (
