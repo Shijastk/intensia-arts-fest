@@ -1,19 +1,51 @@
-import { auth, db, functions, googleProvider } from '../config/firebase';
-import { signInWithCustomToken, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
+import { auth, db, googleProvider } from '../config/firebase';
+import { signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
 import { ref, get, set, update } from 'firebase/database';
-import { httpsCallable } from 'firebase/functions';
 import { User } from '../types';
+import { normalizeUsername, staffPasswordMatches } from '../utils/staffPassword';
+import { describeError } from '../utils/errorReporting';
 
 // UI-only selection of which fest a Super Admin is viewing. It grants nothing: the
 // database rules check the verified superAdmin custom claim on every request.
 const SUPER_ADMIN_FEST_KEY = 'Intensia_super_admin_fest';
 
-const callableMessage = (error: any, fallback: string) => {
-  // Callable errors look like { code: 'functions/unauthenticated', message: '...' }.
-  if (error?.code === 'functions/unavailable' || error?.code === 'functions/internal') {
-    return error?.message && error.message !== 'internal' ? error.message : fallback;
-  }
-  return error?.message || fallback;
+// Staff sessions (no Firebase Auth on the free plan): which staff record this browser logged
+// in as. The password hash is kept so a password change or account removal ends the session.
+const STAFF_SESSION_KEY = 'Intensia_staff_session';
+type StaffSession = { festId: string; staffId: string; check: string };
+
+const readStaffSession = (): StaffSession | null => {
+  try {
+    const value = JSON.parse(localStorage.getItem(STAFF_SESSION_KEY) || 'null');
+    return value && typeof value.festId === 'string' && typeof value.staffId === 'string' ? value : null;
+  } catch { return null; }
+};
+const writeStaffSession = (session: StaffSession | null) => {
+  try {
+    if (session) localStorage.setItem(STAFF_SESSION_KEY, JSON.stringify(session));
+    else localStorage.removeItem(STAFF_SESSION_KEY);
+  } catch { /* storage unavailable */ }
+};
+const passwordCheck = (staff: any) => String(staff?.passwordHash ?? staff?.password ?? '');
+
+const staffUser = (festId: string, staffId: string, staff: any): User => ({
+  uid: `staff:${festId}:${staffId}`,
+  staffId,
+  username: staff.username,
+  role: staff.role,
+  festId,
+  displayName: staff.displayName || staff.username,
+  ...(staff.judgePanel && { judgePanel: staff.judgePanel }),
+  ...(staff.teamName && { teamName: staff.teamName })
+});
+
+/** Super Admin = Google account listed under /superAdmins/{uid} or with the superAdmin claim. */
+export const isSuperAdminUser = async (user: FirebaseUser, forceRefresh = false): Promise<boolean> => {
+  const token = await user.getIdTokenResult(forceRefresh);
+  if (token.signInProvider !== 'google.com') return false;
+  if (token.claims.superAdmin === true) return true;
+  const snap = await get(ref(db, `superAdmins/${user.uid}`)).catch(() => null);
+  return snap?.val() === true;
 };
 
 export const authService = {
@@ -21,6 +53,7 @@ export const authService = {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      writeStaffSession(null);
       const userRef = ref(db, `users/${user.uid}`);
       const snapshot = await get(userRef);
 
@@ -47,59 +80,54 @@ export const authService = {
   },
 
   /**
-   * Staff / Judge / Green Room / Team Leader login. Credentials are verified by the
-   * staffLogin Cloud Function (bcrypt hashes the browser can never read), which returns a
-   * custom token for a Firebase session scoped to this fest.
+   * Staff / Judge / Green Room / Team Leader login with the username and password the fest
+   * admin created. Checked against the salted hash on the staff record.
    */
   async loginStaff(username: string, pass: string, specificFestId?: string): Promise<{ success: boolean; user?: User; error?: string }> {
     if (!specificFestId) {
       return { success: false, error: "Use your fest's staff login link (…/fests/<fest-id>/login)." };
     }
     try {
-      const staffLogin = httpsCallable<{ festId: string; username: string; password: string }, { token: string }>(functions, 'staffLogin');
-      const { data } = await staffLogin({ festId: specificFestId, username: String(username).trim(), password: String(pass).trim() });
-      if (auth.currentUser) await signOut(auth);
-      const credential = await signInWithCustomToken(auth, data.token);
-      const user = await authService.resolveSession(credential.user);
-      if (!user) return { success: false, error: 'Login succeeded but the staff profile could not be loaded.' };
-      return { success: true, user };
+      const snapshot = await get(ref(db, `fests/${specificFestId}/staff`));
+      const all = (snapshot.val() || {}) as Record<string, any>;
+      const wanted = normalizeUsername(username);
+      const password = String(pass).trim();
+      let disabled = false;
+      for (const [staffId, staff] of Object.entries(all)) {
+        if (!staff || normalizeUsername(staff.username) !== wanted) continue;
+        if (!(await staffPasswordMatches(staff, password))) continue;
+        if (staff.isDisabled === true) { disabled = true; continue; }
+        if (auth.currentUser) await signOut(auth);
+        writeStaffSession({ festId: specificFestId, staffId, check: passwordCheck(staff) });
+        return { success: true, user: staffUser(specificFestId, staffId, staff) };
+      }
+      return { success: false, error: disabled ? 'This account has been disabled by the administrator.' : 'Invalid username or password.' };
     } catch (error: any) {
       console.error('Staff login error:', error);
-      return { success: false, error: callableMessage(error, 'Login failed. Please try again.') };
+      return { success: false, error: describeError(error) };
     }
   },
 
   /**
-   * Builds the app user from the verified Firebase session only (token claims + the
-   * database). Nothing stored in localStorage/sessionStorage is trusted.
+   * Builds the app user from the Google session (admins) or the saved staff login, which is
+   * re-checked against the database every time (removed / disabled accounts are logged out).
    */
   async resolveSession(firebaseUser: FirebaseUser | null): Promise<User | null> {
-    if (!firebaseUser) return null;
-    const tokenResult = await firebaseUser.getIdTokenResult();
-    const claims = tokenResult.claims as Record<string, any>;
-    const provider = tokenResult.signInProvider;
-
-    if (typeof claims.staffId === 'string' && typeof claims.festId === 'string') {
-      const snap = await get(ref(db, `fests/${claims.festId}/staff/${claims.staffId}`));
+    if (!firebaseUser) {
+      const session = readStaffSession();
+      if (!session) return null;
+      const snap = await get(ref(db, `fests/${session.festId}/staff/${session.staffId}`));
       const staff = snap.val();
-      if (!staff || staff.isDisabled === true) {
-        await signOut(auth);
+      if (!staff || staff.isDisabled === true || passwordCheck(staff) !== session.check) {
+        writeStaffSession(null);
         return null;
       }
-      return {
-        uid: firebaseUser.uid,
-        staffId: claims.staffId,
-        username: staff.username,
-        role: staff.role,
-        festId: claims.festId,
-        displayName: staff.displayName || staff.username,
-        ...(staff.judgePanel && { judgePanel: staff.judgePanel }),
-        ...(staff.teamName && { teamName: staff.teamName })
-      };
+      return staffUser(session.festId, session.staffId, staff);
     }
+    const provider = (await firebaseUser.getIdTokenResult()).signInProvider;
 
     if (provider === 'google.com') {
-      const isSuperAdmin = claims.superAdmin === true;
+      const isSuperAdmin = await isSuperAdminUser(firebaseUser);
       const snap = await get(ref(db, `users/${firebaseUser.uid}`)).catch(() => null);
       const profile = snap?.val() || {};
       if (profile.isActive === false) {
@@ -118,9 +146,9 @@ export const authService = {
       };
     }
 
-    // Legacy anonymous sessions (old staff login) carry no identity: end them.
+    // Any other Firebase session (old anonymous / custom-token staff logins): end it.
     await signOut(auth);
-    return null;
+    return authService.resolveSession(null);
   },
 
   setSuperAdminFest(festId: string | null) {
@@ -149,6 +177,7 @@ export const authService = {
 
   async logout() {
     authService.setSuperAdminFest(null);
+    writeStaffSession(null);
     await signOut(auth);
   }
 };

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ref, get, remove, update } from 'firebase/database';
-import { db, auth, functions, googleProvider } from '../config/firebase';
+import { db, auth, googleProvider } from '../config/firebase';
 import { Shield, Trash2, Power, PowerOff, Layout, ExternalLink, LogOut, Download } from 'lucide-react';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
+import { staffPasswordFields } from '../utils/staffPassword';
+import { isSuperAdminUser } from '../services/authService';
 import { useNavigate } from 'react-router-dom';
 import { downloadFestBackup } from '../utils/supremeAdminBackup';
 import { appDialog } from '../components/ui/AppDialog';
@@ -19,14 +20,13 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
   const [errorMsg, setErrorMsg] = useState('');
   const [backupFestId, setBackupFestId] = useState<string | null>(null);
 
-  // Super Admin access requires a Google sign-in whose ID token carries the superAdmin
-  // custom claim. The claim can only be set server-side (functions/scripts/set-super-admin.mjs)
-  // and the database rules check it on every request, so nothing in the browser can fake it.
+  // Super Admin access requires a Google sign-in listed under /superAdmins/{uid} (added in the
+  // Firebase Console) or carrying the superAdmin custom claim. The database rules check the
+  // same on every request, so nothing in the browser can fake it.
   const checkSuperAdmin = async (): Promise<boolean> => {
     const user = auth.currentUser;
     if (!user) return false;
-    const token = await user.getIdTokenResult(true);
-    return token.signInProvider === 'google.com' && token.claims.superAdmin === true;
+    return isSuperAdminUser(user, true);
   };
 
   useEffect(() => {
@@ -65,12 +65,27 @@ export const SuperAdminPage = ({ onEnterFest }: { onEnterFest?: (festId: string)
 
   const handleMigration = async () => {
     if (migrating) return;
-    if (!await appDialog.confirm('Run the security migration? It hashes every remaining plaintext staff password (staff keep their current passwords) and rebuilds the public results copy. It is safe to run more than once.', { variant: 'warning', title: 'Run security migration', confirmText: 'Run migration' })) return;
+    if (!await appDialog.confirm('Run the security migration? It replaces every remaining plain-text staff password with a hash (staff keep their current passwords). It is safe to run more than once.', { variant: 'warning', title: 'Run security migration', confirmText: 'Run migration' })) return;
     setMigrating(true);
     try {
-      const migrate = httpsCallable(functions, 'migrateSecurity', { timeout: 540000 });
-      const { data } = await migrate({});
-      appDialog.alert('Migration finished:\n' + JSON.stringify(data, null, 2), { variant: 'success', title: 'Migration finished' });
+      const festsSnap = await get(ref(db, 'fests'));
+      const changes: Record<string, unknown> = {};
+      let hashed = 0;
+      for (const [festId, fest] of Object.entries((festsSnap.val() || {}) as Record<string, any>)) {
+        for (const [staffId, staff] of Object.entries((fest?.staff || {}) as Record<string, any>)) {
+          if (!staff || staff.password === undefined || staff.password === null) continue;
+          const path = `fests/${festId}/staff/${staffId}`;
+          if (!staff.passwordHash) {
+            const fields = await staffPasswordFields(String(staff.password).trim());
+            changes[`${path}/passwordHash`] = fields.passwordHash;
+            changes[`${path}/passwordSalt`] = fields.passwordSalt;
+          }
+          changes[`${path}/password`] = null;
+          hashed++;
+        }
+      }
+      if (hashed) await update(ref(db), changes);
+      appDialog.alert(`Migration finished: ${hashed} plain-text password(s) replaced with hashes.`, { variant: 'success', title: 'Migration finished' });
       fetchData();
     } catch (err: any) {
       appDialog.alert('Migration failed: ' + (err?.message || 'Unknown error'));

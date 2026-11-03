@@ -1,7 +1,6 @@
-import { auth, db, functions } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { reportLoadError } from '../utils/errorReporting';
 import { ref, get, set, update, remove, push, onValue } from 'firebase/database';
-import { httpsCallable } from 'firebase/functions';
 import { Program } from '../types';
 
 export type ProgramAccess = 'private' | 'public' | 'judge';
@@ -37,56 +36,28 @@ export const programService = {
     { access = 'private', judgePanel }: { access?: ProgramAccess; judgePanel?: string } = {}
   ) => {
     const onError = (error: Error) => { reportLoadError('programs', error, !!auth.currentUser); callback([]); };
-
-    if (access === 'private') {
-      return onValue(ref(db, `fests/${festId}/programs`), (snapshot) => callback(toProgramList(snapshot.val())), onError);
-    }
-
-    const publicRef = ref(db, `publicFests/${festId}/programs`);
-    if (access === 'public') {
-      return onValue(publicRef, (snapshot) => callback(toProgramList(snapshot.val())), onError);
-    }
-
-    // Judges: the rules only allow reading full data of programs on their own panel, so
-    // take the program list from the public copy and subscribe to each allowed program.
-    let publicData: Record<string, any> = {};
-    const privateData: Record<string, any> = {};
-    const privateSubs = new Map<string, () => void>();
-    const emit = () => {
-      const merged: Record<string, any> = {};
-      Object.keys(publicData).forEach(id => { merged[id] = privateData[id] || publicData[id]; });
-      callback(toProgramList(merged));
-    };
-    const unsubscribePublic = onValue(publicRef, (snapshot) => {
-      publicData = snapshot.val() || {};
-      const allowed = new Set(Object.keys(publicData).filter(id => !judgePanel || publicData[id]?.judgePanel === judgePanel));
-      privateSubs.forEach((unsub, id) => {
-        if (!allowed.has(id)) { unsub(); privateSubs.delete(id); delete privateData[id]; }
-      });
-      allowed.forEach(id => {
-        if (privateSubs.has(id)) return;
-        privateSubs.set(id, onValue(ref(db, `fests/${festId}/programs/${id}`), (snap) => {
-          if (snap.exists()) privateData[id] = snap.val(); else delete privateData[id];
-          emit();
-        }, () => { delete privateData[id]; emit(); }));
-      });
-      emit();
+    // Every view reads the fest's programs directly (the free plan has no server to keep a
+    // separate public copy). Judges see only the programs of their own panel.
+    return onValue(ref(db, `fests/${festId}/programs`), (snapshot) => {
+      const list = toProgramList(snapshot.val());
+      callback(access === 'judge' && judgePanel ? list.filter(p => !p.judgePanel || p.judgePanel === judgePanel) : list);
     }, onError);
-
-    return () => {
-      unsubscribePublic();
-      privateSubs.forEach(unsub => unsub());
-      privateSubs.clear();
-    };
   },
 
-  /** Team leaders: register / request removal for their own team via the server. */
+  /** Team leaders: register / request removal for their own team only. */
   updateOwnTeam: async (festId: string, programId: string, teamName: string, updates: Partial<Program>): Promise<boolean> => {
     const sameName = (a?: string) => String(a || '').trim().toLowerCase() === teamName.trim().toLowerCase();
     const team = (updates.teams || []).find(t => sameName(t?.teamName));
     if (!team) throw new Error('Team leaders can only change their own team.');
-    const callable = httpsCallable(functions, 'teamLeaderUpdateTeam');
-    await callable({ festId, programId, team: { teamName: team.teamName, participants: team.participants || [] } });
+    // Re-read the program so other teams' entries changed meanwhile are kept as they are.
+    const snapshot = await get(ref(db, `fests/${festId}/programs/${programId}/teams`));
+    const current = Object.values((snapshot.val() || {}) as Record<string, any>).filter(Boolean);
+    const participants = team.participants || [];
+    const index = current.findIndex(t => sameName(t?.teamName));
+    const own = { ...(index >= 0 ? current[index] : {}), ...team, participants };
+    const teams = index >= 0 ? current.map((t, i) => (i === index ? own : t)) : [...current, own];
+    if (!participants.length) teams.splice(index >= 0 ? index : teams.length - 1, 1);
+    await update(ref(db, `fests/${festId}/programs/${programId}`), { teams: teams.length ? cleanData(teams) : null });
     return true;
   },
 
