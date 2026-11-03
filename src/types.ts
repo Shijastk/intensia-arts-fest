@@ -114,7 +114,9 @@ export interface Staff {
   festId: string;
   role: 'GREEN_ROOM' | 'JUDGE' | 'TEAM_LEADER' | 'ADMIN';
   username: string;
-  password?: string; // Write-only: sent to the manageStaff function, never stored in the profile
+  password?: string; // Form input only: stored as passwordHash + passwordSalt, never as plain text
+  passwordHash?: string;
+  passwordSalt?: string;
   panelName?: string; // For Judges or Team Leaders
   stage?: string;     // For Green Room or Judges
   judgePanel?: string; // Additional property to fix TS error

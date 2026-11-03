@@ -2,6 +2,12 @@
 
 Follows the findings in `AUDIT_2026-10.md`. **Nothing has been deployed and no production data was read or changed.** All verification ran on local Firebase emulators under the `demo-intensia` project id.
 
+> **Update 3 Nov 2026: free Spark plan.** The project cannot deploy Cloud Functions, so the app no longer uses them.
+> - The fest admin creates staff usernames and passwords directly. Passwords are stored on the staff record as salted PBKDF2-SHA-256 hashes (`src/utils/staffPassword.ts`) and checked in the browser.
+> - Staff have no Firebase login, so the database cannot tell staff from visitors. Programs, students, settings and staff are therefore **readable and writable by anyone, inside an existing fest** (an accepted trade-off). Google accounts, fest ownership, the fest list and fest deletion stay protected (`tests/database.rules.test.mjs`).
+> - Images are stored as data URLs (no ImgBB key). Super Admins can be added in the Firebase Console under `/superAdmins/<uid>: true`.
+> - The sections below describe the earlier Cloud Functions design.
+
 ---
 
 ## 1. Vulnerabilities fixed

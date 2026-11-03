@@ -10,40 +10,24 @@ const or = (...xs) => p(xs.join(' || '));
 const and = (...xs) => p(xs.join(' && '));
 
 // ---- identity -------------------------------------------------------------------------
-const SUPER = "(auth != null && auth.token.superAdmin === true)";
+// The app runs on the free Spark plan (no Cloud Functions). Admins sign in with Google;
+// staff (judges, green room, team leaders, staff admins) log in with a username and password
+// checked in the browser, so the database cannot tell a staff member from a visitor. Fest
+// data that staff change is therefore writable by anyone, but only inside an existing fest.
+const SUPER = or("(auth != null && auth.token.superAdmin === true)",
+  "(auth != null && root.child('superAdmins').child(auth.uid).val() === true)");
 const GOOGLE = "auth.token.firebase.sign_in_provider === 'google.com'";
 const ACTIVE_GOOGLE_USER = and('auth != null', GOOGLE, "root.child('users').child(auth.uid).child('isActive').val() !== false");
 
 // Fest owner = the Google account recorded as the fest's adminUid (and not deactivated).
 const OWNER = and(ACTIVE_GOOGLE_USER, "root.child('fests').child($festId).child('adminUid').val() === auth.uid");
-
-// Staff = holder of a server-issued custom token for this fest whose record still exists
-// and is not disabled. Role / panel / team are read from the database, never from the client.
-const STAFF_REC = "root.child('fests').child($festId).child('staff').child(auth.token.staffId)";
-const IS_STAFF = and('auth != null', 'auth.token.festId === $festId', 'auth.token.staffId != null',
-  `${STAFF_REC}.exists()`, `${STAFF_REC}.child('isDisabled').val() !== true`);
-const ROLE = (role) => and(IS_STAFF, `${STAFF_REC}.child('role').val() === '${role}'`);
-
-const ADMIN = or(SUPER, OWNER, ROLE('ADMIN'));
-const GREEN_ROOM = ROLE('GREEN_ROOM');
-const MEMBER = or(ADMIN, IS_STAFF);
-
-// A judge may only work on programs allocated to their panel (a judge with no panel
-// assigned, e.g. a chief judge, may work on every program of the fest).
-const PROG = "root.child('fests').child($festId).child('programs').child($programId)";
-const JUDGE_PANEL = `${STAFF_REC}.child('judgePanel').val()`;
-const JUDGE_FOR = and(ROLE('JUDGE'), or(`${JUDGE_PANEL} == null`, `${JUDGE_PANEL} === ''`, `${PROG}.child('judgePanel').val() === ${JUDGE_PANEL}`));
+const FEST_EXISTS = "root.child('fests').child($festId).child('adminUid').exists()";
+const ANYONE_IN_FEST = or(SUPER, FEST_EXISTS);
 
 // ---- validation helpers ---------------------------------------------------------------
-const UNCHANGED = 'newData.val() === data.val()';
-const onlyBy = (who) => ({ '.validate': or(who, UNCHANGED) });
 const str = (max) => ({ '.validate': `newData.isString() && newData.val().length <= ${max}` });
 const bool = { '.validate': 'newData.isBoolean()' };
 const num = { '.validate': 'newData.isNumber()' };
-const scoreFields = (who) => ({ score: onlyBy(who), grade: onlyBy(who), points: onlyBy(who), rank: onlyBy(who) });
-
-const SCORER = or(ADMIN, JUDGE_FOR);
-const CODE_KEEPER = or(ADMIN, GREEN_ROOM);
 
 const rules = {
   rules: {
@@ -60,29 +44,34 @@ const rules = {
         name: str(200),
         createdAt: str(40),
         // Only the Super Admin can (de)activate an account.
-        isActive: { '.validate': and('newData.isBoolean()', or(SUPER, UNCHANGED)) },
+        isActive: { '.validate': and('newData.isBoolean()', or(SUPER, 'newData.val() === data.val()')) },
         // A user can only point their profile at a fest they own.
         festId: {
-          '.validate': and('newData.isString()', or(SUPER, UNCHANGED, "root.child('fests').child(newData.val()).child('adminUid').val() === auth.uid"))
+          '.validate': and('newData.isString()', or(SUPER, 'newData.val() === data.val()', "root.child('fests').child(newData.val()).child('adminUid').val() === auth.uid"))
         },
         $other: { '.validate': SUPER }
       }
     },
 
+    // Super Admins: add  <google uid>: true  here in the Firebase Console (Realtime Database).
+    superAdmins: {
+      $uid: { '.read': "auth != null && auth.uid === $uid", '.write': false }
+    },
+
     fests: {
       '.read': SUPER,
       $festId: {
-        // Super Admin: everything. Google user: may create a brand-new fest they own.
+        // Super Admin: everything (incl. deleting a fest). Google user: may create a brand-new fest they own.
         '.write': or(SUPER, and(ACTIVE_GOOGLE_USER, '!data.exists()', "newData.child('adminUid').val() === auth.uid")),
-        name: { '.read': MEMBER, '.write': ADMIN, ...str(200) },
-        adminUid: { '.read': MEMBER, '.validate': and('newData.isString()', or('!data.exists()', UNCHANGED, SUPER)) },
-        createdAt: { '.read': MEMBER },
-        // Public: fest name, theme, categories, scoring config, poster backgrounds.
-        settings: { '.read': true, '.write': ADMIN },
-        // Fonts uploaded for posters/certificates (public: public pages export winner posters).
+        name: { '.read': true, '.write': or(SUPER, OWNER, FEST_EXISTS), ...str(200) },
+        adminUid: { '.read': true, '.validate': and('newData.isString()', or('!data.exists()', 'newData.val() === data.val()', SUPER)) },
+        createdAt: { '.read': true },
+        // Fest name, theme, categories, scoring config, poster backgrounds.
+        settings: { '.read': true, '.write': ANYONE_IN_FEST },
+        // Fonts uploaded for posters/certificates.
         customFonts: {
           '.read': true,
-          '.write': ADMIN,
+          '.write': ANYONE_IN_FEST,
           $fontId: {
             '.validate': "newData.hasChildren(['family', 'dataUrl'])",
             family: { '.validate': "newData.isString() && newData.val().matches(/^[A-Za-z0-9 _-]{1,60}$/)" },
@@ -91,62 +80,46 @@ const rules = {
           }
         },
         students: {
-          '.read': MEMBER,
-          '.write': ADMIN,
+          '.read': true,
+          '.write': ANYONE_IN_FEST,
           $studentId: { '.validate': "newData.hasChildren(['name'])" }
         },
-        // Profiles only (no passwords). Created/changed exclusively by the manageStaff function.
+        // Staff accounts. Readable so the login page can check the salted password hash;
+        // plain-text passwords can no longer be written (old ones may only be removed).
         staff: {
-          '.read': or(ADMIN, GREEN_ROOM),
+          '.read': true,
+          '.write': ANYONE_IN_FEST,
           $staffId: {
-            '.read': and('auth != null', 'auth.token.festId === $festId', 'auth.token.staffId === $staffId'),
+            '.validate': "newData.hasChildren(['username', 'role'])",
+            role: { '.validate': "newData.isString() && newData.val().matches(/^(GREEN_ROOM|JUDGE|TEAM_LEADER|ADMIN)$/)" },
+            username: str(100),
+            passwordHash: { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{64}$/)" },
+            passwordSalt: { '.validate': "newData.isString() && newData.val().matches(/^[0-9a-f]{32}$/)" },
             password: { '.validate': false }
           }
         },
         programs: {
-          '.read': or(ADMIN, GREEN_ROOM),
-          '.write': ADMIN,
+          '.read': true,
+          '.write': ANYONE_IN_FEST,
           $programId: {
-            '.read': JUDGE_FOR,
             name: str(300),
             category: str(200),
-            status: { '.write': or(GREEN_ROOM, JUDGE_FOR), '.validate': "newData.isString() && newData.val().matches(/^(PENDING|JUDGING|COMPLETED|CANCELLED)$/)" },
-            isPublished: { '.write': JUDGE_FOR, '.validate': and('newData.isBoolean()', or(ADMIN, 'newData.val() === false')) },
+            status: { '.validate': "newData.isString() && newData.val().matches(/^(PENDING|JUDGING|COMPLETED|CANCELLED)$/)" },
+            isPublished: bool,
             isResultPublished: bool,
             resultPublishedOrder: num,
-            isAllocatedToJudge: { '.write': GREEN_ROOM, ...bool },
-            judgePanel: { '.write': GREEN_ROOM, ...str(200) },
-            teams: {
-              '.write': or(GREEN_ROOM, JUDGE_FOR),
-              $team: {
-                id: onlyBy(ADMIN),
-                teamName: onlyBy(ADMIN),
-                ...scoreFields(SCORER),
-                participants: {
-                  $participant: {
-                    name: onlyBy(ADMIN),
-                    chestNumber: onlyBy(ADMIN),
-                    role: onlyBy(ADMIN),
-                    removalRequested: onlyBy(ADMIN),
-                    codeLetter: onlyBy(CODE_KEEPER),
-                    isCodeRevealed: onlyBy(CODE_KEEPER),
-                    ...scoreFields(SCORER)
-                  }
-                }
-              }
-            }
+            isAllocatedToJudge: bool,
+            judgePanel: str(200)
           }
         }
       }
     },
 
-    // Score-free public copy maintained by the mirrorPublicProgram function.
+    // No longer written (was the Cloud Functions' public copy / password store).
     publicFests: {
-      $festId: { '.read': true, '.write': false }
+      $festId: { '.read': true, '.write': SUPER }
     },
-
-    // bcrypt hashes and lockout counters: server (Admin SDK) only.
-    staffSecrets: { '.read': false, '.write': false }
+    staffSecrets: { '.read': false, '.write': SUPER }
   }
 };
 

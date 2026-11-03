@@ -4,11 +4,10 @@ import { programService, ProgramAccess } from '../services/programService';
 import { reportError } from '../utils/errorReporting';
 
 interface UseProgramsOptions {
-  // 'private': admins & green room (full data). 'public': score-free copy (public pages,
-  // team leaders). 'judge': public list + full data for the judge's own panel only.
+  // 'private' / 'public': all programs of the fest. 'judge': only the judge's own panel.
   access?: ProgramAccess;
   judgePanel?: string;
-  // Team leaders change registrations through a Cloud Function, limited to their own team.
+  // Team leaders change registrations of their own team only.
   teamName?: string;
 }
 

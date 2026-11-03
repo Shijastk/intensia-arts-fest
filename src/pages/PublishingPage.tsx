@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Image as ImageIcon, LayoutTemplate } from 'lucide-react';
-import { uploadImageToImgBB } from '../services/imageUploadService';
+import { uploadImage } from '../services/imageUploadService';
 import { describeError, reportError } from '../utils/errorReporting';
 import { useSettings } from '../hooks/useSettings';
 import { getBackgroundSettings, saveBackground, deleteBackground, BackgroundSettings, BackgroundType, saveBackgroundConfig, setActiveBackground, TemplateConfig } from '../services/backgroundService';
@@ -118,7 +118,7 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
     if (!(await checkUploadFile(file, type))) return;
     setUploading(true);
     try {
-      const url = await uploadImageToImgBB(file, festId);
+      const url = await uploadImage(file);
       const id = Date.now().toString();
       const isFirst = Object.keys(backgrounds[type] || {}).length === 0 || !backgrounds.active?.[type];
 
@@ -145,7 +145,7 @@ export const PublishingPage: React.FC<PublishingPageProps> = ({ festId }) => {
     if (!(await checkUploadFile(file, type))) return;
     setUploading(true);
     try {
-      const url = await uploadImageToImgBB(file, festId);
+      const url = await uploadImage(file);
       await saveBackground(festId, type, id, url);
       setBackgrounds(prev => ({ ...prev, [type]: { ...(prev[type] || {}), [id]: url } }));
     } catch (error: any) {
