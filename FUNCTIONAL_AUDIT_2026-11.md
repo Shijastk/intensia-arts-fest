@@ -2,7 +2,7 @@
 
 **Scope:** zones and scoring, results and totals, posters and certificates, scheduling (including mobile), dialog consistency.
 
-**Test environment:** local Firebase emulators, isolated project `demo-intensia`, with controlled test data. **No production data was read or changed. Nothing is deployed or committed.**
+**Test environment:** local Firebase emulators, isolated project `demo-intensia`, with controlled test data. **No production data was read or changed during this audit.** The emulator results do not establish production deployment status. Subsequent changes committed to `main` are recorded in §9.
 
 ---
 
@@ -236,3 +236,54 @@ New code is limited to `cascadeFromEdit()` and `getStagePrograms()` in `schedule
 2. Decide what to do with the dead calculators and components (§3).
 3. Consider moving judge and green-room team writes into a transactional Cloud Function, like team-leader registration. This closes the whole-array lost-update risk noted in `SECURITY.md`.
 4. A larger editor preview, or a "preview with a real participant" option, for small screens.
+
+
+## 9. Repository updates after the original audit (reviewed 3 Nov 2026)
+
+The following changes are present in the repository's `main` history after the original audit. The latest commit visible during this review is `d265737` (1 Nov 2026). This section records repository changes; it is **not** a claim that they have been deployed to production or independently re-tested in this review.
+
+### Scoring defaults
+- The Settings → Default Scoring tables are editable for individual and group programs.
+- Changes can be saved, cancelled or reset to standard values.
+- Defaults are stored per fest in `settings.defaultScores` and are used by judge submission, admin result editing and custom-score removal.
+- Per-program custom scores continue to take precedence.
+- Saving changed defaults requests confirmation and re-ranks completed programs using those defaults in one write, keeping totals and champion calculations consistent.
+
+### Student, save and staff workflows
+- Student deletion now removes the student from every program and from the student register in one atomic write; success is reported only after the save succeeds.
+- Save, delete and load failures are surfaced to users across program, student, settings and staff workflows instead of being console-only. Repeated identical failures are shown once.
+- Program cancellation now applies the confirmed program ID.
+- Team wipe and team rename use atomic writes.
+- Staff forms remain open when a save fails.
+- Team-leader, Green Room, bulk-upload and publishing flows no longer report success when the underlying write fails.
+- Bulk program upload stops at the first failed item and reports how many items were added, so the remaining rows can be retried deliberately.
+
+### Certificates and fest settings
+- Certificate defaults now use the fest name, venue and dates configured in Settings rather than a hard-coded school identity.
+- A value explicitly entered in the certificate design still overrides the Settings value.
+
+### Results and zones
+- Admin results consolidation supports filtering by zone across team standings, Kala/Sarga Prathibha, Top 15, detailed logs and print output.
+- Public and admin result filters now follow the current zone list in Settings.
+- Programs whose saved zone has been removed from Settings are grouped under General.
+- Removing a zone that is still used by programs asks for confirmation and reports how many programs are affected.
+
+### Green Room queue
+- A program in `PENDING` is treated as waiting even if a stale `isAllocatedToJudge` flag remains.
+- Sending a pending program to the Green Room (individually or with Send All) clears stale judge allocation data.
+- The Green Room waiting state is based on program status; assigning a program to a judge changes its status to `JUDGING`.
+
+### Relevant commits on `main`
+| Commit | Change |
+|---|---|
+| `3df4767` | Added zone filtering to admin results consolidation. |
+| `6502521` | Synced public/admin zone filters with Settings and handled deleted zones. |
+| `de7f6dd` | Fixed student deletion, visible save/load errors, cancellation, atomic team actions and fest details on certificates. |
+| `fcb0bd4` | Added editable per-fest default scoring and recalculation. |
+| `1535111` | Fixed pending programs being hidden from the Green Room by stale judge allocation. |
+| `d265737` | Merge commit containing the Green Room fix. |
+
+### Verification boundary and remaining work
+- The commit history confirms these changes are present on `main`; this review did not run the test suite or inspect a live production deployment.
+- Do not mark the original audit's remaining items in §8 as closed solely because these commits exist. In particular, the real ImgBB/CORS/font-embedding staging test and the transactional-write risk for judge/Green Room team updates still require explicit verification.
+- The separate security remediation document, `SECURITY.md`, continues to describe emulator-only verification and outstanding production deployment, IAM, secret-rotation and history-cleanup actions. Treat those as open until independently confirmed.
