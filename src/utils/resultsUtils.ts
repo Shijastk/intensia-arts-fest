@@ -48,16 +48,15 @@ export const sortZones = (zones: string[], settingsZones: string[] = []): string
 
 /**
  * Places 1-3 of a program, including every tied entry (ranks are competition-style: 1, 1, 3).
- * Group programs report one entry per team; individual programs one per participant.
+ * Group programs report one entry per sub-team; individual programs one per participant.
  */
-export const getProgramWinners = (program: Pick<Program, 'isGroup' | 'teams'>): ProgramWinner[] => {
+export const getProgramWinners = (program: Pick<Program, 'isGroup' | 'teams' | 'membersPerGroup'>): ProgramWinner[] => {
   const teams = (program.teams || []).filter(Boolean);
   const winners: ProgramWinner[] = [];
   if (program.isGroup) {
-    teams.forEach(team => {
-      const rank = team.rank || 0;
-      if (rank >= 1 && rank <= 3) {
-        winners.push({ name: team.teamName, teamName: team.teamName, rank, points: team.points || 0, score: team.score || 0, grade: team.grade || '' });
+    getGroupEntries(program).forEach(entry => {
+      if (entry.rank >= 1 && entry.rank <= 3) {
+        winners.push({ name: entry.name, teamName: entry.teamName, rank: entry.rank, points: entry.points, score: entry.score, grade: entry.grade });
       }
     });
   } else {
@@ -73,7 +72,47 @@ export const getProgramWinners = (program: Pick<Program, 'isGroup' | 'teams'>): 
   return winners.sort((a, b) => a.rank - b.rank || b.points - a.points || a.name.localeCompare(b.name));
 };
 
-export const winnersByPlace = (winners: ProgramWinner[]): Record<1 | 2 | 3, ProgramWinner[]> => ({
+export interface GroupEntry {
+  name: string;
+  teamName: string;
+  rank: number;
+  points: number;
+  score: number;
+  grade: string;
+}
+
+/**
+ * The ranked entries of a group program. A team with more members than membersPerGroup
+ * enters several sub-teams ("TEAM A", "TEAM B"), each ranked on its own, so each one has its
+ * own place and points (stored on its members). A single group uses the team's own result.
+ */
+export const getGroupEntries = (program: Pick<Program, 'teams' | 'membersPerGroup'>): GroupEntry[] => {
+  const limit = program.membersPerGroup && program.membersPerGroup > 0 ? program.membersPerGroup : 999;
+  const entries: GroupEntry[] = [];
+  (program.teams || []).filter(Boolean).forEach(team => {
+    const members = (team.participants || []).filter(Boolean);
+    // Older results stored only the team's result: keep using it.
+    if (members.length <= limit || !members.some(m => m.rank !== undefined)) {
+      entries.push({ name: team.teamName, teamName: team.teamName, rank: team.rank || 0, points: team.points || 0, score: team.score || 0, grade: team.grade || '' });
+      return;
+    }
+    for (let i = 0; i < members.length; i += limit) {
+      const chunk = members.slice(i, i + limit);
+      const result = chunk.find(m => m.rank !== undefined) || chunk[0];
+      entries.push({
+        name: `${team.teamName} ${String.fromCharCode(65 + i / limit)}`,
+        teamName: team.teamName,
+        rank: result.rank || 0,
+        points: result.points || 0,
+        score: Number(result.score) || 0,
+        grade: result.grade || ''
+      });
+    }
+  });
+  return entries;
+};
+
+export const winnersByPlace =(winners: ProgramWinner[]): Record<1 | 2 | 3, ProgramWinner[]> => ({
   1: winners.filter(w => w.rank === 1),
   2: winners.filter(w => w.rank === 2),
   3: winners.filter(w => w.rank === 3)

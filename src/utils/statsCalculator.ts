@@ -1,4 +1,5 @@
 import { Program, ProgramStatus } from '../types';
+import { getGroupEntries } from './resultsUtils';
 
 export interface TeamScore {
   name: string;
@@ -88,15 +89,12 @@ const sumUniqueCodeLetterPoints = (team: Program['teams'][number]): number => {
 };
 
 const calculateTeamEventPoints = (program: Program, team: Program['teams'][number]): number => {
-  if (!program.isGroup || program.name?.toLowerCase().includes('quiz')) {
+  if (!program.isGroup) {
     return sumUniqueCodeLetterPoints(team);
   }
-
-  if (typeof team?.points === 'number') {
-    return team.points;
-  }
-
-  return (team?.participants || [])[0]?.points || 0;
+  // Group programs (Quiz included): each sub-team of the team earns its own points.
+  return getGroupEntries({ teams: [team], membersPerGroup: program.membersPerGroup })
+    .reduce((sum, entry) => sum + entry.points, 0);
 };
 
 const calculateZoneScores = (programs: Program[], targetZone: string, teamNames: string[]): Record<string, number> => {
