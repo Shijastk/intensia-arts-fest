@@ -383,7 +383,8 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
       onSaveComplete(bgId, toSave);
       appDialog.alert('Customization saved. Exports will use this background.', { variant: 'success', title: 'Saved' });
     } catch (e) {
-      appDialog.alert('Failed to save customization.', { variant: 'danger' });
+      console.error('Save customization failed:', e);
+      appDialog.alert(`Failed to save customization: ${describeError(e)}`, { variant: 'danger', title: 'Not saved' });
     }
     setSaving(false);
   };
@@ -650,6 +651,34 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                     </label>
                   </div>
                 </div>
+
+                <div className="pt-4 border-t border-slate-100">
+                  <h3 className={sectionTitle}>Colors</h3>
+                  <div className="flex gap-6">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-700 uppercase">Text</label>
+                      <input
+                        type="color"
+                        value={config.textColor ?? '#000000'}
+                        onChange={(e) => update({ textColor: e.target.value })}
+                        className="w-10 h-10 rounded cursor-pointer border-0 p-0"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-700 uppercase">Name</label>
+                      <input
+                        type="color"
+                        value={config.secondaryColor ?? '#dc2626'}
+                        onChange={(e) => update({ secondaryColor: e.target.value })}
+                        className="w-10 h-10 rounded cursor-pointer border-0 p-0"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-400 mt-2 leading-relaxed">Text: chest number, team and events. Name: student name and fest name.</p>
+                  {(config.textColor || config.secondaryColor) && (
+                    <button onClick={() => update({ textColor: undefined, secondaryColor: undefined })} className="mt-2 text-[10px] font-black uppercase text-[#3B3BFA] hover:underline">Reset colors</button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -705,6 +734,8 @@ const CustomizationModal = ({ type, bgId, bgUrl, festId, initialConfig, onClose,
                     bgPositionX={config.bgPositionX}
                     bgPositionY={config.bgPositionY}
                     bgScale={config.bgScale}
+                    textColor={config.textColor}
+                    secondaryColor={config.secondaryColor}
                   />
                 </div>
               )}
