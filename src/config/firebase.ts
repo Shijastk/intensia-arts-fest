@@ -1,6 +1,9 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { connectDatabaseEmulator, getDatabase } from 'firebase/database';
-import { connectAuthEmulator, getAuth, GoogleAuthProvider } from 'firebase/auth';
+import {
+  browserLocalPersistence, browserPopupRedirectResolver, connectAuthEmulator, getAuth,
+  GoogleAuthProvider, indexedDBLocalPersistence, initializeAuth
+} from 'firebase/auth';
 
 // The Firebase web config is public by design; access control lives in database.rules.json
 // (the app runs on the free Spark plan: no Cloud Functions). Never add private API keys here.
@@ -22,7 +25,20 @@ const emulatorConfig = { ...firebaseConfig, projectId: 'demo-intensia', database
 const app = getApps().length > 0 ? getApp() : initializeApp(useEmulators ? emulatorConfig : firebaseConfig);
 
 export const db = getDatabase(app);
-export const auth = getAuth(app);
+// Keep the login in localStorage first. Firebase's IndexedDB store refuses writes while the
+// page is hidden, and the Google sign-in pop-up hides it (always on phones), which failed the
+// login with "Database is closing/hidden". IndexedDB stays as a fallback.
+const createAuth = () => {
+  try {
+    return initializeAuth(app, {
+      persistence: [browserLocalPersistence, indexedDBLocalPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver
+    });
+  } catch {
+    return getAuth(app); // already initialised (hot reload)
+  }
+};
+export const auth = createAuth();
 export const googleProvider = new GoogleAuthProvider();
 
 if (useEmulators) {
