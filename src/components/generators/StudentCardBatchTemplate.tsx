@@ -18,7 +18,14 @@ interface StudentCardBatchTemplateProps {
   bgPositionY?: number;
   bgScale?: number;
   festName?: string;
+  // Picked in Publishing → Student Cards. Unset = the original colours.
+  textColor?: string;      // chest number, team line, events
+  secondaryColor?: string; // student name, fest name
 }
+
+// A picked colour, or the card's original Tailwind colour when none is picked.
+const tone = (picked: string | undefined, fallback: string, opacity = 1) =>
+  picked ? { className: '', style: { color: picked, opacity } } : { className: fallback, style: undefined };
 
 export const StudentCardBatchTemplate: React.FC<StudentCardBatchTemplateProps> = ({
   students,
@@ -28,8 +35,16 @@ export const StudentCardBatchTemplate: React.FC<StudentCardBatchTemplateProps> =
   bgPositionX = 50,
   bgPositionY = 50,
   bgScale = 100,
-  festName = "ARTS FEST"
+  festName = "ARTS FEST",
+  textColor,
+  secondaryColor
 }) => {
+  const nameTone = tone(secondaryColor, 'text-red-600');
+  const chestTone = tone(textColor, 'text-black');
+  const teamTone = tone(textColor, 'text-gray-500', 0.75);
+  const eventsTone = tone(textColor, 'text-gray-700', 0.9);
+  const simpleNameTone = tone(secondaryColor, 'text-blue-900');
+  const simpleTeamTone = tone(textColor, 'text-gray-600', 0.75);
   const gridClass = cardsPerPage === 16 ? 'grid-cols-4 grid-rows-4' : cardsPerPage === 12 ? 'grid-cols-3 grid-rows-4' : 'grid-cols-3 grid-rows-3';
   return (
     <div className={`w-[794px] h-[1123px] bg-white mx-auto overflow-hidden grid ${gridClass} gap-2 p-4`}>
@@ -42,20 +57,20 @@ export const StudentCardBatchTemplate: React.FC<StudentCardBatchTemplateProps> =
               <div className="absolute inset-0 p-4 flex flex-col pt-16">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1 min-w-0 mr-2">
-                    <h3 className="text-sm font-bold text-red-600 uppercase mb-1 leading-tight line-clamp-2 break-words pr-1">
+                    <h3 className={`text-sm font-bold ${nameTone.className} uppercase mb-1 leading-tight line-clamp-2 break-words pr-1`} style={nameTone.style}>
                       {student.name}
                     </h3>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 truncate">
+                    <p className={`text-[10px] ${teamTone.className} uppercase tracking-wider mb-2 truncate`} style={teamTone.style}>
                       {student.team} &middot; {student.category}
                     </p>
                   </div>
-                  <div className="text-3xl font-black text-black shrink-0 pr-2 pb-1">
+                  <div className={`text-3xl font-black ${chestTone.className} shrink-0 pr-2 pb-1`} style={chestTone.style}>
                     {student.chestNo}
                   </div>
                 </div>
                 
                 {/* Events List */}
-                <div className="grid grid-rows-5 grid-flow-col gap-x-2 gap-y-[2px] text-[9px] text-gray-700 mt-2 overflow-hidden h-[120px] content-start">
+                <div className={`grid grid-rows-5 grid-flow-col gap-x-2 gap-y-[2px] text-[9px] ${eventsTone.className} mt-2 overflow-hidden h-[120px] content-start`} style={eventsTone.style}>
                   {student.events.map((event, i) => (
                     <div key={i} className="truncate">
                       {i + 1}. {event}
@@ -67,12 +82,12 @@ export const StudentCardBatchTemplate: React.FC<StudentCardBatchTemplateProps> =
           ) : (
             // Simple Layout (dashed border, centered info)
             <div className="w-full h-full rounded-xl border-2 border-dashed border-gray-400 p-4 flex flex-col items-center justify-center text-center bg-white">
-              <div className="text-[10px] font-bold text-red-600 tracking-[0.2em] mb-4 whitespace-nowrap truncate w-full px-2">{festName}</div>
-              <h1 className="text-6xl font-black text-black mb-4 w-full">{student.chestNo}</h1>
-              <h2 className="text-sm font-bold text-blue-900 uppercase tracking-wide mb-1 break-words w-full px-2 leading-tight line-clamp-2">
+              <div className={`text-[10px] font-bold ${nameTone.className} tracking-[0.2em] mb-4 whitespace-nowrap truncate w-full px-2`} style={nameTone.style}>{festName}</div>
+              <h1 className={`text-6xl font-black ${chestTone.className} mb-4 w-full`} style={chestTone.style}>{student.chestNo}</h1>
+              <h2 className={`text-sm font-bold ${simpleNameTone.className} uppercase tracking-wide mb-1 break-words w-full px-2 leading-tight line-clamp-2`} style={simpleNameTone.style}>
                 {student.name}
               </h2>
-              <p className="text-[10px] text-gray-600 uppercase">
+              <p className={`text-[10px] ${simpleTeamTone.className} uppercase`} style={simpleTeamTone.style}>
                 {student.team}
               </p>
             </div>

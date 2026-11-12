@@ -19,6 +19,8 @@ import { reportError } from '../utils/errorReporting';
 import { parseScheduleTime, toStoredTime, addMinutes } from '../utils/timeUtils';
 
 interface AdminPageProps {
+  // The signed-in fest. (Was taken from the first program, which broke fests with no programs yet.)
+  festId: string;
   programs: Program[];
   setPrograms: React.Dispatch<React.SetStateAction<Program[]>>;
   addProgram: (data: Omit<Program, 'id' | 'festId'>) => Promise<boolean>;
@@ -34,7 +36,7 @@ interface AdminPageProps {
 }
 
 export const AdminPage: React.FC<AdminPageProps> = ({
-  programs, setPrograms, addProgram, updateProgram, deleteProgram,
+  festId, programs, setPrograms, addProgram, updateProgram, deleteProgram,
   staffs, addStaff, updateStaff, deleteStaff, settings, updateSettings, pendingRequestsCount
 }) => {
   const [activeTab, setActiveTab] = useState<'tracker' | 'scheduler' | 'performers' | 'requests' | 'staff' | 'results' | 'publishing'>('tracker');
@@ -234,7 +236,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               updates: { teams: (p.teams || []).map(t => t.teamName.toLowerCase() === oldTeamName.toLowerCase() ? { ...t, teamName: newTeamName } : t) }
             }));
           try {
-            await programService.batchUpdatePrograms(programs[0]?.festId, changes);
+            await programService.batchUpdatePrograms(festId, changes);
           } catch (err) {
             reportError('Team not renamed', err, { oldTeamName, newTeamName });
             return;
@@ -422,7 +424,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </div>
         )}
 
-        {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} festId={programs[0]?.festId} settings={settings} updateSettings={updateSettings} />}
+        {activeTab === 'scheduler' && <ScheduleManager programs={programs} updateProgram={updateProgram} festId={festId} settings={settings} updateSettings={updateSettings} />}
 
         {activeTab === 'results' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -432,7 +434,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
         {activeTab === 'performers' && <ParticipantList programs={programs} onPrintCertificate={async (p) => {
           if (isCertExporting) return;
-          const festId = programs[0]?.festId;
           if (!festId) return;
           // Same aggregation as the bulk export: real categories, non-cancelled programs,
           // position/grade from published results.
@@ -454,7 +455,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         }} deleteParticipant={async (chestNo) => {
           if (!await appDialog.confirm(`Are you SURE you want to completely delete participant (Chest No: ${chestNo}) from the entire festival? This will remove them from ALL programs. This action cannot be undone.`, { variant: 'danger', title: 'Delete participant', confirmText: 'Delete' })) return;
 
-          const festId = programs[0]?.festId;
           if (!festId) {
             appDialog.alert('The fest could not be identified, so nothing was deleted. Please reload the page and try again.', { variant: 'danger', title: 'Participant not deleted' });
             return false;
@@ -593,7 +593,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             .filter(p => (p.teams || []).some(t => t.teamName.toLowerCase() === team))
                             .map(p => ({ id: p.id, updates: { teams: (p.teams || []).filter(t => t.teamName.toLowerCase() !== team) } }));
                           try {
-                            await programService.batchUpdatePrograms(programs[0]?.festId, changes);
+                            await programService.batchUpdatePrograms(festId, changes);
                             appDialog.alert(`Team "${staff.teamName}" was removed from ${changes.length} program${changes.length === 1 ? '' : 's'}.`, { variant: 'success', title: 'Team wiped' });
                           } catch (err) {
                             reportError('Team not wiped', err, { team: staff.teamName });
@@ -611,7 +611,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         )}
 
         {activeTab === 'publishing' && (
-          <PublishingPage festId={programs[0]?.festId || 'default-fest'} />
+          <PublishingPage festId={festId} />
         )}
       </div>
 
@@ -620,7 +620,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       <BulkUploadModal show={showBulkUploadModal} onClose={() => setShowBulkUploadModal(false)} addProgram={addProgram} programs={programs} updateProgram={updateProgram} />
 
       <StaffCredentialModal
-         festId={programs[0]?.festId || 'default-fest'}
+         festId={festId}
          isOpen={showStaffModal}
          onClose={() => { setShowStaffModal(false); setEditingStaff(null); }}
          onSave={handleSaveStaff}

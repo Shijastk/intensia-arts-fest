@@ -190,6 +190,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       case 'ADMIN':
         return (
           <AdminPage 
+            festId={currentUser.festId}
             programs={programs} 
             setPrograms={setPrograms} 
             addProgram={addProgram} 
