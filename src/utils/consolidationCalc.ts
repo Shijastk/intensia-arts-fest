@@ -1,4 +1,5 @@
 import { Program, ProgramStatus } from '../types';
+import { getGroupEntries } from './resultsUtils';
 
 export interface CandidateStat {
   chestNumber: string;
@@ -49,9 +50,10 @@ export const calculateConsolidatedResults = (programs: Program[], includeUnpubli
 
       // Group programs contribute their group result to Team Overall Score.
       // A Group program remains Group based on prog.isGroup, regardless of participant count.
+      // A team with several sub-teams ("TEAM A", "TEAM B") earns the points of each of them.
       if (isGrp) {
-        const teamEventPts = team.points ?? ((team.participants || [])[0]?.points || 0);
-        teamScores[tName] += teamEventPts;
+        teamScores[tName] += getGroupEntries({ teams: [team], membersPerGroup: prog.membersPerGroup })
+          .reduce((sum, entry) => sum + entry.points, 0);
       }
 
       (team.participants || []).filter(Boolean).forEach(p => {

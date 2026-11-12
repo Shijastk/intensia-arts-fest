@@ -61,6 +61,49 @@ describe('rankProgramResults (judge submit + admin edit)', () => {
     expect(teams[0].participants.map(m => m.rank)).toEqual([3, 3, 1, 1]);
     expect(teams[0].rank).toBe(1); // best sub-team represents the team
     expect(teams[1].rank).toBe(2);
+    // Red A (3rd) and Red B (1st) both earn points for Red.
+    expect(teams[0].points).toBe(teams[0].participants[0].points! + teams[0].participants[2].points!);
+  });
+
+  it('one team taking 1st and 2nd with two sub-teams: both places shown and both counted', () => {
+    // Live case: Quiz, 2 per group. TEAM LUCEN B 1st, TEAM LUCEN A 2nd, TEAM VENTO 3rd.
+    const quiz = program({
+      isGroup: true, membersPerGroup: 2,
+      teams: [
+        team('l', 'TEAM LUCEN', [p('L1', '1'), p('L2', '2'), p('L3', '3'), p('L4', '4')]),
+        team('v', 'TEAM VENTO', [p('V1', '5'), p('V2', '6'), p('V3', '7'), p('V4', '8')])
+      ]
+    });
+    const ranked = { ...quiz, teams: rankProgramResults(quiz, { '1': { score: 85, grade: 'A' }, '3': { score: 95, grade: 'A+' }, '5': { score: 75, grade: 'A' } }) };
+    const byPlace = winnersByPlace(getProgramWinners(ranked));
+    expect(byPlace[1].map(w => w.name)).toEqual(['TEAM LUCEN B']);
+    expect(byPlace[2].map(w => w.name)).toEqual(['TEAM LUCEN A']);
+    expect(byPlace[3].map(w => w.name)).toEqual(['TEAM VENTO A']);
+    const totals = calculateConsolidatedResults([ranked]).sortedTeams;
+    expect(totals.find(t => t.name === 'TEAM LUCEN')?.score).toBe(byPlace[1][0].points + byPlace[2][0].points);
+    expect(totals.find(t => t.name === 'TEAM VENTO')?.score).toBe(byPlace[3][0].points);
+  });
+
+  it('existing saved results (team kept only its best sub-team) are read per sub-team', () => {
+    // Exactly what is stored in the live database for the Quiz.
+    let chest = 0;
+    const m = (rank: number, points: number) => ({ name: 'x', chestNumber: String(++chest), rank, points, score: 1, grade: 'C' });
+    const saved = program({
+      isGroup: true, membersPerGroup: 2,
+      teams: [
+        team('l', 'TEAM LUCEN', [m(2, 13), m(2, 13), m(1, 15), m(1, 15)], { rank: 1, points: 15 }),
+        team('v', 'TEAM VENTO', [m(3, 10), m(3, 10), m(0, 0), m(0, 0)], { rank: 3, points: 10 })
+      ]
+    });
+    expect(getProgramWinners(saved).map(w => `${w.rank}:${w.name}:${w.points}`)).toEqual(['1:TEAM LUCEN B:15', '2:TEAM LUCEN A:13', '3:TEAM VENTO A:10']);
+    const totals = calculateConsolidatedResults([saved]).sortedTeams;
+    expect(totals.map(t => `${t.name}:${t.score}`)).toEqual(['TEAM LUCEN:28', 'TEAM VENTO:10']);
+  });
+
+  it('a single group per team keeps the plain team name', () => {
+    const one = program({ isGroup: true, membersPerGroup: 2, teams: [team('r', 'Red', [p('R1', '1'), p('R2', '2')])] });
+    const ranked = { ...one, teams: rankProgramResults(one, { '1': { score: 90, grade: 'A+' } }) };
+    expect(getProgramWinners(ranked).map(w => w.name)).toEqual(['Red']);
   });
 
   it('survives programs with no teams / missing participants (RTDB drops empty arrays)', () => {

@@ -185,8 +185,11 @@ export const rankProgramResults = (
             score: best ? best.score : 0,
             grade: best ? best.grade : '',
             rank: best ? best.rank : 0,
-            // Group: the team's best sub-team counts once. Individual: sum of its members' points.
-            points: program.isGroup ? (best ? best.points : 0) : participants.reduce((sum, p) => sum + (p.points || 0), 0)
+            // Group: every sub-team earns its own points (score/grade/rank above show the best one).
+            // Individual: sum of its members' points.
+            points: program.isGroup
+                ? teamEntries.reduce((sum, e) => sum + e.points, 0)
+                : participants.reduce((sum, p) => sum + (p.points || 0), 0)
         };
     });
 };
